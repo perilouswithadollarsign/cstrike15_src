@@ -1,0 +1,31 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+sampler g_sBase	: register( s0 );
+
+float g_flAlpha : register( c0 );
+float g_flDesaturate : register( c1 );
+float3 g_vColorFade : register( c2 );
+
+struct PS_INPUT
+{
+	float2 uv : TEXCOORD0;
+};
+
+float4 main( PS_INPUT i ) : COLOR0
+{
+	// Fetch blurred texel
+	float4 o = tex2D( g_sBase, i.uv );
+
+	// Desaturate
+	float3 tmpv = { 0.2125, 0.7154, 0.0721 };
+	float flLuminance = dot( o.rgb, tmpv.rgb );
+	o.rgb = lerp( o.rgb, flLuminance, saturate( g_flDesaturate ) );
+
+	// Color fade
+	o.rgb *= g_vColorFade.rgb;
+
+	// Set alpha blend value
+	o.a = g_flAlpha;
+
+	return o;
+}

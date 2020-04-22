@@ -1,0 +1,100 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"
+$MacroRequired				"OUTBINDIR"
+$MacroRequired				"SCE_LIBROOT"
+
+$IgnoreRedundancyWarning	"ON"
+
+$Configuration "Debug"
+{
+	$General	
+	{
+		// General
+		$OutputDirectory					".\Debug_PS3"
+		$IntermediateDirectory				".\Debug_PS3"
+		$ExtensionsToDeleteOnClean
+		$BuildLogFile
+		$SystemIncludeDependencies
+		
+		$ConfigurationType					"LIB"
+	}
+
+	$GCCCompiler
+	{
+		// General
+		$AdditionalIncludeDirectories		"$QUOTE$(SN_PS3_PATH)\spu\include\sn$QUOTE;$QUOTE$(SCE_PS3_ROOT)\target\spu\include$QUOTE;$QUOTE$(SCE_PS3_ROOT)\target\common\include$QUOTE"
+		$PreprocessorDefinitions			"SN_TARGET_PS3_SPU;_DEBUG;__GCC__;SPU;__CELL_ASSERT__"
+		$ForceIncludes
+		$GenerateDebugInformation
+		$Warnings
+		$ExtraWarnings
+		$TreatWarningsAsErrors
+		$ObjectFileName
+		$SPURSUsage
+
+		// Optimization
+		$OptimizationLevel
+		$FastMath
+		$NoStrictAliasing
+		$UnrollLoops
+		$InlineFunctionSizeLimit
+
+		// Code Generation
+		$Position-IndependentCode
+		$FunctionSections
+		$DataSections
+		$StackCheck			
+
+		// Language
+		$C++ExceptionsAndRTTIUsage			"Not using Exceptions or RTTI"
+		$CheckANSICompliance
+		$DefaultCharSigned			
+		$Permissive		
+		$RelaxC++Compliance
+
+		// Command Line
+		$AdditionalOptions
+	}
+
+	$Librarian
+	{
+		$OutputFile
+		$AdditionalDependencies
+		$WholeArchive
+		$LinkLibraryDependencies
+	}
+ 
+	$PreBuildEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PreLinkEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PostBuildEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$CustomBuildStep
+	{
+		// General
+		$CommandLine
+		$Description
+		$Outputs
+		$AdditionalDependencies
+	}
+}

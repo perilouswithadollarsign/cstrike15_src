@@ -1,0 +1,40 @@
+//-----------------------------------------------------------------------------
+//	SOURCE_EXE_WIN_WIN32.VPC
+//
+//	Base Settings for Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$Include "$SRCDIR\vpc_scripts\version.vpc"
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"	"$PROJECTNAME"
+$MacroRequired				"OUTBINDIR"
+$Conditional IS_LIB_PROJECT           "0"
+
+$Include "$SRCDIR\vpc_scripts\source_linux_base_project.vpc"
+
+
+$Project
+{
+	$Folder	"Source Files"
+	{
+		$File	"$SRCDIR\public\tier0\memoverride.cpp"
+		{
+			$Configuration
+			{
+				$Compiler
+				{
+					$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+				}
+			}
+		}
+	}
+}
+
+$Configuration
+{
+	$General
+	{
+		$OutputFile "$OUTBINDIR/$OUTBINNAME$_EXE_EXT"
+	}
+}

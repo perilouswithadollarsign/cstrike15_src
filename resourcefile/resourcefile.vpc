@@ -1,0 +1,56 @@
+//-----------------------------------------------------------------------------
+//	RESOURCEFILE.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$PreBuildEvent
+	{
+//		$CommandLine	"schemacompiler -schproj resourcefile.schproj2" "\n" "$BASE"
+	}
+}
+
+$Project "resourcefile"
+{
+	$Folder	"Source Files"
+	{
+		$File	"resourcedictionary.cpp"
+		$File	"resourcefile.cpp"
+		$File	"resourceintrospection.cpp"
+		$File	"resourcestream.cpp"
+	}
+
+	// TODO: VPC should keep the schproj2 in sync with this
+	$Folder "Schema Headers"
+	{
+		$File	"$SRCDIR\public\resourcefile\schema\particles.g.h"
+		$File	"$SRCDIR\public\resourcefile\schema\resourceextreflist.g.h"
+		$File	"$SRCDIR\public\resourcefile\schema\resourceidlist.g.h"
+		$File	"$SRCDIR\public\resourcefile\schema\sheet.g.h"
+	}
+
+	$Folder "Schema Script"
+	{
+		$File	"resourcefile.schproj2"
+	}
+	
+	$Folder	"Header Files"
+	{
+	}
+
+	$Folder	"Public Header Files"
+	{	
+		$File	"$SRCDIR\public\resourcefile\schema.h"
+
+		$File	"$SRCDIR\public\resourcefile\resourcedictionary.h"
+		$File	"$SRCDIR\public\resourcefile\resourcefile.h"
+		$File	"$SRCDIR\public\resourcefile\resourceintrospection.h"
+		$File	"$SRCDIR\public\resourcefile\resourcestream.h"
+		$File	"$SRCDIR\public\resourcefile\resourcetype.h"
+	}
+}

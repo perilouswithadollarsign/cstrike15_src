@@ -1,0 +1,31 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+//paired with "unlitgeneric_vs20"
+
+#include "common_ps_fxc.h"
+
+sampler BaseTextureSampler	: register( s0 );
+
+struct PS_INPUT
+{
+	float2 vTexCoord0	: TEXCOORD0;
+	float4 vColor		: COLOR0;
+		
+#if defined( _X360 ) //matching pixel shader inputs to vertex shader outputs to avoid shader patches	
+	float2 vTexCoord1	: TEXCOORD1;
+	float2 vTexCoord2	: TEXCOORD2;
+	float2 vTexCoord3	: TEXCOORD3;
+	float4 worldPos_projPosZ		: TEXCOORD7;		// Necessary for pixel fog
+#endif
+};
+
+#ifdef _PS3
+float4_color_return_type main( PS_INPUT i ) : COLOR
+#else // _PS3
+HALF4 main( PS_INPUT i ) : COLOR
+#endif // !_PS3
+{
+	//relevant data is in the alpha channel, modulate vertex alpha by texture alpha
+	float returnAlpha = tex2D( BaseTextureSampler, i.vTexCoord0 ).a * i.vColor.a;
+	
+	return FinalOutput( float4( 1.0f, 1.0f, 1.0f, returnAlpha ), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

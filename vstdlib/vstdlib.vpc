@@ -1,0 +1,152 @@
+//-----------------------------------------------------------------------------
+//	VSTDLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+$Macro NOSCHEMACOMPILER "1"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+$Configuration
+{
+	$General [$X360]
+	{
+		// X360 version publishes to some other directory then copies here so we need to tell VPC to track this
+		// or else it won't know what depends on this project.
+		$AdditionalOutputFiles			"$LIBPUBLIC\$(TargetName).lib"	[$X360]
+		$GameOutputFile					"$OUTBINDIR/$_IMPLIB_DLL_PREFIX$OUTBINNAME$_DLL_EXT"
+	}
+	
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;VSTDLIB_DLL_EXPORT"
+		$GCC_ExtraCompilerFlags		"-fno-stack-protector" [$OSXALL]
+		$GCC_ExtraCompilerFlags		"-U_FORTIFY_SOURCE -fno-stack-protector" [$LINUXALL]
+	}
+
+	$Linker [!$PS3]
+	{
+		$AdditionalDependencies		"$BASE odbc32.lib odbccp32.lib"			[$WINDOWS]
+
+		// 360 publishes the import library via a post build step
+		$ImportLibrary				"$(TargetDir)\$(TargetName).lib"		[$X360]	
+
+		// Everyone but 360 build right to the location.
+		$ImportLibrary					"$LIBPUBLIC\$_IMPLIB_PREFIX$OUTBINNAME$_IMPLIB_EXT"	[!$X360]
+
+		// 360 will auto generate a def file for this import library
+		$ModuleDefinitionFile		" "										[$X360]
+		$AdditionalOptions			"$BASE /AUTODEF:xbox\xbox.def"			[$X360]
+		
+		$SystemFrameworks			"CoreServices"
+		$SystemLibraries			"iconv" [$OSXALL]
+	}
+	
+	$Linker [$PS3||$POSIX]
+	{
+		$ImportLibrary				"$LIBPUBLIC\$_IMPLIB_PREFIX$OUTBINNAME$_IMPLIB_EXT"
+		$AdditionalDependencies		"$BASE libl10n_stub.a"                  [$PS3]
+	}
+
+	$PreLinkEvent [!$POSIX]
+	{	
+		$CommandLine	"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $LIBPUBLIC\$(TargetName).lib $SRCDIR" "\n" \
+						"$BASE"
+	}
+	
+	$PreLinkEvent [$X360]
+	{
+		// Run a pre-link event to clean the .def file from the last link
+		$CommandLine				"if exist xbox\xbox.def del xbox\xbox.def" "\n" \
+									"$BASE"
+	}
+
+	$PreLinkEvent [$PS3]
+	{
+		$CommandLine				"$BASE"
+		$Description				"NOTE - If PRX linking fails, make sure your vstdlib_staticlib is building in same solution configuration (debug/release) as vstdlib prx."
+	}
+
+	$PostBuildEvent [$X360]
+	{
+		// Run a post build event to validate the .def file was correctly generated
+		$CommandLine				"perl $SRCDIR\devtools\bin\make360def.pl -checkauto xbox\xbox.def" "\n" \
+									"if exist $(TargetDir)$(TargetName).lib copy $(TargetDir)$(TargetName).lib $LIBPUBLIC\$(TargetName).lib" "\n" \
+									"$BASE"
+	}
+
+	$PostBuildEvent [$PS3]
+	{
+		// Publish the import lib							
+		$CommandLine		"if exist $(TargetName)_stub.a move $(TargetName)_stub.a $LIBPUBLIC\$(TargetName).lib" "\n" \
+							"if exist $(TargetName)_verlog.txt del $(TargetName)_verlog.txt" "\n" \
+							"$BASE" "\n"
+	}
+	
+	$General [$POSIX]
+	{
+		$GameOutputFile                                 "$OUTBINDIR/$_IMPLIB_DLL_PREFIX$OUTBINNAME$_DLL_EXT"
+	}
+	$General [$PS3]
+	{
+		$AdditionalProjectDependencies		"$BASE;vstdlib_staticlib"
+	}
+
+}
+
+$Configuration "Release"
+{
+	$PreBuildEvent [$PS3]
+	{
+		// Clear potentially stale verlog files
+		$CommandLine		"ppu-lv2-prx-exportpickup -o Release_PS3/prxexport.inl Release_vstdlibstaticlib_PS3/prx.obj Release_vstdlibstaticlib_PS3/random.obj Release_vstdlibstaticlib_PS3/coroutine.obj" "\n" \
+							"if exist vstdlib_rel_verlog.txt del vstdlib_rel_verlog.txt" "\n" \
+							"$BASE" "\n"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE &quot;Release_vstdlibstaticlib_PS3/vstdlib_staticlib_ps3.lib&quot;"
+	}
+}
+
+$Configuration "Debug"
+{
+	$PreBuildEvent [$PS3]
+	{
+		// Clear potentially stale verlog files
+		$CommandLine		"ppu-lv2-prx-exportpickup -o Debug_PS3/prxexport.inl Debug_vstdlibstaticlib_PS3/prx.obj Debug_vstdlibstaticlib_PS3/random.obj Debug_vstdlibstaticlib_PS3/coroutine.obj" "\n" \
+							"if exist vstdlib_dbg_verlog.txt del vstdlib_dbg_verlog.txt" "\n" \
+							"$BASE" "\n"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE &quot;Debug_vstdlibstaticlib_PS3/vstdlib_staticlib_ps3.lib&quot;"
+	}
+}
+
+$Include "vstdlib.inc"
+
+$Project
+{
+	$Folder "PS3 Files" [$PS3]
+	{
+		$File	"prxexport.cpp"
+	}
+
+	$Folder "Source Files"
+	{
+		-$File	"$SRCDIR\common\ps3\prx.cpp"			[$PS3]
+	}
+	$folder	"Link Libraries"
+	{
+		-$ImpLib "$LIBPUBLIC\vstdlib"
+	}
+}
+
+$Project "vstdlib"
+{
+}

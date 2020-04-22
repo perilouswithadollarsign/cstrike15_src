@@ -1,0 +1,381 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "ADDITIVE"				"0..1"
+// STATIC:  "DETAIL1"				"0..1"
+// STATIC:  "DETAIL1BLENDMODE"		"0..1"
+// STATIC:  "DETAIL2"				"0..1"
+// STATIC:  "DETAIL2BLENDMODE"		"0..1"
+// STATIC:  "TANGENTTOPACITY"		"0..1"
+// STATIC:  "TANGENTSOPACITY"		"0..1"
+// STATIC:  "FRESNELOPACITY"		"0..1"
+// STATIC:  "DEPTHBLEND"			"0..1"	[CONSOLE]
+// STATIC:  "DEPTHBLEND"			"0..0"	[PC]
+// STATIC:  "VERTEXCOLOR"			"0..1"
+// STATIC:  "FLOWMAP"				"0..1"
+// STATIC:  "FLOW_CHEAP"			"0..1"  [PC]
+// STATIC:  "FLOW_CHEAP"			"0..0"  [CONSOLE]
+
+// DYNAMIC: "ACTIVE"				"0..1"
+// DYNAMIC: "POWERUP"				"0..1"
+// DYNAMIC: "VORTEX1"				"0..1"
+// DYNAMIC: "VORTEX2"				"0..1"
+
+// SKIP: ( ( $DETAIL1 == 0 ) && ( $DETAIL2 != 0 ) )
+// SKIP: ( ( $DETAIL1 == 0 ) && ( $DETAIL1BLENDMODE != 0 ) )
+// SKIP: ( ( $DETAIL2 == 0 ) && ( $DETAIL2BLENDMODE != 0 ) )
+// SKIP: ( $TANGENTTOPACITY && $TANGENTSOPACITY )
+// SKIP: ( $FRESNELOPACITY ) && ( $TANGENTTOPACITY || $TANGENTSOPACITY )
+// SKIP: ( $FLOWMAP && ( $DETAIL1 || $DETAIL2 ) )
+// SKIP: ( $FLOW_CHEAP && !$FLOWMAP )
+// SKIP: ( ( $FLOWMAP == 0 ) && ( $VORTEX1 || $VORTEX2 || $POWERUP ) )
+// SKIP: ( ( $ACTIVE == 0 ) && ( $VORTEX1 || $VORTEX2 || $POWERUP ) )
+
+#include "common_fog_ps_fxc.h"
+
+#include "shader_constant_register_map.h"
+
+// SAMPLERS
+sampler g_tBase				: register( s0 );
+#if DETAIL1
+	sampler g_tDetail1			: register( s1 );
+#endif
+#if DEPTHBLEND
+	sampler g_tDepth			: register( s3 );
+#endif
+#if DETAIL2
+	sampler g_tDetail2			: register( s4 );
+#endif
+#if FLOWMAP
+	sampler g_tFlowMap			: register( s5 );
+	sampler g_tFlowNoise		: register( s6 );
+	sampler g_tFlowBounds		: register( s7 );
+#endif
+
+// SHADER CONSTANTS
+const float4 g_vTangentTOpacityRanges				: register( c0 );
+const float4 g_vTangentSOpacityRanges				: register( c1 );
+const float4 g_vFresnelOpacityRanges				: register( c2 );
+
+const float4 g_vWriteDepthToAlpha_FlowParams		: register( c3 );
+#define g_bWriteDepthToAlpha			( g_vWriteDepthToAlpha_FlowParams.x )
+#define g_flTime						( g_vWriteDepthToAlpha_FlowParams.y )
+#define g_flPowerUp						( g_vWriteDepthToAlpha_FlowParams.z )
+#define g_flIntensity					( g_vWriteDepthToAlpha_FlowParams.w )
+
+const float4 g_DepthFeatheringConstants				: register( c4 );
+const float4 g_DiffuseModulation					: register( c5 );
+
+const float4 g_vFlowParams1			: register( c6 );
+#define g_flWorldUvScale  ( g_vFlowParams1.x ) // 1.0f / 10.0f
+#define g_flNormalUvScale ( g_vFlowParams1.y ) // 1.0f / 1.15f
+//#define UNUSED		    g_vFlowParams1.z
+#define g_flOutputIntensity ( g_vFlowParams1.w ) 
+
+const float4 g_vFlowParams2			: register( c7 );
+#define g_flFlowTimeIntervalInSeconds ( g_vFlowParams2.x ) // 0.4f // Number of seconds to lerp from texture 1 to texture 2
+#define g_flFlowUvScrollDistance      ( g_vFlowParams2.y ) // 0.25f // Distance in uv space to fetch
+//#define UNUSED                ( g_vFlowParams2.z )
+#define g_flColorFlowLerpExp		  ( g_vFlowParams2.w )
+
+const float4 g_vFlowColor			: register( c8 );
+#define g_cFlow	( g_vFlowColor.xyz )
+//#define UNUSED		    g_cFlow.w
+
+const float4 g_vVortexParams		: register( c9 );
+#define g_cVortex		( g_vVortexParams.xyz )
+#define g_flVortexSize	( g_vVortexParams.w )
+
+struct PS_INPUT
+{
+	float4 vUV0_UV1							: TEXCOORD0;
+	float4 vFlowUV_UV2						: TEXCOORD1;
+	float4 vIteratedProjPos					: TEXCOORD2;
+	#if ( VORTEX1 )
+		float3 vVortexPositions1				: TEXCOORD3;
+	#endif
+	#if ( VORTEX2 )
+		float3 vVortexPositions2				: TEXCOORD4;
+	#endif
+	#if ( TANGENTSOPACITY || TANGENTTOPACITY || FRESNELOPACITY )
+		float4 vWorldNormal_worldEyeX			: TEXCOORD5;
+		float4 vWorldTangent_worldEyeY			: TEXCOORD6;
+		float4 vTangentAlignedView_worldEyeZ	: TEXCOORD7;
+	#endif
+	#if ( VERTEXCOLOR )
+		float4 vColor						: COLOR0;
+	#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 cOut = { 0.0f, 0.0f, 0.0f, 1.0f };
+	float4 cBase = { 0.0f, 0.0f, 0.0f, 1.0f };
+	float3 vWorldEyeDir = float3( 0.0f, 0.0f, 0.0f );
+	float3 vWorldNormal = float3( 0.0f, 0.0f, 0.0f );
+	float3 vWorldTangent = float3( 0.0f, 0.0f, 0.0f );
+
+#if( TANGENTSOPACITY || TANGENTTOPACITY || FRESNELOPACITY )
+	vWorldEyeDir = float3( i.vWorldNormal_worldEyeX.w, i.vWorldTangent_worldEyeY.w, i.vTangentAlignedView_worldEyeZ.w );
+	vWorldNormal = i.vWorldNormal_worldEyeX.xyz;
+	vWorldTangent = i.vWorldTangent_worldEyeY.xyz;
+#endif
+
+	float fBackfaceRatio = 0.0f;
+	
+	#if ( ACTIVE )
+	{
+		#if ( FLOWMAP )
+		{
+			float4 vBoundsTexel = tex2D( g_tFlowBounds, i.vUV0_UV1.xy );
+			float2 vFlowVectorTs = float2( 0.0f, 0.0f );
+			#if ( !FLOW_CHEAP )
+			{
+				float2 vFlowUV = i.vFlowUV_UV2.xy * g_flWorldUvScale;
+				float4 vFlowTexel = tex2D( g_tFlowMap, vFlowUV.xy );
+				vFlowVectorTs = ( vFlowTexel.rg * 2.0f ) - 1.0f;
+				vFlowVectorTs *= vBoundsTexel.r; // slow flow
+			}
+			#endif
+			float flVortexIntensity = 0.0f;
+
+			// vortex 1
+			#if ( VORTEX1 )
+			{
+				float flVortex1Intensity = saturate( g_flVortexSize / length( i.vVortexPositions1.xyz ) - 0.5f );
+				#if ( !FLOW_CHEAP )
+				{
+					vFlowVectorTs = lerp( vFlowVectorTs, normalize( i.vVortexPositions1.xy ), flVortex1Intensity * 0.5f );
+				}
+				#endif
+				flVortexIntensity += flVortex1Intensity;
+			}
+			#endif
+			#if ( VORTEX2 )
+			{
+				float flVortex2Intensity = saturate( g_flVortexSize / length( i.vVortexPositions2.xyz ) - 0.5f );
+				#if ( !FLOW_CHEAP )
+				{
+					vFlowVectorTs = lerp( vFlowVectorTs, normalize( i.vVortexPositions2.xy ), flVortex2Intensity * 0.5f );
+				}
+				#endif
+				flVortexIntensity += flVortex2Intensity;
+			}
+			#endif
+
+			// Unpack world flow vector from texture
+			float flNoise = tex2D( g_tFlowNoise, i.vFlowUV_UV2.zw ).g;
+
+			// Every interval has a unique offset so we don't see the same bump texels repeating continuously
+			float flTimeInIntervals = ( g_flTime / ( g_flFlowTimeIntervalInSeconds * 2.0f ) ) + flNoise;
+			float flScrollTime1 = frac( flTimeInIntervals ) - 0.5;
+			float flScrollTime2 = frac( flTimeInIntervals + 0.5f ) - 0.5; // Half an interval off from texture 1
+
+			float flOffset1 = 0.0f;
+			float flOffset2 = 0.5f;
+
+			#if ( !FLOW_CHEAP )
+			{
+				flOffset1 = floor( flTimeInIntervals ) * 0.311f;
+				flOffset2 = floor( flTimeInIntervals + 0.5f ) * 0.311f + 0.5f; // The +0.5 is to match the phase offset
+			}
+			#endif
+
+			float flColorFlowLerpExp = g_flColorFlowLerpExp;
+
+			float flWeight1 = abs( ( 2.0f * frac( flTimeInIntervals + 0.5f ) ) - 1.0f );
+			float flWeight2 = abs( ( 2.0f * frac( flTimeInIntervals ) ) - 1.0f );
+			#if ( !FLOW_CHEAP )
+			{
+				flWeight1 = pow( flWeight1, g_flColorFlowLerpExp );
+				flWeight2 = pow( flWeight2, g_flColorFlowLerpExp );
+			}
+			#else
+			{
+				flWeight1 *= flWeight1;
+				flWeight2 *= flWeight2;
+			}
+			#endif
+
+			float flFlowUvScrollDistance = g_flFlowUvScrollDistance;
+			float2 vFlowUV0 = i.vUV0_UV1.zw + flOffset1;
+			float2 vFlowUV1 = i.vUV0_UV1.zw + flOffset2;
+
+			#if ( !FLOW_CHEAP )
+			{
+				flFlowUvScrollDistance *= ( 1.0f + flVortexIntensity );
+				vFlowUV0 += ( flScrollTime1 * ( flFlowUvScrollDistance * vFlowVectorTs.xy ) );
+				vFlowUV1 += ( flScrollTime2 * ( flFlowUvScrollDistance * vFlowVectorTs.xy ) );
+			}
+			#endif
+
+			cBase.rgba = tex2D( g_tBase, vFlowUV0 ) * flWeight1;
+			cBase.rgba += tex2D( g_tBase, vFlowUV1 ) * flWeight2;
+
+			#if ( POWERUP )
+			{
+				float flNoiseReveal = ( flNoise + ( 1.0f - vBoundsTexel.g ) ) * 0.5;
+				float flPowerStage1 = saturate( 0.7f - g_flPowerUp );
+				float flPowerStage2 = saturate( g_flPowerUp * 3.0f );
+				float flPowerUpRange1 = smoothstep( 0.02f, 0.0f, abs( flNoiseReveal - g_flPowerUp ) );
+				float flPowerUpRange2 = smoothstep( 0.02f, 0.0f, ( flNoiseReveal - g_flPowerUp ) );
+
+				cBase.ag += flPowerUpRange1 * g_flPowerUp * (1.0f - g_flPowerUp );
+				cBase.ag *= flPowerStage2 * flPowerUpRange2;
+				cBase.ag += vBoundsTexel.g * flPowerStage2;
+			}
+			#else
+			{
+				cBase.ag += vBoundsTexel.g;
+			}
+			#endif
+
+			float3 cFlowField = cBase.a * g_cFlow.rgb;
+			#if( VORTEX1 || VORTEX2 )
+			{
+				float3 cVortex = cBase.g * g_cVortex.rgb;
+				cBase.rgb = lerp( cFlowField, cVortex, flVortexIntensity );
+			}
+			#else
+			{
+				cBase.rgb = cFlowField;
+			}
+			#endif
+			cBase.rgb *= vBoundsTexel.b * g_flIntensity;
+		}
+		#else
+		{
+			cBase = tex2D( g_tBase, i.vUV0_UV1.xy );
+		}
+		#endif
+
+		#if( TANGENTTOPACITY || TANGENTSOPACITY || FRESNELOPACITY )
+		{
+			vWorldEyeDir.xyz = normalize( vWorldEyeDir.xyz );
+			vWorldNormal.xyz = normalize( vWorldNormal.xyz );
+			fBackfaceRatio = dot( vWorldEyeDir.xyz, vWorldNormal.xyz ) * 0.5f + 0.5f;
+			fBackfaceRatio *= fBackfaceRatio;
+		}
+		#endif
+
+		#if( TANGENTSOPACITY || TANGENTTOPACITY )
+		{
+			vWorldTangent.xyz = normalize( vWorldTangent.xyz );
+		}
+		#endif
+
+		//alpha
+		float alpha = 1.0f;
+		float fBackfaceAlpha = 1.0f;
+		#if TANGENTTOPACITY
+		{
+			float fTTFacing = abs( dot( vWorldTangent, normalize( i.vTangentAlignedView_worldEyeZ.xyz ) ) );
+			alpha *= lerp( g_vTangentTOpacityRanges.x, g_vTangentTOpacityRanges.y, pow( fTTFacing, g_vTangentTOpacityRanges.z ) );
+			fBackfaceAlpha = lerp( 1.0f, g_vTangentTOpacityRanges.w, fBackfaceRatio );
+		}
+		#endif
+
+		#if TANGENTSOPACITY
+		{
+			float fTSFacing = abs( dot( vWorldTangent, normalize( i.vTangentAlignedView_worldEyeZ.xyz ) ) );
+			alpha *= lerp( g_vTangentSOpacityRanges.x, g_vTangentSOpacityRanges.y, pow( fTSFacing, g_vTangentTOpacityRanges.z ) );
+			fBackfaceAlpha = min( fBackfaceAlpha, lerp( g_vTangentSOpacityRanges.w, 1.0f, fBackfaceRatio ) );
+		}
+		#endif
+
+		#if FRESNELOPACITY
+		{
+			float tNFacing = abs( dot( vWorldNormal, vWorldEyeDir.xyz ) );
+			alpha *= lerp( g_vFresnelOpacityRanges.x, g_vFresnelOpacityRanges.y, pow( tNFacing, g_vFresnelOpacityRanges.z ) );
+			fBackfaceAlpha = min( fBackfaceAlpha, lerp( g_vFresnelOpacityRanges.w, 1.0f, dot( vWorldEyeDir.xyz, vWorldNormal.xyz ) * 0.5f + 0.5f ) );
+		}
+		#endif
+
+		alpha *= fBackfaceAlpha;
+
+		#if DEPTHBLEND
+		{
+			alpha *= DepthFeathering( g_tDepth, i.vIteratedProjPos, g_DepthFeatheringConstants );
+		}
+		#endif
+
+		#if ( !FLOWMAP && !TANGENTTOPACITY && !TANGENTSOPACITY && !FRESNELOPACITY && !( DETAIL1 && DETAIL1BLENDMODE == 1 ) )
+			alpha *= cBase.a;
+		#endif
+		
+		float flCameraFade = ComputeCameraFade( i.vIteratedProjPos );
+
+		//color
+		float4 cDetail1 = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+		float4 cDetail2 = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+		
+		#if( DETAIL2 )
+		{
+			cDetail2 = tex2D( g_tDetail2, i.vFlowUV_UV2.zw );
+		}
+		#endif
+		
+		#if( DETAIL1 )
+		{
+			cDetail1 = tex2D( g_tDetail1, i.vUV0_UV1.zw );
+			#if( DETAIL1BLENDMODE == 0 )
+			{
+				cBase.rgb *= 2.0f * cDetail1.rgb;
+			}
+			#else
+			{
+				cBase.rgb = lerp( cBase.rgb * cDetail1.rgb, cBase.rgb, cBase.a );
+			}
+			#endif
+		}
+		#endif
+
+		#if( DETAIL2 )
+		{
+			#if( DETAIL2BLENDMODE == 0 )
+			{
+				#if( DETAIL1 )
+				{
+					cDetail2.rgb *= cDetail1.rgb;
+				}
+				#endif
+				cBase.rgb += cDetail2.rgb;
+			}
+			#else
+			{
+				cBase.rgb *= cDetail2.rgb;
+			}
+			#endif
+		}
+		#endif
+
+		cOut.a = alpha;
+		cOut.rgb = cBase.rgb;
+		#if ( POWERUP && !FLOWMAP )
+		{
+			cOut.rgb *= g_flPowerUp;
+		}
+		#endif
+
+		#if ( ADDITIVE )
+		{
+			cOut.rgb *= ( 1.0f + alpha ) * flCameraFade;
+			cOut.a = 1.0f;
+		}
+		#endif
+
+		#if ( VERTEXCOLOR )
+		{
+			// fun with saturation:
+			float3 vColor = pow( i.vColor.rgb, ( 2.0f - alpha ) * 2.0f );
+			cOut.rgb *= vColor.rgb;
+		}
+		#endif
+	}
+	#endif // ACTIVE
+
+	// Limit tonemap scalar to 0.0-1.0 so the colors don't oversaturate, but let it drop down to 0 in case we're fading
+	float flTonemapScalar = saturate( LINEAR_LIGHT_SCALE );
+	
+	// g_flOutputIntensity is normally 1.0f, except to work around overall intensity problems on platforms that blend in gamma space (such as PS3).
+	return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE ) * flTonemapScalar * g_flOutputIntensity;
+}

@@ -1,0 +1,49 @@
+//-----------------------------------------------------------------------------
+//	quickhull.vpc
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+$macro SRCDIR		"..\.."
+//$macro OUTLIBDIR	"$SRCDIR\lib\public"
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\public;$SRCDIR\common;$SRCDIR\public\quickhull"
+		$DisableSpecificWarnings	"$BASE;4127;4239" [$WINDOWS]
+		$EnableRunTimeTypeInfo		"No (/GR-)"
+	}
+	$Compiler [$WINDOWS]
+	{
+		$EnableEnhancedInstructionSet	"Streaming SIMD Extensions (/arch:SSE)"
+	}
+}
+
+$Project "quickhull"
+{
+	$Folder	"Source Files"
+	{	
+		$File	"qhTypes.h"
+		$File	"qhMath.h"
+		$File	"qhMath.inl"
+		$File	"qhMath.cpp"
+		$File	"qhMemory.h"
+		$File	"qhMemory.inl"
+		$File	"qhMemory.cpp"
+		$File	"qhArray.h"
+		$File	"qhArray.inl"
+		$File	"qhList.h"
+		$File	"qhList.inl"
+		$File	"qhHalfEdge.h"
+		$File	"qhHalfEdge.cpp"
+		$File	"qhConvex.h"
+		$File	"qhConvex.inl"
+		$File	"qhConvex.cpp"	
+		$File	"qhMass.h"
+		$File	"qhMass.cpp"
+	}
+}

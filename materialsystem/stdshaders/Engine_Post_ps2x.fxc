@@ -1,0 +1,569 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// FIXMEL4DTOMAINMERGE
+// Need to re-enable bloom and disable other L4D-only features in here and the cpp file.
+
+// STATIC: "TOOL_MODE"						"0..1"
+// STATIC: "DEPTH_BLUR_ENABLE"				"0..1"
+// STATIC: "LINEAR_INPUT"					"0..1"  [ps20b] [ps30] [PC]
+// STATIC: "LINEAR_INPUT"					"0..0"  [ps20b] [CONSOLE]
+// STATIC: "LINEAR_OUTPUT"					"0..1"  [ps20b] [ps30] [PC]
+// STATIC: "LINEAR_OUTPUT"					"0..0"  [ps20b] [CONSOLE]
+
+// DYNAMIC: "AA_ENABLE"						"0..0"  [ps20] [ps20b] [PC]
+// DYNAMIC: "AA_ENABLE"						"0..1"  [ps30] [PC]
+// DYNAMIC: "AA_ENABLE"						"0..1"  [CONSOLE]
+
+// DYNAMIC: "COL_CORRECT_NUM_LOOKUPS"		"0..3"
+
+// DYNAMIC: "CONVERT_FROM_LINEAR"			"0..1"	[ps20b] [ps30] [PC]
+// DYNAMIC: "CONVERT_TO_LINEAR"				"0..1"	[ps20b] [ps30] [PC]
+// DYNAMIC: "CONVERT_FROM_LINEAR"			"0..0"	[ps20b] [CONSOLE]
+// DYNAMIC: "CONVERT_TO_LINEAR"				"0..0"	[ps20b] [CONSOLE]
+// SKIP: ( $CONVERT_FROM_LINEAR == 0 ) && ( $CONVERT_TO_LINEAR == 1 )
+// SKIP: ( $TOOL_MODE == 0 ) && ( $CONVERT_FROM_LINEAR == 1 )
+// SKIP: ( $TOOL_MODE == 0 ) && ( $CONVERT_TO_LINEAR == 1 )
+
+// These are similar but mutually exclusive, the former for SFM PC and the latter for Mac
+// SKIP: ( $CONVERT_FROM_LINEAR == 1 ) && ( $LINEAR_INPUT  == 1 )
+// SKIP: ( $CONVERT_TO_LINEAR   == 1 ) && ( $LINEAR_OUTPUT == 1 )
+
+// DYNAMIC: "FADE_TO_BLACK"					"0..1"
+// DYNAMIC: "FADE_TYPE"						"0..2"
+
+// These two are enabled for PC, but only used in special cases
+// DYNAMIC: "NOISE_ENABLE"					"0..0"	[ps20b] [ps30] [PC]
+// DYNAMIC: "VIGNETTE_ENABLE"				"0..1"	[ps20b] [ps30] [PC]
+// DYNAMIC: "NOISE_ENABLE"					"0..0"	[ps20b] [CONSOLE]
+// DYNAMIC: "VIGNETTE_ENABLE"				"0..1"	[ps20b] [CONSOLE]
+
+// None of these effects are utilized by Portal 2, so they're always zero:
+// DYNAMIC: "LOCAL_CONTRAST_ENABLE"			"0..1"	[ps20b] [ps30]
+// DYNAMIC: "BLURRED_VIGNETTE_ENABLE"		"0..1"	[ps20b] [ps30]
+
+// DYNAMIC: "VOMIT_ENABLE"					"0..0"
+// SKIP: ( $LOCAL_CONTRAST_ENABLE == 0 ) && ( $BLURRED_VIGNETTE_ENABLE == 1 )
+
+// DYNAMIC: "TV_GAMMA"						"0..1"	[ps20b] [ps30] [PC]
+// DYNAMIC: "DESATURATEENABLE"				"0..1"	[ps20b] [ps30] [PC]
+// SKIP: ( $TOOL_MODE == 0 ) && $TV_GAMMA
+// SKIP: ( $TOOL_MODE == 0 ) && $DESATURATEENABLE
+
+#include "common_ps_fxc.h"
+
+#define FXAA_ENABLE	1 
+
+#include "fxaa3_11_fxc.h"
+
+
+sampler	BaseTextureSampler				: register( s0 );
+sampler	FBTextureSampler				: register( s1 );
+sampler3D ColorCorrectionVolumeTexture0	: register( s2 );
+sampler3D ColorCorrectionVolumeTexture1	: register( s3 );
+sampler3D ColorCorrectionVolumeTexture2	: register( s4 );
+sampler3D ColorCorrectionVolumeTexture3	: register( s5 );
+sampler	NoiseSampler					: register( s6 );
+sampler	VignetteSampler					: register( s7 );
+sampler ScreenEffectSampler				: register( s8 );	// used for vomit/paint screen particle effects
+
+
+float4	psTapOffs_Packed				: register( c0 ); // psTapOffs_packed contains 1-pixel offsets: ( +dX, 0, +dY, -dX )
+float4	tweakables						: register( c1 ); // (x - AA strength/unused) (y - reduction of 1-pixel-line blur)
+														  // (z - edge threshold multipler) (w - tap offset multiplier)
+
+
+float4	uvTransform						: register( c2 ); // Transform BaseTexture UVs for use with the FBTexture
+
+float	ColorCorrectionDefaultWeight	: register( c3 );
+float4	ColorCorrectionVolumeWeights	: register( c4 );
+
+// Bloom & Depth Blur parameters
+// x: bloom amount; multiply bloom downscale buffer by this value and add to base color
+// y: bloom lerp amount; lerp between base color and blurred bloom buffer with this factor (allows for color bleeding in dark areas)
+// z: depth blur focal plane distance.  Value is in dest alpha space [0,1], not world units.
+// w: depth blur scale value; scale distance from focal plane by this amount
+float4	BloomParameters					: register( c5 );
+#define g_flBloomAmount ( BloomParameters.x )
+#define g_flBloomLerpFactor ( BloomParameters.y )
+#define g_flDepthBlurFocalDistance ( BloomParameters.z )
+#define g_flDepthBlurScale ( BloomParameters.w )
+
+float	g_flNoiseScalar					: register( c6 );
+float	g_flTime						: register( c7 );
+float4	g_vLocalContrastParams			: register( c8 );
+#define g_flLocalContrastStrength		g_vLocalContrastParams.x
+#define g_flLocalContrastMidToneMask	g_vLocalContrastParams.y
+#define g_flBlurredVignetteStrength		g_vLocalContrastParams.z
+
+float4	g_vLocalContrastVignetteParams	: register( c9 );
+#define g_flLocalContrastVignetteStart	g_vLocalContrastVignetteParams.x
+#define g_flLocalContrastVignetteEnd	g_vLocalContrastVignetteParams.y
+#define g_flLocalContrastEdgeStrength	g_vLocalContrastVignetteParams.z
+
+float	g_flFadeToBlackStrength			: register( c10 );
+
+float4	g_vVomitColor[2]				: register( c11 );
+#define g_flVomitRefractStrength		g_vVomitColor[0].a
+
+float4	g_vViewportTransform			: register( c13 );
+float4	g_vInvViewportTransform			: register( c14 );
+
+float4  g_vViewFadeColor				: register( c15 );
+
+float   g_flDesaturation				: register( c16 );
+
+// FXAA consts
+float4  g_fxaaConsoleRcpFrameOpt		: register( c17 );
+float4  g_fxaaConsoleRcpFrameOpt2		: register( c18 );
+float4  g_fxaaConsole360RcpFrameOpt2	: register( c19 );
+float4  g_fxaaConsoleEdge				: register( c20 );
+float4  g_fxaaConsole360ConstDir		: register( c21 );
+float4  g_fxaaQualityRcpFrame			: register( c22 );
+float4  g_fxaaQualitySubpixEdge			: register( c23 );
+
+
+HALF Luminance( HALF3 cColor )
+{
+	HALF3 tmpv = { 0.2125f, 0.7154f, 0.0721f };
+	HALF flLuminance = dot( cColor.rgb, tmpv.rgb );
+	return flLuminance;
+}
+
+
+HALF LuminanceLinear( HALF3 cColor )
+{
+	// Alternate formula for calculating luminance for linear RGB space (Widely used in color hue and saturation computations)
+	HALF3 tmpv = { 0.3086f, 0.6094f, 0.0820f };
+	HALF flLuminance = dot( cColor.rgb, tmpv.rgb );
+	return flLuminance;
+}
+
+
+HALF4 GetBloomColor( float2 bloomUV )
+{
+	HALF4 vBloomSample = tex2D( BaseTextureSampler, bloomUV );
+	#if ( LINEAR_INPUT == 1 )
+	{
+		// In this case, which is only used on OpenGL, we want sRGB data from this tex2D.
+		// Hence, we have to undo the sRGB conversion that we are forced to apply by OpenGL
+		vBloomSample.rgb = SrgbLinearToGamma( vBloomSample.rgb );
+	}
+	#endif
+
+	#if defined( _X360 )
+	{
+		#if defined( CSTRIKE15 )
+		{
+			// [mariod] - no pwl space for CS:GO
+		}
+		#else
+		{
+			// Since bloom is added in gamma space, the 360's PWL gamma space requires an artificial
+			// dim factor to match the look of the PC and PS3. 0.5 works best for portal2
+			vBloomSample.rgb *= 0.5f;
+			vBloomSample.rgb = SrgbLinearToGamma( vBloomSample.rgb );
+		}
+		#endif
+	}
+	#endif
+
+	// Scale bloom by 50% for all platforms
+	vBloomSample.rgb *= 0.5f;
+
+	return vBloomSample.rgba;
+}
+
+HALF4 PerformColorCorrection( HALF4 outColor )
+{
+	#if ( COL_CORRECT_NUM_LOOKUPS > 0 )
+	{
+		// NOTE: This code requires the color correction texture to be 32 units to be correct.
+		// This code will cause (0,0,0) to be read from 0.5f/32
+		// and (1,1,1) to be read from 31.5f/32
+		HALF4 offsetOutColor = outColor * (HALF)(31.0f / 32.0f) + (HALF)(0.5f / 32.0f);
+
+		outColor.rgb  = outColor.rgb * (HALF)ColorCorrectionDefaultWeight;
+		#if ( defined( _PS3 ) )
+		{
+			outColor.rgb += h3tex3D( ColorCorrectionVolumeTexture0, offsetOutColor.rgb ).rgb * (HALF3)ColorCorrectionVolumeWeights.xxx;
+		}
+		#else
+		{
+			outColor.rgb += tex3D( ColorCorrectionVolumeTexture0, offsetOutColor.rgb ).rgb * ColorCorrectionVolumeWeights.xxx;
+		}
+		#endif
+		if ( COL_CORRECT_NUM_LOOKUPS > 1 )
+		{
+			outColor.rgb += tex3D( ColorCorrectionVolumeTexture1, offsetOutColor.rgb ).rgb * ColorCorrectionVolumeWeights.yyy;
+			if ( COL_CORRECT_NUM_LOOKUPS > 2 )
+			{
+				outColor.rgb += tex3D( ColorCorrectionVolumeTexture2, offsetOutColor.rgb ).rgb * ColorCorrectionVolumeWeights.zzz;
+				if ( COL_CORRECT_NUM_LOOKUPS > 3 )
+				{
+					outColor.rgb += tex3D( ColorCorrectionVolumeTexture3, offsetOutColor.rgb ).rgb * ColorCorrectionVolumeWeights.www;
+				}
+			}
+		}
+	}
+	#endif
+
+	return outColor;
+}
+
+float3 PerformVomitBlend( float3 vRefractParams, float3 vFullResColor, float3 vBlurredColor )
+{
+
+	#ifdef _PS3
+		// Compensate for gamma badness.  Turns out that the particle system rendering for the vomit effect
+		// is blending is gamma space on ps3.  Doing this to somewhat compensate for this.
+		// Would do a sqrt here, but it introduces a lot of banding artifacts.
+		vRefractParams.z = saturate( vRefractParams.z * 2.0f );
+	#endif
+
+	float3 vVomitColor = lerp( g_vVomitColor[0].rgb, g_vVomitColor[1].rgb, vRefractParams.z );	// vomit tint
+	
+
+	// Get the luminance of the color buffer.
+	float vFullResLum = dot( vFullResColor, float3( 0.3, 0.59, 0.11 ) );
+	
+	// Tint color buffer with vomit color.
+	vFullResColor.rgb = lerp( vFullResColor, vFullResLum * vVomitColor, saturate( 1.0f * vRefractParams.z ) );	// vomit tint full-res buffer
+
+	// blend to the solid vomit color so that the color is more apparent.
+	vFullResColor.rgb = lerp( vFullResColor, vVomitColor, 1.0f * vRefractParams.z );	// vomit tint full-res buffer
+
+	// blend in blurred backbuffer.
+	vFullResColor.rgb = lerp ( vFullResColor.rgb, vVomitColor.rgb * vBlurredColor.rgb, saturate( 1.0f * vRefractParams.z ) );
+	return vFullResColor.rgb;
+}
+
+
+// Apply TV Gamma for movie layoff specific to 360 TV movie playback path
+float3 SrgbGammaToTvGamma( float3 cInput )
+{
+	float3 cLinear = SrgbGammaToLinear( cInput );
+	return pow( cLinear, 1.0f / 2.5f );
+}
+
+
+/*============================================================================*/
+
+
+struct PS_INPUT
+{
+	float4 bloombaseCoords	: TEXCOORD0;
+	float4 fxaaCoords		: TEXCOORD1;
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+//	float4 fbTexCoord = float4( i.bloomCoords, i.baseCoords );
+	float4 fbTexCoord = i.bloombaseCoords;
+
+	HALF4 cBloomBlurredLum = GetBloomColor( i.bloombaseCoords.zw );	// bloom color and blurred luminance in alpha
+
+	float4 vVomitRefractParams;
+	#if ( VOMIT_ENABLE == 1 )
+	{
+		// perturb texture coordinate
+		vVomitRefractParams = tex2D( ScreenEffectSampler, i.bloombaseCoords.zw );
+		fbTexCoord = fbTexCoord + g_flVomitRefractStrength * ( vVomitRefractParams.xyxy - 0.5 );
+
+		#if !defined( SHADER_MODEL_PS_2_0 )
+		{
+			// screen coords -> viewport coords
+			float4 vNormalizedTexCoord = g_vViewportTransform.xyxy * fbTexCoord + g_vViewportTransform.zwzw;
+			// mirrored repeat texcoord math doesn't fit into 2.0
+			vNormalizedTexCoord = min( 2.0 - vNormalizedTexCoord, abs( vNormalizedTexCoord ) );
+			// viewport coords -> screen coords
+			fbTexCoord = g_vInvViewportTransform.xyxy * vNormalizedTexCoord + g_vInvViewportTransform.zwzw;
+
+			cBloomBlurredLum = GetBloomColor( fbTexCoord.zw );	// fetch again with perturbed texcoords
+		}
+		#else
+		{
+			cBloomBlurredLum = GetBloomColor( fbTexCoord.xy );	// fetch again with perturbed texcoords
+		}
+		#endif
+	}
+	#endif
+
+#if ( defined( _PS3 ) )
+	HALF4 rawColor = h4tex2D( FBTextureSampler, fbTexCoord.xy ).rgba;
+#else
+	HALF4 rawColor = tex2D( FBTextureSampler, fbTexCoord.xy ).rgba;
+#endif
+
+	HALF3 baseColor  = rawColor.rgb;
+	float depthValue = rawColor.a;
+	
+	#if ( CONVERT_FROM_LINEAR == 1 )
+	{
+		baseColor.rgb = SrgbLinearToGamma( baseColor.rgb );
+	}
+	#endif
+
+	HALF4 outColor = HALF4( baseColor, 1 );
+
+	// In this case, which is only used on OpenGL, we have linear inputs.
+	// This means we converted to sRGB prior to accessing the color correction textures.
+	#if ( LINEAR_INPUT )
+	{
+		outColor.rgb = SrgbLinearToGamma( saturate( outColor.rgb ) );
+	}
+	#endif
+
+	#if ( AA_ENABLE == 1 )
+	{
+		half3 aaRGB;
+
+		#if ( FXAA_ENABLE == 1 )
+		{
+			// FXAA for all platforms if using software AA
+
+			//
+			// args - compute in shader where necessary for now, use shader constants when working
+			// see fxaa3_11_fxc.h for documentation on arguments
+			//
+
+			// 
+			FxaaFloat2 pos = fbTexCoord.xy;
+
+			//
+			FxaaFloat4 fxaaConsolePosPos = i.fxaaCoords;
+
+			// tex = FBTextureSampler
+			// fxaaConsole360TexExpBiasNegOne - FIXME: just use tex and do the biasing in shader for now
+			// fxaaConsole360TexExpBiasNegTwo - "
+
+			// do FXAA
+			aaRGB = FxaaPixelShader( pos, 
+									 fxaaConsolePosPos,
+									 FBTextureSampler, FBTextureSampler, FBTextureSampler,
+									 g_fxaaQualityRcpFrame,
+									 g_fxaaConsoleRcpFrameOpt,
+									 g_fxaaConsoleRcpFrameOpt2,
+									 g_fxaaConsole360RcpFrameOpt2,
+									 g_fxaaQualitySubpixEdge.x, // QualitySubpix
+									 g_fxaaQualitySubpixEdge.z, // QualityEdgeThreshold
+									 g_fxaaQualitySubpixEdge.w, // QualityEdgeThresholdMin
+									 g_fxaaConsoleEdge.y, // ConsoleEdgeSharpness
+									 g_fxaaConsoleEdge.z, // ConsoleEdgeThreshold,
+									 g_fxaaConsoleEdge.w, // ConsoleThresholdMin,
+									 g_fxaaConsole360ConstDir );
+		}
+		#else
+		{
+			// TODO: put old code back here?
+			aaRGB = ouColor.rgb;
+		}
+		#endif
+
+		outColor.rgb = aaRGB;
+	}
+	#endif
+
+	#if ( VOMIT_ENABLE == 1 )
+	{
+		outColor.rgb = PerformVomitBlend( vVomitRefractParams.xyz, outColor.rgb, cBloomBlurredLum.aaa );
+	}
+	#endif
+
+	#if ( LOCAL_CONTRAST_ENABLE == 1 )
+	{
+		HALF fMask = 1.0;
+
+		// Extract midtones and limit contrast enhancement there
+		// TODO: This can probably go away for perf.
+		//float fBrightness = dot( outColor.rgb, float3( 0.3, 0.59, 0.11 ) );
+		// bell-shaped mask
+		//fMask = smoothstep( 0.5 - g_flLocalContrastMidToneMask, 0.5, fBrightness );
+		//fMask *= smoothstep( 0.5 + g_flLocalContrastMidToneMask, 0.5, fBrightness );
+
+		//fMask = smoothstep( 1.0, 0.5, fBrightness );
+		
+		/*
+		// unsharp mask on luminance only
+		// This is the technically correct way, going to YUV, applying contrast to Y, and converting back to RGB
+		float3 outColorYUV;
+		outColorYUV.x = dot( outColor.rgb, float3( 0.299, 0.587, 0.114 ) );
+		outColorYUV.y = dot( outColor.rgb, float3( -0.14713, -0.28886, 0.436 ) );
+		outColorYUV.z = dot( outColor.rgb, float3( 0.615, -0.51499, -0.10001 ) );
+		outColorYUV.x = outColorYUV.x + g_flLocalContrastStrength * fMask * ( outColorYUV.x - cBloomBlurredLum.aaa );
+		outColor.r = dot( outColorYUV.xyz, float3( 1.0, 0.0, 1.13983 ) );
+		outColor.g = dot( outColorYUV.xyz, float3( 1.0, -0.39465, -0.58060 ) );
+		outColor.b = dot( outColorYUV.xyz, float3( 1.0, 2.03211, 0.0 ) );
+		*/
+
+		// This applies the delta contrast derived from the luminance to all color channels. The difference to the
+		// correct way is imperceptible.
+		HALF fLuminance = dot( outColor.rgb, HALF3( 0.299, 0.587, 0.114 ) );
+		HALF fContrastLum = fLuminance + (HALF)g_flLocalContrastStrength * ( fLuminance - cBloomBlurredLum.a );
+		
+		// Mask off pixels that got very bright, to control super-contrast 
+		//fMask = 1.0 - smoothstep( 0.3, 1.0, fContrastLum );
+
+		HALF2 vCenterDir = ( (HALF)2.0f * (HALF2)i.bloombaseCoords.zw ) - (HALF)1.0f;
+		HALF fMyVignette = smoothstep( (HALF)g_flLocalContrastVignetteStart, (HALF)g_flLocalContrastVignetteEnd, length( vCenterDir ) );
+		HALF fMyVignette2 = fMyVignette;
+		fMyVignette = lerp( (HALF)g_flLocalContrastStrength, (HALF)g_flLocalContrastEdgeStrength, fMyVignette );
+
+		fMask = fMyVignette;
+
+		// If the mask is positive, only brighten pixels. If the mask is negative, don't let it get less than -1.0.
+		//outColor.rgb += fMask * ( fLuminance - cBloomBlurredLum.aaa );
+		outColor.rgb += max( fMask * ( fLuminance - cBloomBlurredLum.aaa ), (HALF)-1.0f + step( (HALF)0.0f, fMask ) ); // Selective clamp to positive adds 4 instructions
+
+		#if ( BLURRED_VIGNETTE_ENABLE == 1 )
+			outColor.rgb = lerp( outColor.rgb, cBloomBlurredLum.aaa, fMyVignette2 * (HALF)g_flBlurredVignetteStrength );
+		#endif
+	}
+	#endif
+
+	// Composite bloom and full-screen + depth blur effects
+	#if ( DEPTH_BLUR_ENABLE )
+	{
+		float blurFactor = g_flBloomLerpFactor + abs( depthValue - g_flDepthBlurFocalDistance ) * g_flDepthBlurScale;
+		blurFactor = clamp( blurFactor, 0, 1 );
+		outColor.rgb = lerp( outColor.rgb, cBloomBlurredLum.rgb, blurFactor );
+		outColor.rgb += g_flBloomAmount * cBloomBlurredLum.rgb;
+	}
+	#else
+	{
+		outColor.rgb += (HALF)g_flBloomAmount * (HALF3)cBloomBlurredLum.rgb;
+	}
+	#endif
+
+	#if ( FADE_TYPE == 1 )
+	{
+		outColor.rgb = lerp( outColor.rgb, (HALF3)g_vViewFadeColor.rgb, (HALF3)g_vViewFadeColor.aaa );
+	}
+	#elif ( FADE_TYPE == 2 )
+	{
+		outColor.rgb = lerp( outColor.rgb, (HALF3)g_vViewFadeColor.rgb * outColor.rgb, (HALF3)g_vViewFadeColor.aaa );
+	}
+	#endif
+
+	#if ( DESATURATEENABLE )
+	{
+		float flLum = saturate( dot( outColor.rgb, HALF3( 0.3f, 0.59f, 0.11f) ) );
+		outColor.rgb = lerp( saturate( outColor.rgb ), flLum.xxx, saturate( g_flDesaturation ) );
+	}
+	#else
+	{
+		outColor = PerformColorCorrection( outColor );	// Color correction
+	}
+	#endif
+
+	// Vignette
+	#if ( VIGNETTE_ENABLE == 1 )
+	{
+		// Vignette
+		float2 vUv = i.bloombaseCoords.zw;
+		float2 vTmp = ( vUv.xy * 2.0 ) - 1.0;
+		float flVignette;
+
+		#if ( defined( _X360 ) ) && ( !defined( CSTRIKE15 ) )
+		{
+			// Make title safe and deal with different gamma space
+			flVignette = 1.0 - pow( abs( vTmp.x ), 4.0f );
+			flVignette *= 1.0 - pow( abs( vTmp.y ), 4.0f );
+			flVignette = 1.0 - ( 1.0 - flVignette ) * ( ( saturate( ( 1.0 - vUv.y ) - 0.1 ) / 0.9 ) );
+
+			// This tex2D solves the 3 lines of math above
+			//flVignette = tex2D( VignetteSampler, vUv.xy ).g; // Green is for the 360
+			//flVignette = saturate( flVignette * 0.75 + 0.26 );
+		}
+		#else
+		{
+			flVignette = 1.0 - pow( abs( vTmp.x ), 6.0f );
+			flVignette *= 1.0 - pow( abs( vTmp.y ), 6.0f );
+			flVignette = 1.0 - ( 1.0 - flVignette ) * ( ( saturate( ( 1.0 - vUv.y ) - 0.3 ) / 0.7 ) );
+
+			// This tex2D solves the 3 lines of math above
+			//flVignette = tex2D( VignetteSampler, vUv.xy ).r; // Red is for the PC
+			//flVignette = saturate( flVignette * 0.55 + 0.46 );
+		}
+		#endif
+
+		// Artificially lighten the vignette. We may have to tune this differently for the 360.
+		//outColor.rgb *= ( flVignette * 0.75 ) + 0.25;
+		outColor.rgb *= ( flVignette * 0.33 ) + 0.67;
+	}
+	#endif
+
+	// Noise
+	#if ( NOISE_ENABLE == 1 )
+	{
+		// Additive Noise
+		float2 vUv0 = i.bloombaseCoords.zw * 10.0 + g_flTime;
+		float2 vUv1 = i.bloombaseCoords.wz * 20.0 - g_flTime;
+		float2 vNoiseTexelUv;
+		vNoiseTexelUv.x = tex2D( NoiseSampler, vUv0.xy ).g;
+		vNoiseTexelUv.y = tex2D( NoiseSampler, vUv1.xy ).g;
+		float flNoiseTexel = tex2D( NoiseSampler, vNoiseTexelUv.xy ).g;
+
+		HALF3 vTmp = { 0.2125f, 0.7154f, 0.0721f };
+		float flLuminance = saturate( dot( outColor.rgb, vTmp.rgb ) );
+
+		#if defined( _X360 ) && !defined( CSTRIKE15 ) 
+		{
+			// 360
+			float flNoiseScalar = 0.2f + 1.0f * ( saturate( pow( 1.0 - flLuminance, 64.0 ) ) );
+			outColor.rgb += ( ( flNoiseTexel * 0.3f ) - 0.15f  ) * g_flNoiseScalar * flNoiseScalar;
+		}
+		#else
+		{
+			// PC
+			float flNoiseScalar = 0.2f + 0.8f * ( saturate( pow( 1.0 - flLuminance, 12.0 ) ) );
+			outColor.rgb += ( ( flNoiseTexel * 0.3f ) - 0.15f  ) * g_flNoiseScalar * flNoiseScalar;
+		}
+		#endif
+	}
+	#endif
+
+	#if ( FADE_TO_BLACK )
+	{
+		// Fade to black
+		outColor.rgb = lerp( outColor.rgb, (HALF3)0.0f, (HALF)g_flFadeToBlackStrength );
+	}
+	#endif
+	
+	#if TV_GAMMA
+	{
+		// Used for SFM to record movies in native TV gamma space
+		outColor.rgb = SrgbGammaToTvGamma( outColor.rgb );
+	}
+	#endif
+
+	#if ( CONVERT_TO_LINEAR == 1 )
+	{
+		// If we have a float back buffer, we want to remain in linear space after this shader
+		outColor.rgb = SrgbGammaToLinear( outColor.rgb );
+	}
+	#endif
+
+	outColor = FinalOutput( outColor, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+		
+	// Go to linear since we're forced to do an sRGB write on OpenGL in ps2b
+	#if ( LINEAR_OUTPUT )
+	{
+		outColor.rgb = SrgbGammaToLinear( outColor.rgb );
+	}
+	#endif
+
+	/* Debug code for evaluating gamma spaces from the framebuffer to the TV
+	outColor.rgba = 0;
+	float flTmp = saturate( i.bloombaseCoords.z * 1.2 - 0.1 );
+	if ( ( flTmp <= 0.0f ) || ( flTmp >= 1.0f ) )
+		flTmp = 0.5f;
+	#if defined( _X360 )
+		outColor.rgb = X360LinearToGamma( flTmp );
+	#else
+		outColor.rgb = SrgbLinearToGamma( flTmp );
+	#endif
+	//*/
+
+	return outColor;
+}
+

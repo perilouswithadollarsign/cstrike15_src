@@ -1,0 +1,60 @@
+//-----------------------------------------------------------------------------
+//	VGUI_SURFACELIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		"..\.."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;ALLOW_TEXT_MODE=1" [$CSTRIKE_TRUNK_BUILD||$CSTRIKE_STAGING_BUILD]
+	}
+}
+
+$Project "vgui_surfacelib"
+{
+	$Folder	"Source Files"
+	{
+		$File	"BitmapFont.cpp"
+		$File	"FontAmalgam.cpp"
+		$File	"fontmanager.cpp"
+		$File	"FontEffects.cpp"
+		$File	"FontEffects.h"
+		$File	"fonttexturecache.cpp"
+		$File	"texturedictionary.cpp"
+		$File	"Win32Font.cpp"			[$WINDOWS]
+		$File	"Win32Font_x360.cpp"	[$X360]
+		$File	"ps3font.cpp"			[$PS3]
+		$File	"osxfont.cpp"			[$OSXALL]
+		$File	"linuxfont.cpp"			[$LINUXALL]
+	}
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\tier0\basetypes.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\BitmapFont.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\FontAmalgam.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\fontmanager.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\fonttexturecache.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\ifontsurface.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\texturedictionary.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\tier1\interface.h"
+		$File	"$SRCDIR\public\tier1\strtools.h"
+		$File	"$SRCDIR\public\tier1\utlbuffer.h"
+		$File	"$SRCDIR\public\tier1\utlmemory.h"
+		$File	"$SRCDIR\public\tier1\utlvector.h"
+		$File	"$SRCDIR\public\mathlib\vector2d.h"
+		$File	"$SRCDIR\public\vstdlib\vstdlib.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\vguifont.h"
+		$File	"$SRCDIR\common\vgui_surfacelib\Win32Font.h" [$WINDOWS]
+		$File	"$SRCDIR\common\vgui_surfacelib\ps3font.h" [$PS3]
+		$File	"$SRCDIR\common\vgui_surfacelib\osxfont.h" [$OSXALL]
+	}
+}

@@ -1,0 +1,135 @@
+// STATIC:  "VERTEXCOLOR"			"0..1"
+// DYNAMIC: "COMPRESSED_VERTS"		"0..1"
+// DYNAMIC: "SKINNING"				"0..1"
+// DYNAMIC: "TESSELLATION"			"0..0"	[vs30] [PC]
+// DYNAMIC: "TESSELLATION"			"0..0"	[CONSOLE]
+// DYNAMIC: "TESSELLATION"			"0..0"	[vs20] [PC]
+
+// SKIP: $TESSELLATION && $VERTEXCOLOR
+
+#include "common_fog_vs_fxc.h"
+#include "common_vs_fxc.h"
+
+static const int g_FogType			= DOWATERFOG;
+static const bool g_bSkinning		= SKINNING ? true : false;
+
+const float4 cBaseTextureTransform[2]	: register( SHADER_SPECIFIC_CONST_0 );
+const float4 cMaskTextureTransform[2]	: register( SHADER_SPECIFIC_CONST_2 );
+const float4 cDetailTextureTransform[2] : register( SHADER_SPECIFIC_CONST_4 );
+
+#if TESSELLATION
+
+#include "tessellation_vs_fxc.h"
+
+const float4 g_SubDControls					: register( SHADER_SPECIFIC_CONST_9 );
+sampler2D BezierSampler						: register( s1 );
+sampler2D DispSampler						: register( s2 );
+// VS_INPUT defined in header
+
+#else // no TESSELLATION
+
+struct VS_INPUT
+{
+	float4 vPos			: POSITION;
+	float4 vBoneWeights	: BLENDWEIGHT;
+	float4 vBoneIndices	: BLENDINDICES;
+	float4 vNormal		: NORMAL;
+#if VERTEXCOLOR
+	float4 vColor		: COLOR0;
+#endif
+	float4 vTexCoord0	: TEXCOORD0;
+};
+
+#endif
+
+struct VS_OUTPUT
+{
+	float4 vProjPos		: POSITION;
+	float2 vTexCoord0	: TEXCOORD0;
+	float2 vTexCoord1	: TEXCOORD1;
+	float2 vTexCoord2	: TEXCOORD2;
+	float2 vTexCoord3	: TEXCOORD3;
+
+	float4 vColor		: COLOR0;
+
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float  fog		: FOG;
+#endif
+
+	float4 worldPos_projPosZ : TEXCOORD7;		// Necessary for pixel fog
+};
+
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	float3 worldPos;
+	float3 worldNormal;
+	float2 vTexCoord0;
+	float4 vColor;
+
+	#if TESSELLATION
+	{
+		float flBiTangentSign;
+		float3 worldTangentS, worldTangentT;
+		float2 vDetailCoord;
+		float flWrinkleWeight;
+		vColor = float4(1,1,1,1);
+		
+		EvaluateSubdivisionSurface( v, g_SubDControls.x, g_SubDControls.y, g_SubDControls.z, BezierSampler, DispSampler,
+								    worldNormal, worldPos, worldTangentS, worldTangentT, flBiTangentSign,
+									flWrinkleWeight, vTexCoord0, vDetailCoord );
+	}
+	#else // no TESSELLATION
+	{
+		//------------------------------------------------------------------------------
+		// Vertex blending
+		//------------------------------------------------------------------------------
+		SkinPosition( g_bSkinning, v.vPos, v.vBoneWeights, v.vBoneIndices, worldPos );
+		vTexCoord0 = v.vTexCoord0.xy;
+#if VERTEXCOLOR
+		vColor = v.vColor;
+#endif
+	}
+	#endif
+	
+	o.vProjPos = mul( float4( worldPos, 1 ), cViewProj );
+	
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.vProjPos.y = -o.vProjPos.y;
+	o.vProjPos.z = 2.0f * o.vProjPos.z - o.vProjPos.w;
+#endif // _PS3
+
+	o.worldPos_projPosZ = float4( worldPos.xyz, o.vProjPos.z );
+
+	//------------------------------------------------------------------------------
+	// Fog
+	//------------------------------------------------------------------------------
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	o.fog = CalcFixedFunctionFog( worldPos, g_FogType );
+#endif
+
+	//------------------------------------------------------------------------------
+	// Texture coord transforms
+	//------------------------------------------------------------------------------
+	#ifdef _PS3
+	o.vTexCoord0 = ( cBaseTextureTransform[0].xy   * vTexCoord0.xx ) + ( cBaseTextureTransform[1].xy   * vTexCoord0.yy );
+	o.vTexCoord3 = ( cDetailTextureTransform[0].xy * vTexCoord0.xx ) + ( cDetailTextureTransform[1].xy * vTexCoord0.yy );
+	#else
+	o.vTexCoord0 = mul( vTexCoord0, (float2x4)cBaseTextureTransform );
+	o.vTexCoord3 = mul( vTexCoord0, (float2x4)cDetailTextureTransform );
+	#endif
+
+	o.vColor = cModulationColor;
+
+#if VERTEXCOLOR
+	o.vColor *= v.vColor;
+#endif
+
+	return o;
+}
+
+
+

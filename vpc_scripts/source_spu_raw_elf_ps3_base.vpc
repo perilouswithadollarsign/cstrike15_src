@@ -1,0 +1,54 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects	
+//-----------------------------------------------------------------------------
+
+$Include "$SRCDIR\vpc_scripts\version.vpc"
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"	"$PROJECTNAME"
+$MacroRequired				"OUTBINDIR"
+$MacroRequired				"DEVKITBINDIR"	"."
+
+$Macro PLATSUBDIR		"\."
+$Macro LIBPUBLIC		"$SRCDIR\lib\public"
+$Macro LIBCOMMON		"$SRCDIR\lib\common"
+
+$Macro SCE_LIBROOT		"$(SCE_PS3_ROOT)\target\ppu\lib"
+
+$Include "$SRCDIR\vpc_scripts\source_spu_elf_ps3_debug.vpc"
+$Include "$SRCDIR\vpc_scripts\source_spu_elf_ps3_release.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+
+// Common Configuration
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;_MEMTEST"		[$MEMTEST]
+		$PreprocessorDefinitions	"$BASE;_LOWVIOLENCE"	[$LV]
+		$PreprocessorDefinitions	"$BASE;_CERT"           [$CERT]
+		$PreprocessorDefinitions	"$BASE;NO_STEAM"        [$NO_STEAM]
+		$PreprocessorDefinitions	"$BASE;VJOB=$OUTBINNAME"
+	}
+
+	$PreBuildEvent
+	{
+		$CommandLine			"$CRCCHECK" "\n"
+	}
+}
+
+// Skeleton Project
+$Project
+{
+	$Folder	"Source Files"
+	{
+		$File "$SRCDIR\common\ps3\spu_job_main.cpp"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$File "$SRCDIR\common\ps3\spu_job_shared.h"
+	}
+}
+

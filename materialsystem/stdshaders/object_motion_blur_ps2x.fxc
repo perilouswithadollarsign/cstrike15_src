@@ -1,0 +1,69 @@
+//====== Copyright © 1996-2007, Valve Corporation, All rights reserved. ===========================
+
+#ifdef HDRTYPE
+	#undef HDRTYPE
+#endif
+#define HDRTYPE HDR_TYPE_NONE
+
+// Includes =======================================================================================
+#include "common_ps_fxc.h"
+
+// Texture Samplers ===============================================================================
+sampler g_tFullScreenColor : register( s0 );
+sampler g_tFullScreenVelocity : register( s1 );
+
+// Shaders Constants and Globals ==================================================================
+
+// Interpolated values ============================================================================
+struct PS_INPUT
+{
+	float2 vUv0 : TEXCOORD0;
+};
+
+// Main ===========================================================================================
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 vVelocity = tex2D( g_tFullScreenVelocity, i.vUv0.xy );
+	vVelocity.xy = vVelocity.xy * 256.0f / 255.0f * 2.0f - float2( 1.0f, 1.0f );
+	
+#define NUM_SAMPLES 10
+#define STEP_SIZE 0.002
+	
+#define OLD_METHOD 0
+
+#if OLD_METHOD
+
+	float4 cBlurColor = float4( 0, 0, 0, 0 );
+	for ( int x = 0; x < NUM_SAMPLES; x ++ )
+	{
+		// Calculate offset uv
+		float2 vUvTmp = i.vUv0.xy - ( vVelocity.xy * x * STEP_SIZE );
+		
+		cBlurColor += (1.0f / NUM_SAMPLES ) * tex2D( g_tFullScreenColor, vUvTmp.xy ); 
+	}
+	return float4( cBlurColor.rgb, 1.0f );
+	
+#else
+
+	float4 cBaseColor = tex2D( g_tFullScreenColor, i.vUv0.xy ); 
+	float4 cBlurColor = float4( 0, 0, 0, 0 );
+	
+	float flTotalBlurWeight = 0.0f;
+	
+	// @TODO: unroll loop on X360?
+	for ( int x = 1; x < NUM_SAMPLES; x ++ )
+	{
+		// Calculate offset uv
+		float2 vUvTmp = i.vUv0.xy + ( vVelocity.xy * x * STEP_SIZE );
+		
+		float4 vOffsetVelocity = tex2D( g_tFullScreenVelocity, vUvTmp );
+		flTotalBlurWeight += vOffsetVelocity.b;
+	
+		cBlurColor += vOffsetVelocity.b * tex2D( g_tFullScreenColor, vUvTmp.xy ); 
+	}
+	
+	float4 cFinalColor = ( cBlurColor + ( NUM_SAMPLES - flTotalBlurWeight ) * cBaseColor ) / NUM_SAMPLES;
+	return float4( cFinalColor.rgb, 1.0f );
+	
+#endif	
+}

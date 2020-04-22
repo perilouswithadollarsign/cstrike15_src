@@ -1,0 +1,22 @@
+//-----------------------------------------------------------------------------
+//	SOURCE_EXE_CON_WIN32_BASE.VPC
+//
+//	Base Settings for all Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$Include "$SRCDIR\vpc_scripts\platform_dirs.vpc"
+$Include "$SRCDIR\vpc_scripts\source_base.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINDIR"
+
+$Include "$SRCDIR\vpc_scripts\source_exe_win_win32_base.vpc"
+
+$Configuration
+{
+	$Linker
+	{
+		$SubSystem		"Console (/SUBSYSTEM:CONSOLE)"
+	}
+}

@@ -1,0 +1,76 @@
+//
+// dx_proxy_base.vpc
+//
+// Base script for generating dx_proxy.dll for different
+// versions of Microsoft DirectX SDK
+//
+
+$MacroRequired "SRCDIR"
+$MacroRequired "OUTBINDIR"
+$MacroRequired "DX_SDK_VER"
+
+$Macro OUTBINNAME	"dx_proxy"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$OutputDirectory			".\Debug_$DX_SDK_VER"
+		$IntermediateDirectory		".\Debug_$DX_SDK_VER"
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$OutputDirectory			".\Release_$DX_SDK_VER"
+		$IntermediateDirectory		".\Release_$DX_SDK_VER"
+	}
+}
+
+$Configuration
+{
+	$General
+	{
+		$TargetName	"dx_proxy"
+	}
+
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;DX_PROXY_EXPORTS;$DX_SDK_VER"
+		$EnableC++Exceptions		"Yes (/EHsc)"
+	}
+
+	$Linker
+	{
+		$IgnoreSpecificLibrary		"libcp.lib; libcpd.lib"
+	}
+}
+
+$Project 
+{
+	$Folder	"Source Files"
+	{
+		-$File	"$SRCDIR\public\tier0\memoverride.cpp"
+
+		$File	"dx_proxy.cpp"
+		$File	"filememcache.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\common\dx_proxy\dx_proxy.h"
+		$File	"dxincludeimpl.h"
+		$File	"filememcache.h"
+	}
+
+	$Folder "Link Libraries"
+	{
+		-$File	"$SRCDIR\lib\public\tier0.lib"
+		-$File	"$SRCDIR\lib\public\tier1.lib"
+		-$File	"$SRCDIR\lib\public\vstdlib.lib"
+	}
+}

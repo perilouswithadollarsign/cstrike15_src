@@ -1,0 +1,181 @@
+ //-----------------------------------------------------------------------------
+//	VPC.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro VPCNAME		"vpc"						[$STATIC_LINK]
+$Macro VPCNAME		"vpcd"						[!$STATIC_LINK]
+$Macro VPCNAME		"vpcs_test"					[$VPC_STATIC_LINK_TEST]
+
+//$Macro NO_HARD_LINKS 1
+
+$Macro SRCDIR					"..\..\.."
+$Macro OUTBINDIR				"$SRCDIR\devtools\bin"		[$WIN32]
+$Macro OUTBINDIR				"$SRCDIR\devtools\bin\linux64"	[$LINUX64]
+$Macro OUTBINDIR				"$SRCDIR\devtools\bin\osx"	[$OSX32]
+$Macro RPATH_TO_STANDARD_BINS	"$ORIGIN/../../../../game/bin$PLATSUBDIR"
+$Macro LIBSUBDIR				"$PLATFORM"					[$STATIC_LINK && $WINDOWS]
+$Macro OUTBINNAME				"$VPCNAME"
+
+// isolate any build outputs from the normal DLL version
+$Macro _STATICSUBDIR	"Static"					[$STATIC_LINK]
+$Macro _STATICSUBDIR	"StaticTest"				[$VPC_STATIC_LINK_TEST]
+
+$Conditional DISABLE_TCMALLOC 1					[$LINUXALL]
+// $Conditional LINK_P4API "true"					[$STATIC_LINK && $WINDOWS]
+$Conditional REQUIRES_ITERATOR_DEBUGGING "true" [$LINK_P4API] //or else we get linker errors against the p4api libs
+$Conditional DISABLE_MULTIPROCESSOR_COMPILATION "true"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_base.vpc"		[!$STATIC_LINK]
+$Include "$SRCDIR\vpc_scripts\source_exe_con_base.vpc"	[$STATIC_LINK]
+
+$Configuration
+{
+	$General
+	{
+		$AdditionalProjectDependencies		"$BASE;binlaunch;p4lib;filesystem_stdio"	[!$STATIC_LINK]
+	}
+	
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE;..\..\..\thirdparty\clang\include"
+	
+		$PreprocessorDefinitions			"$BASE;_USRDLL;_USE_32BIT_TIME_T"			[$WIN32]
+		$PreprocessorDefinitions			"$BASE;_USRDLL"								[$WIN64]
+
+		$DisableSpecificWarnings			"$BASE;4005" // 'identifier': macro redefinition
+	}
+	
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE ws2_32.lib" [$WINDOWS]
+		$StackReserveSize				"2097152"
+        $SystemLibraries                "$BASE;iconv" [$OSXALL]
+		$SystemFrameworks 				"$BASE;Foundation;CoreServices" [$OSXALL]
+		$SystemLibraries				"$BASE;rt"						[$LINUXALL]
+	}
+
+	// Note that CS:GO vpc is an exe. The rule below does not fire
+	$PostBuildEvent [$WINDOWS && !$STATIC_LINK && !$ANALYZE]
+	{
+		// Copy binlaunch.exe to our exe.  Don't try to hardlink.
+		// And don't try to sign it.  That makes up-to-date check complicated.
+		$CommandLine		"$BASE" "\n" \
+							"$CALLCOPYBUILDOUTPUTSCRIPT --no-ensure-source-writable --copy $SRCDIR\devtools\bin$PLATSUBDIR\binlaunch.exe $OUTBINDIR\$(TargetName).exe" "\n"
+	}
+
+	$PostBuildEvent [$WINDOWS && $STATIC_LINK && !$ANALYZE]
+	{
+		// Copy dlls over from the game bin directory, to insulate vpc from changes in those dlls
+		// tier0, vstdlib, p4lib, filesystem_stdio
+
+		$CommandLine		"$BASE" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $SRCDIR\devtools\bin\vstdlib.dll $SRCDIR $QUOTEVPC Auto Checkout$QUOTE" "\n" \
+							"copy $SRCDIR\..\game\bin\vstdlib.dll $SRCDIR\devtools\bin" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $SRCDIR\devtools\bin\tier0.dll $SRCDIR $QUOTEVPC Auto Checkout$QUOTE" "\n" \
+							"copy $SRCDIR\..\game\bin\tier0.dll $SRCDIR\devtools\bin" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $SRCDIR\devtools\bin\filesystem_stdio.dll $SRCDIR $QUOTEVPC Auto Checkout$QUOTE" "\n" \
+							"copy $SRCDIR\..\game\bin\filesystem_stdio.dll $SRCDIR\devtools\bin" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $SRCDIR\devtools\bin\p4lib.dll $SRCDIR $QUOTEVPC Auto Checkout$QUOTE" "\n" \
+							"copy $SRCDIR\..\game\bin\p4lib.dll $SRCDIR\devtools\bin" "\n" \
+							"echo Check in contents of changelist $QUOTEVPC Auto Checkout$QUOTE"
+	}
+}
+
+$Project "$VPCNAME"
+{
+	$Folder	"Source Files"
+	{
+		$File	"baseprojectdatacollector.cpp"
+		$File	"$SRCDIR/common/clang/clang_utils.cpp"
+		$File	"clanggenerator.cpp"
+		$File	"conditionals.cpp"
+		$File	"configuration.cpp"
+		$File	"../vpccrccheck/crccheck_shared.cpp"
+		$File	"dependencies.cpp"
+		$File	"$SRCDIR/common/environment_utils.cpp"
+		$File	"$SRCDIR/common/bundled_module_info.cpp"
+		$File	"generatordefinition.cpp"
+		$File	"generated_files.cpp"
+		$File	"groupscript.cpp"
+		$File	"macros.cpp"
+		$File	"main.cpp"
+		$File	"p4sln.cpp"							[$WINDOWS]
+		$File	"pch_helpers.cpp"
+		$File	"projectgenerator_android.cpp"
+//		$File	"projectgenerator_codelite.cpp"
+		$File	"projectgenerator_vcproj.cpp"
+		$File	"projectgenerator_makefile.cpp"
+		$File	"projectgenerator_win32.cpp"
+		$File	"projectgenerator_win32_2010.cpp"
+		$File	"projectgenerator_ps3.cpp"
+		$File	"projectgenerator_xbox360.cpp"
+		$File	"projectgenerator_xbox360_2010.cpp"
+		$File	"projectscript.cpp"
+		$File	"qtgenerator.cpp"
+		$File	"schemagenerator.cpp"
+		$File	"scriptsource.cpp"
+//		$File	"solutiongenerator_codelite.cpp"
+		$File	"solutiongenerator_makefile.cpp"
+		$File	"solutiongenerator_xcode.cpp"
+		$File	"solutiongenerator_win32.cpp"
+		$File	"sys_utils.cpp"
+		$File	"unity.cpp"
+		$File	"updateautoexp.cpp"					[$WINDOWS]
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"baseprojectdatacollector.h"
+		$File	"$SRCDIR/common/clang/clang_utils.h"
+		$File	"dependencies.h"
+		$File	"$SRCDIR/common/environment_utils.h"
+		$File	"generatordefinition.h"
+		$File	"ibaseprojectgenerator.h"
+		$File	"ibasesolutiongenerator.h"
+		$File	"p4sln.h"							[$WINDOWS]
+		$File	"projectgenerator_android.h"
+		$File	"projectgenerator_android.inc"
+//		$File	"projectgenerator_codelite.h"
+		$file	"projectgenerator_ps3.h"
+		$file	"projectgenerator_ps3.inc"
+		$file	"projectgenerator_win32_2010.h"
+		$File	"projectgenerator_win32_2010.inc"
+		$file	"projectgenerator_win32.h"
+		$File	"projectgenerator_win32.inc"
+		$File	"projectgenerator_vcproj.h"
+		$File	"projectgenerator_xbox360.h"
+		$File	"projectgenerator_xbox360.inc"
+		$File	"projectgenerator_xbox360_2010.h"
+		$File	"projectgenerator_xbox360_2010.inc"
+		$File	"projectgenerator_makefile.h"
+		$File	"scriptsource.h"		
+		$file	"sys_utils.h"
+		$File	"vpc.h"
+	}
+	
+	$Folder	"Link Libraries"
+	{
+		$Lib	 "p4lib_staticlink"	[$LINK_P4API]
+
+		$Lib	"$SRCDIR/lib/common/libclient"		[$LINK_P4API && !$VS2015]
+		$Lib	"$SRCDIR/lib/common/libp4sslstub"	[$LINK_P4API && !$VS2015]
+		$Lib	"$SRCDIR/lib/common/librpc"		[$LINK_P4API && !$VS2015]
+		$Lib	"$SRCDIR/lib/common/libsupp"		[$LINK_P4API && !$VS2015]
+
+		$Lib	"$SRCDIR/lib/common/2015/libclient"	[$LINK_P4API && $VS2015]
+		$Lib	"$SRCDIR/lib/common/2015/libp4sslstub"	[$LINK_P4API && $VS2015]
+		$Lib	"$SRCDIR/lib/common/2015/librpc"	[$LINK_P4API && $VS2015]
+		$Lib	"$SRCDIR/lib/common/2015/libsupp"	[$LINK_P4API && $VS2015]
+	}
+
+	$Folder	"VPC Definitions"
+	{
+		$File	"$SRCDIR/vpc_scripts/definitions/ps3.def"
+		$File	"$SRCDIR/vpc_scripts/definitions/xbox360.def"
+		$File	"$SRCDIR/vpc_scripts/definitions/xbox360_2010.def"
+		$File	"$SRCDIR/vpc_scripts/definitions/win32_2005.def"
+		$File	"$SRCDIR/vpc_scripts/definitions/win32_2010.def"
+	}
+}

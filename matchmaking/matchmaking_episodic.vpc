@@ -1,0 +1,49 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_episodic.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro OUTBINNAME "matchmaking"
+
+$Include "matchmaking_episodic_inc.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;MATCHMAKING_DLL" 
+	}
+}
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$OutputDirectory			".\Debug_$GAMENAME"			[$WIN32||$POSIX]
+		$IntermediateDirectory		".\Debug_$GAMENAME"			[$WIN32||$POSIX]
+
+		$OutputDirectory			".\Debug_$GAMENAME_360"		[$X360]
+		$IntermediateDirectory		".\Debug_$GAMENAME_360"		[$X360]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$OutputDirectory			".\Release_$GAMENAME"		[$WIN32||$POSIX]
+		$IntermediateDirectory		".\Release_$GAMENAME"		[$WIN32||$POSIX]
+
+		$OutputDirectory			".\Release_$GAMENAME_360"	[$X360]
+		$IntermediateDirectory		".\Release_$GAMENAME_360"	[$X360]
+	}
+}
+
+$Project "Matchmaking (episodic)"
+{
+	$Folder	"Link Libraries"
+	{
+		$Lib	matchmakingbase
+	}
+}

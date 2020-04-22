@@ -1,0 +1,227 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "DETAIL1"				"0..1"
+// STATIC:  "DETAIL2"				"0..1"
+// STATIC:  "TANGENTTOPACITY"		"0..1"
+// STATIC:  "TANGENTSOPACITY"		"0..1"
+// STATIC:  "FRESNELOPACITY"		"0..1"
+// STATIC:  "VERTEXCOLOR"			"0..1"
+// STATIC:  "FLOWMAP"				"0..1"
+// STATIC:  "MODELFORMAT"			"0..1"
+
+// DYNAMIC: "COMPRESSED_VERTS"		"0..1"
+// DYNAMIC: "SKINNING"				"0..1"
+// DYNAMIC: "VORTEX1"				"0..1"
+// DYNAMIC: "VORTEX2"				"0..1"
+
+// SKIP: ( ( $DETAIL1 == 0 ) && ( $DETAIL2 != 0 ) )
+// SKIP: ( $TANGENTTOPACITY && $TANGENTSOPACITY )
+// SKIP: ( $FLOWMAP && ( $DETAIL1 || $DETAIL2 ) )
+// SKIP: ( ( $FLOWMAP == 0 ) && ( $VORTEX1 || $VORTEX2 ) )
+
+#include "common_fog_vs_fxc.h"
+#include "common_vs_fxc.h"
+
+const float4 cBaseTextureTransform[2]		: register( SHADER_SPECIFIC_CONST_0 ); // 0-1
+const float4 cDetail1TextureTransform[2]	: register( SHADER_SPECIFIC_CONST_2 ); // 2-3
+const float4 g_vEyePosition					: register( SHADER_SPECIFIC_CONST_4 );
+#define g_vEyePos						g_vEyePosition.xyz
+//#define UNUSED						g_vEyePosition.w
+const float4 cDetail2TextureTransform[2]	: register( SHADER_SPECIFIC_CONST_6 ); //6-7
+const float4 g_vVortexPos1_NoiseScale		: register( SHADER_SPECIFIC_CONST_9 );
+#define g_vVortexPos1					g_vVortexPos1_NoiseScale.xyz
+#define g_flNoiseScale					g_vVortexPos1_NoiseScale.w
+const float4 g_vVortexPos2_NormalUVScale	: register( SHADER_SPECIFIC_CONST_10 );
+#define g_vVortexPos2					g_vVortexPos2_NormalUVScale.xyz
+#define g_flNormalUVScale				g_vVortexPos2_NormalUVScale.w
+
+// Structs
+struct VS_INPUT
+{
+	float4 vPos					: POSITION;
+	float2 vTexCoord			: TEXCOORD0;	
+	float4 vNormal				: NORMAL;
+	float3 vTangentS			: TANGENT;
+	float3 vTangentT			: BINORMAL;
+	float4 vUserData			: TANGENT;
+	float4 vBoneWeights			: BLENDWEIGHT;
+	float4 vBoneIndices			: BLENDINDICES;
+	#if ( VERTEXCOLOR )
+		float4 vColor			: COLOR0;
+	#endif
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPos								: POSITION;		// Projection-space position
+	float4 vUV0_UV1								: TEXCOORD0;
+	float4 vFlowUV_UV2							: TEXCOORD1;
+	float4 vIteratedProjPos						: TEXCOORD2;
+	#if ( VORTEX1 )
+		float3 vVortexPositions1				: TEXCOORD3;
+	#endif
+	#if ( VORTEX2 )
+		float3 vVortexPositions2				: TEXCOORD4;
+	#endif
+	#if ( TANGENTSOPACITY || TANGENTTOPACITY || FRESNELOPACITY )
+		float4 vWorldNormal_worldEyeX			: TEXCOORD5;
+		float4 vWorldTangent_worldEyeY			: TEXCOORD6;
+		float4 vTangentAlignedView_worldEyeZ	: TEXCOORD7;
+	#endif
+	#if ( VERTEXCOLOR )
+		float4 vColor						: COLOR0;
+	#endif
+};
+
+// Main
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	float4 projPos;
+	float3 worldPos;
+	float3 vWorldTangentT = float3( 0.0f, 0.0f, 0.0f );
+	float3 vWorldTangentS = float3( 0.0f, 0.0f, 0.0f );
+	float3 vWorldNormal   = float3( 0.0f, 0.0f, 0.0f );
+
+	//SkinPosition( SKINNING, i.vPos, i.vBoneWeights, i.vBoneIndices, worldPos );
+	worldPos = mul4x3( i.vPos, cModel[0] );
+	projPos = mul( float4( worldPos, 1 ), cViewProj );
+	o.vProjPos = projPos;
+	
+	#if ( VERTEXCOLOR )
+	{
+		o.vColor.rgba = i.vColor.rgba;
+	}
+	#endif
+	
+	float3 vCameraToPositionRayWs = g_vEyePos.xyz - worldPos.xyz;
+	float3 vCameraToPositionDirWs = float3( 0.0f, 0.0f, 0.0f );
+	#if( TANGENTTOPACITY || TANGENTSOPACITY || FRESNELOPACITY )
+	{
+		vCameraToPositionDirWs = normalize( vCameraToPositionRayWs );
+		o.vWorldNormal_worldEyeX.w = vCameraToPositionDirWs.x;
+		o.vWorldTangent_worldEyeY.w = vCameraToPositionDirWs.y;
+		o.vTangentAlignedView_worldEyeZ.w = vCameraToPositionDirWs.z;
+	}
+	#endif
+
+	#if ( FRESNELOPACITY || TANGENTTOPACITY || TANGENTSOPACITY || FLOWMAP )
+	{
+		#if ( MODELFORMAT )
+		{
+			float4 vWorldTangent;
+			DecompressVertex_NormalTangent( i.vNormal, i.vUserData, vWorldNormal, vWorldTangent );
+			vWorldTangentT = vWorldTangent.xyz;
+			vWorldTangentS = normalize( cross( vWorldNormal, vWorldTangentT ) * i.vUserData.w );
+			#if ( FRESNELOPACITY || TANGENTTOPACITY || TANGENTSOPACITY )
+			{
+				o.vWorldNormal_worldEyeX.xyz = vWorldNormal;
+			}
+			#endif
+		}
+		#else
+		{
+			vWorldTangentT = mul3x3( i.vTangentT.xyz, ( const float3x3 )cModel[0] );
+			vWorldTangentS = mul3x3( i.vTangentS.xyz, ( const float3x3 )cModel[0] );
+			float3 vObjNormal;
+			DecompressVertex_Normal( i.vNormal, vObjNormal );
+			vWorldNormal = mul3x3( vObjNormal, ( float3x3 )cModel[0] );
+			#if ( FRESNELOPACITY || TANGENTTOPACITY || TANGENTSOPACITY )
+			{
+				o.vWorldNormal_worldEyeX.xyz = vWorldNormal;
+			}
+			#endif
+		}
+		#endif
+		#if ( TANGENTTOPACITY )
+		{
+			o.vWorldTangent_worldEyeY.xyz = vWorldTangentT;
+			float3 vRightT = cross( vWorldTangentS.xyz, vCameraToPositionDirWs.xyz );
+			float3 vAlignedViewT = normalize( cross( vWorldTangentS.xyz, vRightT.xyz ) );
+			o.vTangentAlignedView_worldEyeZ.xyz = vAlignedViewT.xyz;
+		}
+		#elif ( TANGENTSOPACITY )
+		{
+			float3 vRightS = cross( vWorldTangentT.xyz, vCameraToPositionDirWs.xyz );
+			float3 vAlignedViewS = normalize( cross( vWorldTangentT.xyz, vRightS.xyz ) );
+			o.vTangentAlignedView_worldEyeZ.xyz = vAlignedViewS.xyz;
+			o.vWorldTangent_worldEyeY.xyz = vWorldTangentS;
+		}
+		#elif ( FRESNELOPACITY )
+		{
+			o.vTangentAlignedView_worldEyeZ.xyz = float3( 0.0f, 0.0f, 0.0f );
+			o.vWorldTangent_worldEyeY.xyz = float3( 0.0f, 0.0f, 0.0f );
+		}
+		#endif
+	}
+	#endif
+
+	o.vIteratedProjPos = projPos;
+	
+	#ifdef _PS3
+	{
+		// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+		o.vProjPos.y = -o.vProjPos.y;
+		o.vProjPos.z = 2.0f * o.vProjPos.z - o.vProjPos.w;
+	}
+	#endif // _PS3
+
+	o.vUV0_UV1.x = dot( i.vTexCoord.xy, cBaseTextureTransform[0].xy ) + cBaseTextureTransform[0].w;
+	o.vUV0_UV1.y = dot( i.vTexCoord.xy, cBaseTextureTransform[1].xy ) + cBaseTextureTransform[1].w;
+	
+	#if ( DETAIL1 )
+	{
+		o.vUV0_UV1.z = dot( i.vTexCoord.xy, cDetail1TextureTransform[0].xy ) + cDetail1TextureTransform[0].w;
+		o.vUV0_UV1.w = dot( i.vTexCoord.xy, cDetail1TextureTransform[1].xy ) + cDetail1TextureTransform[1].w;
+	}
+	#else
+	{
+		o.vUV0_UV1.zw = float2( 0.0f, 0.0f );
+	}
+	#endif
+
+	#if ( DETAIL2 )
+	{
+		o.vFlowUV_UV2.z = dot( i.vTexCoord.xy, cDetail2TextureTransform[0].xy ) + cDetail2TextureTransform[0].w;
+		o.vFlowUV_UV2.w = dot( i.vTexCoord.xy, cDetail2TextureTransform[1].xy ) + cDetail2TextureTransform[1].w;
+	}
+	#else
+	{
+		o.vFlowUV_UV2.zw = float2( 0.0f, 0.0f );
+	}
+	#endif
+
+	#if ( FLOWMAP )
+	{
+		float2 vFlowUV = i.vTexCoord.xy;
+		#if ( !MODELFORMAT )
+		{
+			vFlowUV = float2( dot( worldPos.xyz, vWorldTangentS.xyz ), dot( worldPos.xyz, vWorldTangentT.xyz ) );
+		}
+		#endif
+		o.vFlowUV_UV2.xy = vFlowUV.xy;
+		o.vFlowUV_UV2.zw = vFlowUV.xy * g_flNoiseScale;
+		o.vUV0_UV1.zw = vFlowUV.xy * g_flNormalUVScale;
+
+		#if ( VORTEX1 )
+		{
+			float3 vVPos1 = g_vVortexPos1.xyz - worldPos.xyz;
+			o.vVortexPositions1.xyz = -float3( dot( vVPos1, vWorldTangentS.xyz ), dot( vVPos1, vWorldTangentT.xyz ), dot( vVPos1, vWorldNormal.xyz ) );
+		}
+		#endif
+		#if ( VORTEX2 )
+		{
+			float3 vVPos2 = g_vVortexPos2.xyz - worldPos.xyz;
+			o.vVortexPositions2.xyz = -float3( dot( vVPos2, vWorldTangentS.xyz ), dot( vVPos2.xyz, vWorldTangentT.xyz ), dot( vVPos2.xyz, vWorldNormal.xyz ) );
+		}
+		#endif
+	}
+	#else
+	{
+		o.vFlowUV_UV2.xy = float2( 0.0f, 0.0f );
+	}
+	#endif
+
+	return o;
+}

@@ -1,0 +1,280 @@
+//-----------------------------------------------------------------------------
+//	LOADADDRESS.VPC
+//
+//	Contains the DLL/EXE Load Addresses. Generates the $LOADADDRESS_??? Macro from
+//	an easily updated table. This feature is primarily to facilitate the mandatory
+//	fixed address specification of 360 DLLs and thus efficient 360 packing of DLLs
+//	into memory.
+//
+//	Format:
+//	$LoadAddressMacro	<MacroName>
+//	{
+//		<ProjectName>	<BaseAddress>
+//	}
+//
+//	$LoadAddressMacroAuto	<MacroName> <BaseAddress>
+//	{
+//		<ProjectName>	<Length>
+//	}
+//
+//	If "ProjectName" is not found, the "MacroName" will not be updated.
+//	"ProjectName" is the internal short project name reference and is usually the name of
+//	the project inside a group definition.
+//
+//	"Length" is either floating point MB or integer bytes, and is used to successively
+//	to determine the next base address. 
+//-----------------------------------------------------------------------------
+
+// Explicitly defined "empty" only for WIN32 or WIN64 only because they are not required for WIN32 projects
+$Macro LOADADDRESS_DEVELOPMENT		" "		[$WINDOWS]
+$Macro LOADADDRESS_RETAIL			" "		[$WINDOWS]
+
+
+// NOTE!!! We ran out of address space on the 360. Since
+// shaderapi + rendersystemdx9 are never going to simultaneously be loaded,
+// we have rendersystemdx9 alias shaderapidx9 so they load in the same place.
+// The same trick is used for worldrenderer + resourcesystem + rendersystemtest/resourcesystemtest.
+$LoadAddressMacroAlias shaderapidx9
+{
+	rendersystemdx9
+}
+
+$LoadAddressMacroAlias datacache
+{
+	resourcesystem
+}
+
+$LoadAddressMacroAlias stdshader_dx9
+{
+	worldrenderer
+}
+
+$LoadAddressMacroAlias materialsystem
+{
+	rendersystemtest
+	resourcesystemtest
+}
+
+$LoadAddressMacroAlias studiorender
+{
+	meshsystem
+}
+
+$LoadAddressMacro LOADADDRESS_DEVELOPMENT
+{
+	launcher_main			0x82000000	[$X360]
+	simdtest				0x82000000	[$X360]
+}
+
+$LoadAddressMacro LOADADDRESS_RETAIL
+{
+	launcher_main			0x82000000	[$X360]
+	simdtest				0x82000000	[$X360]
+}
+
+// DLL address ranges padded to avoid overlap even for debug builds (160MB of 64KB-page virtual memory available for this)
+$LoadAddressMacroAuto LOADADDRESS_DEVELOPMENT	0x82200000 [$X360 && !$PORTAL2 && !$SWARM]
+{
+	// top of chain, due to licensee lack of source restrictions
+	vphysics                   4.75
+	
+	tier0                      1.69
+	vstdlib                    1.56
+	filesystem_stdio           2.69
+	inputsystem                1.31
+	launcher                   1.69
+	SoundEmitterSystem         1.61
+	SceneFileCache             1.06
+	localize                   1.56
+	
+	// this is vgui2
+	vgui_dll                   1.81
+	
+	vscript                    1.94
+	
+	//aliased by resourcesystem
+	datacache                  2.38
+	
+	//aliased by rendersystemdx9
+	shaderapidx9               8.56
+	
+	//aliased by worldrenderer
+	stdshader_dx9              4.62
+	
+	//aliased by rendersystemtest and resourcesystemtest
+	materialsystem             19.5
+	
+	vxbdm                      1.06
+	vguimatsurface             5.13
+
+	//aliased by meshsystem
+	studiorender               6.81
+	
+	engine                    23.69
+	client                    25.12
+	server                    24.56
+	matchmaking                2.81
+	
+	//total size of enumerated dlls
+	//145.78
+}
+
+//Automatically generated! VPC with /define:VPCINFO . Build full debug, run with -dllinfo and paste the spewed table from vxconsole to realign
+$LoadAddressMacroAuto_Padded LOADADDRESS_DEVELOPMENT	0x82200000 [$X360 && $PORTAL2]
+{
+
+	vphysics				4.625
+//	vjobs					2.0
+	datacache				2.3125
+	engine					22.25
+	filesystem_stdio		2.5625
+	inputsystem				1.125
+	launcher				1.4375
+	localize				1.25
+	materialsystem			5.375
+	scenefilecache			0.8125
+	shaderapidx9			13.1875
+	soundemittersystem		1.375
+	stdshader_dx9			4.1875
+	studiorender			6.6875
+	tier0					1.625
+	vgui_dll				1.6875
+	vguimatsurface			4.4375
+	vscript					1.875
+	vstdlib					1.6875
+	vxbdm					0.9375
+	client					25.75
+	matchmaking				2.375
+	server					26.4375
+}
+
+$LoadAddressMacroAuto_Padded LOADADDRESS_DEVELOPMENT	0x82200000 [$X360 && $SWARM]
+{
+	vphysics				4.5
+//	vjobs					2.0
+	datacache				2.3125
+	engine					22.0625
+	filesystem_stdio		2.5625
+	inputsystem				1.125
+	launcher				1.4375
+	localize				1.25
+	materialsystem			5.3125
+	missionchooser			6.375
+	scenefilecache			0.8125
+	shaderapidx9			8.1875
+	soundemittersystem		1.375
+	stdshader_dx9			4.125
+	studiorender			6.625
+	tier0					1.625
+	vgui_dll				1.6875
+	vguimatsurface			4.375
+	vscript					1.875
+	vstdlib					1.6875
+	vxbdm					0.9375
+	client					28.25
+	matchmaking				2.3125
+	server					28.5625
+}
+
+// Retail versions are expected to be minimally packed
+// UNDONE: remove this, there's no point packing for retail (this is a virtual memory range reserved for code!)
+$LoadAddressMacroAuto LOADADDRESS_RETAIL 0x82200000 [$X360]
+{
+	// top of chain, due to licensee lack of source restrictions
+	vphysics				2.5
+//	vjobs					1.0
+
+	tier0					1.0
+	vstdlib					1.0
+	filesystem_stdio		1.0
+	inputsystem				1.0
+	launcher				1.0
+	SoundEmitterSystem		1.0
+	SceneFileCache			1.0
+	localize				0.5
+	vgui_dll				1.0
+	vscript					1.0
+
+	
+	//aliased by resourcesystem
+	datacache				1.0
+
+	//aliased by rendersystemdx9	
+	shaderapidx9			4.0
+
+	//aliased by worldrenderer
+	stdshader_dx9			1.5
+	
+	//aliased by rendersystemtest and resourcesystemtest
+	materialsystem			3.5
+
+	vxbdm					0.5
+	vguimatsurface			1.5
+
+	//aliased by meshsystem
+	studiorender			4.5
+
+	engine					6.0
+	client					10.5
+	server					15.5
+	matchmaking				8.0
+}
+
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// [jason] For reference, the latest results of running the 360 build with -dllinfo:
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Debug - 1/25/2011
+//-----------------------------------------------------------------------------
+//0x826c0000,  1.44 MB, tier0_360.dll
+//0x85b10000,  0.81 MB, vxbdm_360.dll
+//0x82880000,  1.31 MB, vstdlib_360.dll
+//0x83180000,  0.81 MB, scenefilecache_360.dll
+//0x82fe0000,  1.38 MB, soundemittersystem_360.dll
+//0x83290000,  1.31 MB, localize_360.dll
+//0x82cd0000,  1.06 MB, inputsystem_360.dll
+//0x82e20000,  1.44 MB, launcher_360.dll
+//0x84790000, 16.44 MB, materialsystem_360.dll
+//0x83a60000,  8.31 MB, shaderapidx9_360.dll
+//0x86150000,  6.25 MB, studiorender_360.dll
+//0x82a10000,  2.25 MB, filesystem_stdio_360.dll
+//0x83420000,  1.56 MB, vgui2_360.dll
+//0x837f0000,  1.94 MB, datacache_360.dll
+//0x842f0000,  3.81 MB, stdshader_dx9_360.dll
+//0x835f0000,  1.63 MB, vscript_360.dll
+//0x85c20000,  4.81 MB, vguimatsurface_360.dll
+//0x82200000,  4.44 MB, vphysics_360.dll
+//0x86820000, 21.19 MB, engine_360.dll
+//0x8b190000,  2.56 MB, matchmaking_360.dll
+//0x89900000, 21.19 MB, server_360.dll
+//0x87fe0000, 22.69 MB, client_360.dll
+
+//-----------------------------------------------------------------------------
+//  Release - 1/25/2011
+//-----------------------------------------------------------------------------
+// 0x826c0000,  0.50 MB, tier0_360.dll
+// 0x85b10000,  0.25 MB, vxbdm_360.dll
+// 0x82880000,  0.31 MB, vstdlib_360.dll
+// 0x83180000,  0.19 MB, scenefilecache_360.dll
+// 0x82fe0000,  0.31 MB, soundemittersystem_360.dll
+// 0x83290000,  0.25 MB, localize_360.dll
+// 0x82cd0000,  0.25 MB, inputsystem_360.dll
+// 0x82e20000,  0.31 MB, launcher_360.dll
+// 0x84790000,  5.44 MB, materialsystem_360.dll
+// 0x83a60000,  2.13 MB, shaderapidx9_360.dll
+// 0x86150000,  2.44 MB, studiorender_360.dll
+// 0x82a10000,  0.50 MB, filesystem_stdio_360.dll
+// 0x83420000,  0.31 MB, vgui2_360.dll
+// 0x837f0000,  0.38 MB, datacache_360.dll
+// 0x842f0000,  0.81 MB, stdshader_dx9_360.dll
+// 0x835f0000,  0.44 MB, vscript_360.dll
+// 0x85c20000,  1.13 MB, vguimatsurface_360.dll
+// 0x82200000,  1.06 MB, vphysics_360.dll
+// 0x86820000,  7.19 MB, engine_360.dll
+// 0x8b190000,  0.63 MB, matchmaking_360.dll
+// 0x89900000,  7.69 MB, server_360.dll
+// 0x87fe0000,  7.50 MB, client_360.dll

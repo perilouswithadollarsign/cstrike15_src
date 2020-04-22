@@ -1,0 +1,141 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:	"USEBOUNCECOLOR"				"0..0" [vs20]
+// STATIC:	"USEBOUNCECOLOR"				"0..1" [vs30]
+// STATIC:  "FLASHLIGHT"					"0..1"
+// STATIC:  "FLATTEN_STATIC_CONTROL_FLOW"	"0..1" 
+
+// DYNAMIC: "COMPRESSED_VERTS"				"0..1"
+// DYNAMIC: "SKINNING"						"0..1"
+// DYNAMIC: "NUM_LIGHTS"					"0..4" [vs30]
+// DYNAMIC: "NUM_LIGHTS"					"0..2" [vs20] 
+
+// If using static control flow on Direct3D, we should use the NUM_LIGHTS=0 combo
+//  SKIP: ( $FLATTEN_STATIC_CONTROL_FLOW == 0 ) && ( $NUM_LIGHTS > 0 ) [vs20] [PC]
+
+#include "common_fog_vs_supportsvertexfog_fxc.h"
+#include "common_vs_fxc.h"
+
+static const bool g_bSkinning		= SKINNING ? true : false;
+static const int g_FogType			= DOWATERFOG;
+
+const float3 g_vBounceCenter						: register( SHADER_SPECIFIC_CONST_0 );
+const float3 g_vEntityOrigin						: register( SHADER_SPECIFIC_CONST_1 );
+
+#define g_vShadowRimMin   0.01f
+#define g_vShadowRimMax   0.05f
+#define g_vViewFakeRimDir float3( 0.7f, 1.0f, 0.0f )
+
+struct VS_INPUT
+{
+	float4 vPos				: POSITION;
+	float2 vTexCoord0		: TEXCOORD0;
+	float4 vBoneWeights		: BLENDWEIGHT;
+	float4 vBoneIndices		: BLENDINDICES;
+	float4 vNormal			: NORMAL;
+	float4 vColor			: COLOR0;
+	float3 vTangentS		: TANGENT;
+	float3 vTangentT		: BINORMAL;
+	float4 vUserData		: TANGENT;
+};
+
+struct VS_OUTPUT
+{
+	float4 vProjPos								: POSITION;	
+
+	float4 vTexCoord0							: TEXCOORD0;
+	float4 lightAtten							: TEXCOORD1;
+	float4 tangentSpaceTranspose0_FakeRimx		: TEXCOORD2;
+	float4 tangentSpaceTranspose1_FakeRimy		: TEXCOORD3;
+	float4 tangentSpaceTranspose2_FakeRimz		: TEXCOORD4;
+	float4 vWorldPos_projZ						: TEXCOORD5;
+	float4 cAmbient_fRimBoost					: TEXCOORD6;
+	#if defined( SHADER_MODEL_VS_3_0 )
+		float4 vWorldTangentS_vBounceCenterx	: TEXCOORD7;
+		float4 vWorldTangentT_vBounceCentery	: TEXCOORD8;
+		float4 vBounceCenterDir_vBounceCenterz	: TEXCOORD9;
+	#endif
+};
+
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	float4 vPosition, vTangent, vTexCoords;
+	float3 vNormal, worldPos, worldNormal, worldTangentS, worldTangentT;
+
+	vPosition = i.vPos;
+
+	DecompressVertex_NormalTangent( i.vNormal, i.vUserData, vNormal, vTangent );
+
+	// Perform skinning
+	SkinPositionNormalAndTangentSpace( g_bSkinning, vPosition, vNormal, vTangent,
+										i.vBoneWeights, i.vBoneIndices, worldPos,
+										worldNormal, worldTangentS, worldTangentT );
+	
+	// Tangent space transform
+	o.tangentSpaceTranspose0_FakeRimx.xyz = float3( worldTangentS.x, worldTangentT.x, worldNormal.x );
+	o.tangentSpaceTranspose1_FakeRimy.xyz = float3( worldTangentS.y, worldTangentT.y, worldNormal.y );
+	o.tangentSpaceTranspose2_FakeRimz.xyz = float3( worldTangentS.z, worldTangentT.z, worldNormal.z );
+	#if defined( SHADER_MODEL_VS_3_0 )
+		o.vWorldTangentS_vBounceCenterx.xyz = worldTangentS.xyz;
+		o.vWorldTangentT_vBounceCentery.xyz = worldTangentT.xyz;
+	#endif
+
+	o.vTexCoord0.xy = i.vTexCoord0.xy;
+
+	// Transform into projection space
+	o.vProjPos = mul( float4( worldPos, 1 ), cViewProj );
+	o.vWorldPos_projZ.xyz = worldPos.xyz;
+	o.vWorldPos_projZ.w = o.vProjPos.z;
+
+	#if( USEBOUNCECOLOR )
+		o.vBounceCenterDir_vBounceCenterz.xyz = normalize( g_vEntityOrigin + g_vBounceCenter - worldPos );
+		float3 vBounceCenter = g_vEntityOrigin + g_vBounceCenter;
+		o.vWorldTangentS_vBounceCenterx.w = vBounceCenter.x;
+		o.vWorldTangentT_vBounceCentery.w = vBounceCenter.y;
+		o.vBounceCenterDir_vBounceCenterz.w = vBounceCenter.z;
+	#endif
+
+	#if ( FLASHLIGHT )
+		o.tangentSpaceTranspose0_FakeRimx.w = o.vProjPos.x;
+		o.tangentSpaceTranspose1_FakeRimy.w = o.vProjPos.y;
+		o.tangentSpaceTranspose2_FakeRimz.w = o.vProjPos.z;
+	#else
+		float3 vWorldFakeRimDir =  normalize( mul( cViewProj, float4( g_vViewFakeRimDir, 1 ) ).xyz );
+
+		o.tangentSpaceTranspose0_FakeRimx.w = vWorldFakeRimDir.x;
+		o.tangentSpaceTranspose1_FakeRimy.w = vWorldFakeRimDir.y;
+		o.tangentSpaceTranspose2_FakeRimz.w = vWorldFakeRimDir.z;
+	#endif
+
+	// Compute lighting attenuations
+	#if ( FLATTEN_STATIC_CONTROL_FLOW )
+	{
+		#if ( NUM_LIGHTS > 0 )
+			o.lightAtten.x = GetVertexAttenForLight( worldPos.xyz, 0, false );
+		#endif
+		#if ( NUM_LIGHTS > 1 )
+			o.lightAtten.y = GetVertexAttenForLight( worldPos.xyz, 1, false );
+		#endif
+	}
+	#else
+	{
+		o.lightAtten.x = GetVertexAttenForLight( worldPos, 0 );
+		o.lightAtten.y = GetVertexAttenForLight( worldPos, 1 );
+#if defined( SHADER_MODEL_VS_3_0 )
+		o.lightAtten.z = GetVertexAttenForLight( worldPos, 2 );
+		o.lightAtten.w = GetVertexAttenForLight( worldPos, 3 );
+#endif
+	}
+	#endif
+
+	float3 cAmbient = AmbientLight( worldNormal );
+	o.cAmbient_fRimBoost.xyz = cAmbient;
+
+	float3 lum = float3( 0.299, 0.587, 0.114 ); 
+	float fAmbientLightLum = dot( lum, cAmbient );
+	o.cAmbient_fRimBoost.w = smoothstep( g_vShadowRimMax, g_vShadowRimMin, fAmbientLightLum );
+
+	return o;
+}

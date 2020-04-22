@@ -1,0 +1,218 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "DEFERRED_SHADOWS"	"0..1"	[CONSOLE]
+// STATIC: "DEFERRED_SHADOWS"	"0..0"	[PC]
+// STATIC: "BLOBBY_SHADOWS"		"0..1"
+#include "common_fog_ps_fxc.h"
+
+#define HDRTYPE HDR_TYPE_NONE
+#include "common_ps_fxc.h"
+
+const float4 g_ShadowColor						: register( c1 );
+const float3 g_EyePos							: register( c2 );
+const float4 g_FogParams							: register( c3 );
+const float4 g_DeferredParams					: register( c4 );
+#define g_MaxFalloffAmount	g_DeferredParams.x
+#define g_vInvScreenSize	g_DeferredParams.yz
+
+const float4x4 g_mInvViewProj					: register( c5 );
+
+sampler ShadowSampler	: register( s0 );
+sampler sDepth			: register( s1 );
+
+#if DEFERRED_SHADOWS == 0
+
+//////////////////////////////////
+// NORMAL SHADOW SHADER
+//////////////////////////////////
+
+struct PS_INPUT
+{
+	float4 worldPos_projPosZ		: TEXCOORD0;
+	float4 vFalloffParams			: TEXCOORD1_centroid;
+	float3 texCoord0_shadowAlpha	: TEXCOORD2_centroid;
+#if !defined( _X360 )
+	float4 texCoord1_2				: TEXCOORD3_centroid;
+	float4 texCoord3_4				: TEXCOORD4;
+#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float shadowCoverage;
+	
+	#if BLOBBY_SHADOWS == 1
+	{
+		shadowCoverage = tex2D( ShadowSampler, i.texCoord0_shadowAlpha.xy ).a;
+	}
+	#elif !defined( _X360 )
+	{
+		float samples0;
+		float4  samples1_4;
+		samples0 = tex2D( ShadowSampler, i.texCoord0_shadowAlpha.xy ).a;
+		samples1_4.x = tex2D( ShadowSampler, i.texCoord1_2.xy ).a;
+		samples1_4.y = tex2D( ShadowSampler, i.texCoord1_2.wz ).a;
+		samples1_4.z = tex2D( ShadowSampler, i.texCoord3_4.xy ).a;
+		samples1_4.w = tex2D( ShadowSampler, i.texCoord3_4.wz ).a;
+
+		// Interpolate between a bunch of jittered shadow samples.
+		shadowCoverage = samples0 * 0.2 + dot( samples1_4, float4( 0.2, 0.2, 0.2, 0.2 ) );
+	}
+	#else
+	{
+		float samples0 = tex2D( ShadowSampler, i.texCoord0_shadowAlpha.xy ).a;
+		float2 texCoord = i.texCoord0_shadowAlpha.xy;
+		float4 samples1_4;
+		asm {
+			tfetch2D samples1_4.w___, texCoord.xy, ShadowSampler, OffsetX = -1.0, OffsetY = -1.0
+			tfetch2D samples1_4._w__, texCoord.xy, ShadowSampler, OffsetX =  1.0, OffsetY = -1.0
+			tfetch2D samples1_4.__w_, texCoord.xy, ShadowSampler, OffsetX = -1.0, OffsetY =  1.0
+			tfetch2D samples1_4.___w, texCoord.xy, ShadowSampler, OffsetX =  1.0, OffsetY =  1.0
+		};
+
+		// Interpolate between a bunch of jittered shadow samples.
+		shadowCoverage = samples0 * 0.2 + dot( samples1_4, float4( 0.2,0.2,0.2,0.2 ) );
+	}
+	#endif
+
+	// compute "vertex" alpha
+	// NOTE: 0 means black, non-zero adds towards white...
+	float fVertAlpha = saturate( i.vFalloffParams.w * i.vFalloffParams.y + i.vFalloffParams.x );	// could pull the mad into the VS
+	fVertAlpha = saturate( i.vFalloffParams.z + fVertAlpha * g_MaxFalloffAmount );
+	//fVertAlpha = i.texCoord0_shadowAlpha.z;
+
+	// To accomplish shadow fading, subtract vertex alpha from texture alpha
+	shadowCoverage = saturate( shadowCoverage - fVertAlpha );
+		
+	// Blend between white and the constant color...
+	// return lerp( 1.0-shadowCoverage, 1.0, g_ShadowColor );  
+	
+	// this is equivalent, and saves an instruction
+	float4 result = shadowCoverage*g_ShadowColor - shadowCoverage;
+	result = 1.0 + result;
+
+	float alpha = 1.0f;
+
+	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+	
+	// Apply fog here to compensate for our srcColor*dstColor alpha blend into already fogged pixels
+	result.rgb = 1.0f - ( ( 1.0f - result.rgb ) * pow( ( 1.0f - fogFactor ), 4.0f ) );
+
+	// Call FinalOutput without fog!
+	return FinalOutput( float4( result.rgb, alpha ), fogFactor, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}
+
+#else // DEFERRED_SHADOWS == 1
+
+//////////////////////////////////
+// X360 DEFERRED SHADOW SHADER
+//////////////////////////////////
+
+struct PS_INPUT
+{
+	float4 vTexCoordBiasScale	: TEXCOORD0;
+
+	float4 vProjToTex0			: TEXCOORD1_centroid;
+	float4 vProjToTex1			: TEXCOORD2_centroid;
+	float4 vProjToTex2			: TEXCOORD3_centroid;
+	float4 vProjToTex3			: TEXCOORD4;
+	float3 vFalloffParams		: TEXCOORD5;
+
+#ifdef _PS3
+	float4 vPos					: TEXCOORD6;
+#else
+	float2 vPos					: VPOS;
+#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 vPosCS;
+	vPosCS.xy = ( i.vPos.xy+float2(0.5, 0.5) ) * g_vInvScreenSize;
+	vPosCS.z = 1.0 - tex2D( sDepth, vPosCS.xy );
+	vPosCS.w = 1.0;
+	vPosCS.xy = 2.0 * vPosCS.xy - 1.0;
+	vPosCS.y = -vPosCS.y;
+
+	//return float4((1-vPosCS.z).xxx, 1);
+
+	float4 vPosTS;// = mul( vPosCS, g_mScreenToTexture );
+	
+	// Clip space to shadow texture space transform
+	vPosTS.x = dot( vPosCS, i.vProjToTex0 );
+	vPosTS.y = dot( vPosCS, i.vProjToTex1 );
+	vPosTS.z = dot( vPosCS, i.vProjToTex2 );
+	vPosTS.w = dot( vPosCS, i.vProjToTex3 );
+	vPosTS /= vPosTS.w;
+
+	// check if pixel is within shadow frustum, and early-out if it's not
+	float2 vClamped = saturate( vPosTS.xy );
+	vClamped -= vPosTS.xy;
+	clip( 0.0001 - dot( vClamped, vClamped ) );
+
+	// extract normal in texture space
+	float3 vNormalTS = cross( ddx(vPosTS.xyz), ddy(vPosTS.xyz) );
+
+	#if BLOBBY_SHADOWS == 0
+		float2 vTexCoord = i.vTexCoordBiasScale.xy + i.vTexCoordBiasScale.zw * vPosTS.xy;
+	#else
+		float2 vTexCoord = vPosTS.xy;
+	#endif
+
+	float shadowCoverage = 0.0f;
+	#if !defined( _X360 ) || ( BLOBBY_SHADOWS == 1 )
+	{
+		shadowCoverage = tex2D( ShadowSampler, vTexCoord ).a;
+	}
+	#else
+	{
+		float samples0 = tex2D( ShadowSampler, vTexCoord ).a;
+		float4 samples1_4;
+		asm {
+			tfetch2D samples1_4.w___, vTexCoord.xy, ShadowSampler, OffsetX = -1.0, OffsetY = -1.0
+			tfetch2D samples1_4._w__, vTexCoord.xy, ShadowSampler, OffsetX =  1.0, OffsetY = -1.0
+			tfetch2D samples1_4.__w_, vTexCoord.xy, ShadowSampler, OffsetX = -1.0, OffsetY =  1.0
+			tfetch2D samples1_4.___w, vTexCoord.xy, ShadowSampler, OffsetX =  1.0, OffsetY =  1.0
+		};
+
+		// Interpolate between a bunch of jittered shadow samples.
+		shadowCoverage = samples0 * 0.2 + dot( samples1_4, float4( 0.2,0.2,0.2,0.2 ) );
+	}
+	#endif
+
+	// compute "vertex" alpha
+	// NOTE: 0 means black, non-zero adds towards white...
+	float fVertAlpha = saturate( vPosTS.z * i.vFalloffParams.y + i.vFalloffParams.x );	// could pull the mad into the VS
+	fVertAlpha = saturate( i.vFalloffParams.z + fVertAlpha * g_MaxFalloffAmount );
+
+	// To accomplish shadow fading, subtract vertex alpha from texture alpha
+	shadowCoverage = saturate( shadowCoverage - fVertAlpha );
+
+	// mask out shadows on geometry facing away from the shadow direction
+	shadowCoverage *= saturate(sign(vNormalTS.z));
+
+	// TODO: Add fog
+
+	// Blend between white and the constant color...
+	// return lerp( 1.0-shadowCoverage, 1.0, g_ShadowColor );  
+	
+	// this is equivalent, and saves an instruction
+	float4 result = shadowCoverage*g_ShadowColor - shadowCoverage;
+	result = 1.0 + result;
+
+	float alpha = 1.0f;
+
+	// TODO: Add support for fog
+	float fogFactor = 0;	
+	/*
+	// Apply fog here to compensate for our srcColor*dstColor alpha blend into already fogged pixels
+	result.rgb = 1.0f - ( ( 1.0f - result.rgb ) * pow( ( 1.0f - fogFactor ), 4.0f ) );
+	*/
+
+	//return float4( g_shadowColor.rgb, shadowCoverage );
+
+	// Call FinalOutput without fog!
+	return FinalOutput( float4( result.rgb, alpha ), fogFactor, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}
+
+#endif

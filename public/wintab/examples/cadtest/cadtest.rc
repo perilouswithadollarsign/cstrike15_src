@@ -1,0 +1,32 @@
+#include "windows.h"
+#include "cadtest.h"
+
+CadtestMenu MENU
+BEGIN
+    POPUP        "&File"
+    BEGIN
+        MENUITEM "&Open...", IDM_OPEN
+        MENUITEM "&Save", IDM_SAVE
+        MENUITEM "Save &As...", IDM_SAVE_AS
+    END
+    POPUP        "&Edit"
+    BEGIN
+        MENUITEM "&Configure Tablet Context...", IDM_CONFIG
+		MENUITEM "&Persistent Context",			 IDM_PERSIST
+    END
+    POPUP        "&Help"
+    BEGIN
+        MENUITEM "&About Cadtest...", IDM_ABOUT
+    END
+END
+
+AboutBox DIALOG 22, 17, 144, 75
+STYLE DS_MODALFRAME | WS_CAPTION | WS_SYSMENU
+CAPTION "About Cadtest"
+BEGIN
+    CTEXT "LCS/Telegraphics"     -1,       0,  5, 144,  8
+    CTEXT "Cadtest Application"   -1,       0, 14, 144,  8
+    CTEXT "Version 0.0"           -1,       0, 34, 144,  8
+    DEFPUSHBUTTON "OK"          IDOK,      53, 59,  32, 14,      WS_GROUP
+END
+

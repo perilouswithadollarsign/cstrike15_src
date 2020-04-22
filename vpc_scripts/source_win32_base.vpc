@@ -1,0 +1,194 @@
+$Include "$SRCDIR\vpc_scripts\source_lowest_base.vpc"
+
+$Configuration
+{
+	$General
+	{
+		// Request a specific compiler toolset.
+		$PlatformToolset "v110_xp" [$VS2012 && !$ANALYZE] // VS 2012 targeting Windows XP - http://msdn.microsoft.com/en-us/library/vstudio/jj851139.aspx
+		$PlatformToolset "v110" [$VS2012 && $ANALYZE] // VS 2012 for /analyze
+		$PlatformToolset "v120_xp" [$VS2013 && !$ANALYZE] // VS 2013 targeting Windows XP - http://msdn.microsoft.com/en-us/library/vstudio/jj851139.aspx
+		$PlatformToolset "v120" [$VS2013 && $ANALYZE] // VS 2013 for /analyze
+		$PlatformToolset "v140" [$VS2015]
+	}
+
+	$General
+	{
+		$ExecutableDirectories "$(ExecutablePath);$(Path)"
+		// We need to override mt.exe for Win7 compatibiity.  Append paths before $(ExecutablePath) if you need VS to use your tools rather than its own
+		$ExecutableDirectories "$SRCDIR\devtools\vstools;$BASE"									[$WIN32]
+		// VS 2012 compiles fine but does not link. We want to redirect to stub versions of
+		// the tools (like link.exe and mt.exe) so that the link stage will be NOPed when
+		// doing /analyze builds.
+		$ExecutableDirectories "$SRCDIR\devtools\vs_nop_tools;$BASE"							[$ANALYZE]
+	}
+
+	$Compiler
+	{
+		$MultiProcessorCompilation "True"
+
+		// warning C4316: object allocated on the heap may not be aligned 16
+		$DisableSpecificWarnings	"$BASE;4316" [$VS2013]
+
+		// When using /analyze (triggered with /define:ANALYZE on the vpc command line) we want to forcibly disable lots
+		// of warnings (also disabled in platform.h but not everybody includes that).
+		// See platform.h for the list of warnings with explanations.
+		// Note that /analyze for VS 2010 only works with the 32-bit compiler, but for VS 2012 it works on 64-bit
+		// as well.
+		// warning C6296: Ill-defined for-loop.  Loop body only executed once.
+		$DisableSpecificWarnings	"$BASE;6308;6255;6387;6309;6011;6211;6031;6326;6239;6285;6237;6235;6240;6323;6335;6320;6250;6384;6318;6322;6296" [$ANALYZE]
+		// See http://randomascii.wordpress.com/2011/10/04/analyzecommand-line-options/ for details on these options.
+		// /analyze:only may result in fewer warnings being reported, but the warnings it misses should show up in the regular build.
+		$AdditionalOptions	"$BASE /analyze /analyze:stacksize100000" [$ANALYZE]
+		$AdditionalOptions	"$BASE /analyze:only" [$ANALYZE && $ANALYZE_MACHINE] // /analyze:only makes builds faster on buildbot but is terrible for incremental /analyze on developer machines
+
+		// Specify /define:ALLOWSHADOWING to suppress variable shadowing warnings
+		$DisableSpecificWarnings	"$BASE;6244;6246" [$ANALYZE && $ALLOWSHADOWING]
+
+		// warning C28125: The function 'InitializeCriticalSection' must be called from within a try\except block
+		// warning C28160: Error annotation: Calling VirtualFreeEx without the MEM_RELEASE flag frees memory but not address descriptors (VADs); results in address space leaks.
+		// warning C6248: Setting a SECURITY_DESCRIPTOR's DACL to NULL will result in an unprotected object.
+		// warning C6102: Using value from failed function call
+		$DisableSpecificWarnings	"$BASE;28125;28160;6248;6102" [$ANALYZE && ($VS2012 || $VS2013 || $VS2015)]
+
+
+		//Disable specific warnings.
+		// Note parentheses warning level and possibly an 'X' to denote that it's disabled by default (overridden with "/Wall")
+		// Warning Levels:
+		//  1 - Severe
+		//  2 - Significant
+		//  3 - Production Quality
+		//  4 - Informational
+		//	? - No level found. Generally these are "/Wall" and probably level 4 in severity
+		//  A - /analyze only
+		$DisableSpecificWarnings	"$BASE;4061" //(4X) enumerator 'identifier' in switch of enum 'enumeration' is not explicitly handled by a case label
+		$DisableSpecificWarnings	"$BASE;4062" //(4X) enumerator 'identifier' in switch of enum 'enumeration' is not handled
+		$DisableSpecificWarnings	"$BASE;4091" //(1) keyword': ignored on left of 'type' when no variable is declared
+		$DisableSpecificWarnings	"$BASE;4097" //(1) expected pragma parameter to be 'restore' or 'off'
+		$DisableSpecificWarnings	"$BASE;4100" //(4) 'identifier': unreferenced formal parameter
+		$DisableSpecificWarnings	"$BASE;4121" //(4) 'symbol': alignment of a member was sensitive to packing
+		$DisableSpecificWarnings	"$BASE;4127" //(4) conditional expression is constant
+		$DisableSpecificWarnings	"$BASE;4189" [$PROFILE || $RETAIL] //(4) 'identifier': local variable is initialized but not referenced. Ignored when there's a high probability of variables only being used by assertions that are disabled
+		$DisableSpecificWarnings	"$BASE;4191" //(3X) 'operator/operation': unsafe conversion from 'type_of_expression' to 'type_required'. Calling this function through the result pointer may cause your program to fail
+		$DisableSpecificWarnings	"$BASE;4201" //(4) nonstandard extension used: nameless struct/union
+		$DisableSpecificWarnings	"$BASE;4239" //(4) nonstandard extension used: 'token': conversion from 'type1' to 'type2'
+		$DisableSpecificWarnings	"$BASE;4242" //(4X) 'identfier': conversion from 'type1' to 'type1', possible loss of data
+		$DisableSpecificWarnings	"$BASE;4244" [!$STRICT_TYPE_CONVERSION_WARNINGS_ACTIVE] //(2) 'conversion_type': conversion from 'type1' to 'type2', possible loss of data
+		$DisableSpecificWarnings	"$BASE;4250" //(2) 'classname': inherits 'base_classname::member' via dominance
+		$DisableSpecificWarnings	"$BASE;4254" //(4X) 'operator': conversion from 'type1:field_bits' to 'type2:field_bits', possible loss of data
+		$DisableSpecificWarnings	"$BASE;4255" //(4X) 'function': no function prototype given: converting '()' to '(void)'
+		$DisableSpecificWarnings	"$BASE;4263" //(4X) 'function': member function does not override any base class virtual member function
+		$DisableSpecificWarnings	"$BASE;4264" //(1X) 'virtual_function': no override available for virtual member function from base 'classname'; function is hidden
+		$DisableSpecificWarnings	"$BASE;4265" //(3X) 'classname': class has virtual functions, but destructor is not virtual. instances of this class may not be destructed correctly
+		$DisableSpecificWarnings	"$BASE;4266" //(4X) 'virtual_function': no override available for virtual member function from base 'classname'; function is hidden
+		$DisableSpecificWarnings	"$BASE;4296" //(4X) 'operator': expression is always 'boolean_value'
+		$DisableSpecificWarnings	"$BASE;4302" //(2X) 'conversion': truncation from 'type1' to 'type2'
+		$DisableSpecificWarnings	"$BASE;4311" //(1X) 'variable': pointer truncation from 'type1' to 'type2'
+		$DisableSpecificWarnings	"$BASE;4316" //(3) 'identifier': object allocated on the heap may not be aligned 'alignment'
+		$DisableSpecificWarnings	"$BASE;4324" //(4) 'structname': structure was padded due to __declspec(align())
+		$DisableSpecificWarnings	"$BASE;4350" //(1X) behavior change: 'member1' called instead of 'member2'
+		$DisableSpecificWarnings	"$BASE;4351" //(1) new behavior: elements of array 'array' will be default initialized
+		$DisableSpecificWarnings	"$BASE;4355" //(1X) 'this': used in base member initializer list		
+		$DisableSpecificWarnings	"$BASE;4365" //(4X) 'expression': conversion from 'type1' to 'type2', signed/unsigned mismatch
+		$DisableSpecificWarnings	"$BASE;4371" //(3X) 'classname': layout of class may have changed from a previous version of the compiler due to better packing of member 'member'
+		$DisableSpecificWarnings	"$BASE;4388" //(4X) 'comparison': signed/unsigned mismatch
+		$DisableSpecificWarnings	"$BASE;4435" //(4X) 'derived_class': Object layout under /vd2 will change due to virtual base 'base_class'
+		$DisableSpecificWarnings	"$BASE;4456" [$ALLOWSHADOWING] //(3) declaration of 'identifier' hides previous local declaration
+		$DisableSpecificWarnings	"$BASE;4457" [$ALLOWSHADOWING] //(3) declaration of 'identifier' hides function parameter
+		$DisableSpecificWarnings	"$BASE;4458" [$ALLOWSHADOWING] //(3) declaration of 'identifier' hides class member
+		$DisableSpecificWarnings	"$BASE;4459" [$ALLOWSHADOWING] //(3) declaration of 'identifier' hides global declaration
+		$DisableSpecificWarnings	"$BASE;4464" //(?X) relative include path contains '..'
+		$DisableSpecificWarnings	"$BASE;4471" //(4X) 'enumeration': a forward declaration of an unscoped enumeration must have an underlying type (int assumed)
+		$DisableSpecificWarnings	"$BASE;4481" //(4) nonstandard extension used: override specifier 'keyword'
+		$DisableSpecificWarnings	"$BASE;4505" //(4) 'function': unreferenced local function has been removed
+		$DisableSpecificWarnings	"$BASE;4511" //(3) 'class': copy constructor was implicitly defined as deleted
+		$DisableSpecificWarnings	"$BASE;4512" //(4) 'class': assignment operator was implicitly defined as deleted
+		$DisableSpecificWarnings	"$BASE;4514" //(4X) 'function': unreferenced inline function has been removed
+		$DisableSpecificWarnings	"$BASE;4530" //(1) C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc
+		$DisableSpecificWarnings	"$BASE;4544" //(1) 'declaration': default template argument ignored on this template declaration
+		$DisableSpecificWarnings	"$BASE;4547" //(1X) 'operator': operator before comma has no effect; expected operator with side-effect
+		$DisableSpecificWarnings	"$BASE;4548" //(1X) expression before comma has no effect; expected expression with side-effect
+		//$DisableSpecificWarnings	"$BASE;4555" //(1X) expression has no effect; expected expression with side-effect
+		$DisableSpecificWarnings	"$BASE;4571" //(4X) Informational: catch(...) semantics changed since Visual C++ 7.1; structured exceptions (SEH) are no longer caught
+		$DisableSpecificWarnings	"$BASE;4574" //(4X) 'Identifier' is defined to be '0': did you mean to use '#if identifier'?
+		$DisableSpecificWarnings	"$BASE;4577" //(?X) 'noexcept' used with no exception handling mode specified; termination on exception is not guaranteed. Specify /EHsc
+		$DisableSpecificWarnings	"$BASE;4587" //(1) 'anonymous_structure': behavior change: constructor is no longer implicitly called
+		$DisableSpecificWarnings	"$BASE;4611" //(4) interaction between 'function' and C++ object destruction is non-portable
+		$DisableSpecificWarnings	"$BASE;4619" //(3X) #pragma warning: there is no warning number 'number'
+		$DisableSpecificWarnings	"$BASE;4623" //(4X) 'derived class': default constructor was implicitly defined as deleted because a base class default constructor is inaccessible or deleted
+		$DisableSpecificWarnings	"$BASE;4625" //(4X) 'derived class': copy constructor was implicitly defined as deleted because a base class copy constructor is inaccessible or deleted
+		$DisableSpecificWarnings	"$BASE;4626" //(4X) 'derived class': assignment operator was implicitly defined as deleted because a base class assignment operator is inaccessible or deleted
+		$DisableSpecificWarnings	"$BASE;4628" //(1X) digraphs not supported with -Ze. Character sequence 'digraph' not interpreted as alternate token for '%s'
+		$DisableSpecificWarnings	"$BASE;4640" //(3X) 'instance': construction of local static object is not thread-safe
+		$DisableSpecificWarnings	"$BASE;4647" //(?X) call to undefined 'constexpr' function results in a non-constant expression
+		$DisableSpecificWarnings	"$BASE;4668" //(4X) 'symbol' is not defined as a preprocessor macro, replacing with '0' for 'directive'
+		$DisableSpecificWarnings	"$BASE;4702" //(4) unreachable code
+		$DisableSpecificWarnings	"$BASE;4710" //(4X) 'function': function not inlined
+		$DisableSpecificWarnings	"$BASE;4711" //(1) function 'function' selected for automatic inline expansion
+		$DisableSpecificWarnings	"$BASE;4738" //(3X) storing 32-bit float result in memory, possible loss of performance
+		$DisableSpecificWarnings	"$BASE;4748" //(?) /GS can not protect parameters and local variables from local buffer overrun because optimizations are disabled in function
+		$DisableSpecificWarnings	"$BASE;4774" //(4X) ‘<function>’ : format string expected in argument <position> is not a string literal
+		$DisableSpecificWarnings	"$BASE;4777" //(4X) ‘<function>’ : format string ‘<format-string>’ requires an argument of type ‘<type>’, but variadic argument <position> has type ‘<type>’
+		$DisableSpecificWarnings	"$BASE;4786" //(?X) long symbol name
+		$DisableSpecificWarnings	"$BASE;4820" //(4X) 'bytes' bytes padding added after construct 'member_name'
+		$DisableSpecificWarnings	"$BASE;4826" //(2X) Conversion from 'type1 ' to 'type_2' is sign-extended. This may cause unexpected runtime behavior.
+		$DisableSpecificWarnings	"$BASE;4868" //(?X) 'file(line_number)' compiler may not enforce left-to-right evaluation order in braced initialization list
+		$DisableSpecificWarnings	"$BASE;4883" //(?X) function size suppresses optimizations
+		$DisableSpecificWarnings	"$BASE;4917" //(1X) 'declarator': a GUID can only be associated with a class, interface or namespace
+		$DisableSpecificWarnings	"$BASE;4928" //(1X) illegal copy-initialization; more than one user-defined conversion has been implicitly applied
+		$DisableSpecificWarnings	"$BASE;4946" //(1X) reinterpret_cast used between related classes: 'class1' and 'class2'
+		$DisableSpecificWarnings	"$BASE;4986" //(?X) 'function': exception specification does not match previous declaration
+		$DisableSpecificWarnings	"$BASE;4987" //(4X) nonstandard extension used: 'throw (...)'
+		$DisableSpecificWarnings	"$BASE;4996" //(3) functions declared deprecated
+		$DisableSpecificWarnings	"$BASE;5026" [$AT_LEAST_VS2015] //(?X) 'derived class' : move constructor was implicitly defined as deleted because a base class move constructor is inaccessible or deleted
+		$DisableSpecificWarnings	"$BASE;5027" [$AT_LEAST_VS2015] //(?X) 'derived class' : move assignment operator was implicitly defined as deleted because a base class move constructor is inaccessible or deleted
+		$DisableSpecificWarnings	"$BASE;5029" [$AT_LEAST_VS2015] //(?X) nonstandard extension used: alignment attributes in C++ apply to variables, data members and tag types only
+		$DisableSpecificWarnings	"$BASE;5031" [$AT_LEAST_VS2015] //(?X) #pragma warning(pop): likely mismatch, popping warning state pushed in different file
+		$DisableSpecificWarnings	"$BASE;5032" [$AT_LEAST_VS2015] //(?X) detected #pragma warning(push) with no corresponding #pragma warning(pop)
+		$DisableSpecificWarnings	"$BASE;6011" [$ANALYZE] //(A) dereferencing NULL pointer <name>
+		$DisableSpecificWarnings	"$BASE;6014" [$ANALYZE] //(A) Leaking memory.
+		$DisableSpecificWarnings	"$BASE;6031" [$ANALYZE] //(A) return value ignored: <function> could return unexpected value
+		$DisableSpecificWarnings	"$BASE;6211" [$ANALYZE] //(A) Leaking memory <pointer> due to an exception. Consider using a local catch block to clean up memory
+		$DisableSpecificWarnings	"$BASE;6235" [$ANALYZE] //(A) (<non-zero constant> || <expression>) is always a non-zero constant
+		$DisableSpecificWarnings	"$BASE;6237" [$ANALYZE] //(A) (<zero> && <expression>) is always zero. <expression> is never evaluated and may have side effects
+		$DisableSpecificWarnings	"$BASE;6239" [$ANALYZE] //(A) (<non-zero constant> && <expression>) always evaluates to the result of <expression>. Did you intend to use the bitwise-and operator?
+		$DisableSpecificWarnings	"$BASE;6240" [$ANALYZE] //(A) (<expression> && <non-zero constant>) always evaluates to the result of <expression>. Did you intend to use the bitwise-and operator?
+		$DisableSpecificWarnings	"$BASE;6244" [$ALLOWSHADOWING && $ANALYZE] //(A) local declaration of <variable> hides previous declaration at <line> of <file>
+		$DisableSpecificWarnings	"$BASE;6246" [$ALLOWSHADOWING && $ANALYZE] //(A) Local declaration of <variable> hides declaration of same name in outer scope. Additional Information: See previous declaration at <location>.
+		$DisableSpecificWarnings	"$BASE;6250" [$ANALYZE] //(A) Calling <function> VirtualFree without the MEM_RELEASE flag may free memory but not address descriptors (VADs); results in address space leaks
+		$DisableSpecificWarnings	"$BASE;6255" [$ANALYZE] //(A) _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead
+		$DisableSpecificWarnings	"$BASE;6285" [$ANALYZE] //(A) (<non-zero constant> || <non-zero constant>) is always a non-zero constant. Did you intend to use the bitwise-and operator?
+		$DisableSpecificWarnings	"$BASE;6308" [$ANALYZE] //(A) 'realloc' may return null pointer: assigning a null pointer to <variable>, which is passed as an argument to 'realloc', will cause the original memory block to be leaked
+		$DisableSpecificWarnings	"$BASE;6309" [$ANALYZE] //(A) argument <number> is null: it does not adhere to function specification of <function>
+		$DisableSpecificWarnings	"$BASE;6318" [$ANALYZE] //(A) Ill-defined __try/__except: use of the constant EXCEPTION_CONTINUE_SEARCH or another constant that evaluates to zero in the exception-filter expression. The code in the exception handler block is not executed
+		$DisableSpecificWarnings	"$BASE;6320" [$ANALYZE] //(A) exception-filter expression is the constant EXCEPTION_EXECUTE_HANDLER. This may mask exceptions that were not intended to be handled
+		$DisableSpecificWarnings	"$BASE;6322" [$ANALYZE] //(A) empty _except block
+		$DisableSpecificWarnings	"$BASE;6323" [$ANALYZE] //(A) use of arithmetic operator on Boolean type(s)
+		$DisableSpecificWarnings	"$BASE;6326" [$ANALYZE] //(A) potential comparison of a constant with another constant
+		$DisableSpecificWarnings	"$BASE;6335" [$ANALYZE] //(A) leaking process information handle <handlename>
+		$DisableSpecificWarnings	"$BASE;6340" [$ANALYZE] //(A) Mismatch on sign: Incorrect type passed as parameter in call to function
+		$DisableSpecificWarnings	"$BASE;6384" [$ANALYZE] //(A) dividing sizeof a pointer by another value
+		$DisableSpecificWarnings	"$BASE;6387" [$ANALYZE] //(A) <argument> may be <value>: this does not adhere to the specification for the function <function name>: Lines: x, y
+		$DisableSpecificWarnings	"$BASE;28159" [$ANALYZE] //(A) Consider using another function instead.
+		$DisableSpecificWarnings	"$BASE;28182" [$ANALYZE] //(A) Dereferencing NULL pointer.
+		$DisableSpecificWarnings	"$BASE;28183" [$ANALYZE] //(A) The argument could be one value, and is a copy of the value found in the pointer
+		$DisableSpecificWarnings	"$BASE;28195" [$ANALYZE] //(A) The function was declared as acquiring memory in a variable and exited without doing so
+		$DisableSpecificWarnings	"$BASE;28197" [$ANALYZE] //(A) Possibly leaking memory
+		$DisableSpecificWarnings	"$BASE;28198" [$ANALYZE] //(A) Possibly leaking memory due to an exception.
+		$DisableSpecificWarnings	"$BASE;28204" [$ANALYZE] //(A) <function> : Only one of this overload and the one at <filename>(<line>) are annotated for <paramname>: both or neither must be annotated.
+		$DisableSpecificWarnings	"$BASE;28247" [$ANALYZE] //(A)  Model file annotation for function '_vsnprintf': annotation on _Param_(1)/SAL_post, 'RequiresZeroTermination' duplicates header file annotation 'SAL_nullTerminated'. Remove the duplicated annotations from the model file. (Header: c:\program files (x86)\microsoft visual studio 11.0\vc\include\stdio.h(349).)
+		$DisableSpecificWarnings	"$BASE;28251" [$ANALYZE] //(A) Inconsistent annotation for function: this instance has an error
+		$DisableSpecificWarnings	"$BASE;28301" [$ANALYZE] //(A) No annotations for first declaration of <function>.<note1> See <filename>(<line>). <note2>
+
+		// Defines to differentiate 32 from 64 bit builds
+		$PreprocessorDefinitions			"$BASE;PLATFORM_64BITS;WIN64;_WIN64;COMPILER_MSVC64" [$WIN64]
+		$PreprocessorDefinitions			"$BASE;COMPILER_MSVC32" [$WIN32]
+
+		// /Gw is a VS 2013 option that puts global and static variables in individual sections so that the
+		// linker can discard unreferenced data. When building @client /dota with linker optimizations this
+		// reduces the client.dll size by about 1.14%. When linker optimizations are disabled this has no
+		// effect. This option does not show up in the IDE so we need to add it in $AdditionalOptions.
+		// http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
+		$AdditionalOptions	"$BASE /Gw" [$VS2013]
+	}
+}

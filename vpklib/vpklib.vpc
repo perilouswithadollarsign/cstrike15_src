@@ -1,0 +1,34 @@
+//-----------------------------------------------------------------------------
+//	VPKLIB.VPC
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"	
+
+$Linux
+{
+		$BuildForLinux 1
+}
+
+$Configuration
+{
+	$Compiler
+	{
+		//$PreprocessorDefinitions		"$BASE"
+	}
+}
+
+$Project "vpklib"
+{
+	$Folder	"Source Files"
+	{
+		$File	"packedstore.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\vpklib\packedstore.h"
+		$File	"packedstore_internal.h"
+	}
+}

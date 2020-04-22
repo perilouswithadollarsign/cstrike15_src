@@ -1,0 +1,356 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "COMPOSITEMODE"				"0..2"
+// STATIC:  "CASCADED_SHADOW_MAPPING"	"0..1" [ps30]
+// STATIC:	"CSM_MODE"					"0..0" [ = 0 ] [ps20] [ps20b] [PC]
+// STATIC:	"CSM_MODE"					"0..3" [ps30] [PC]
+// STATIC:  "USE_PATTERN1"				"0..1"
+// STATIC:  "USE_PATTERN2"				"0..1"
+// STATIC:  "USE_PATTERN_OFFSET"		"0..1"
+// STATIC:  "USE_LOGO1"					"0..1"
+// STATIC:  "USE_LOGO2"					"0..1"
+// STATIC:  "SWAP_PATTERN_MASKS"		"0..1"
+
+// DYNAMIC: "NUM_LIGHTS"				"0..2" [ps20]
+// DYNAMIC: "NUM_LIGHTS"				"0..4" [ps20b] [ps30]
+// DYNAMIC: "DYN_CSM_ENABLED"			"0..1"
+// DYNAMIC:	"AO_MODE"					"0..1"
+
+// SKIP: ( ( $COMPOSITEMODE == 1 ) && ( $CASCADED_SHADOW_MAPPING != 0 ) )
+// SKIP: ( ( $COMPOSITEMODE == 1 ) && ( $NUM_LIGHTS != 0 ) )
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $DYN_CSM_ENABLED == 1 )
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CSM_MODE != 0 )
+
+// SKIP: ( $USE_PATTERN2 == 1 ) && ( $USE_PATTERN1 == 0 )
+// SKIP: ( $USE_PATTERN_OFFSET == 1 ) && ( $USE_PATTERN1 == 0 && $USE_PATTERN2 == 0 )
+// SKIP: ( $SWAP_PATTERN_MASKS == 1 ) && ( $USE_PATTERN1 == 0 && $USE_PATTERN2 == 0 )
+// SKIP: ( $USE_LOGO2 == 1 ) && ( $USE_LOGO1 == 0 )
+
+// SKIP: ( $COMPOSITEMODE == 2 ) && ( $USE_PATTERN1 == 1 )
+// SKIP: ( $COMPOSITEMODE == 2 ) && ( $USE_PATTERN2 == 1 )
+// SKIP: ( $COMPOSITEMODE == 2 ) && ( $USE_PATTERN_OFFSET == 1 )
+// SKIP: ( $COMPOSITEMODE == 2 ) && ( $USE_LOGO1 == 1 )
+// SKIP: ( $COMPOSITEMODE == 2 ) && ( $USE_LOGO2 == 1 )
+
+// SKIP: ( $AO_MODE == 1 ) && ( $COMPOSITEMODE == 1 )
+// SKIP: ( $AO_MODE == 1 ) && ( $NUM_LIGHTS != 0 )
+// SKIP: ( $AO_MODE == 1 ) && ( $DYN_CSM_ENABLED == 1 )
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+#define NEED_COMPOSITE_INPUTS ( COMPOSITEMODE == 0 || COMPOSITEMODE == 1 ) //3D preview or 2D composite
+#define IS_3D_MODE ( COMPOSITEMODE != 1 ) //Not mode 1, that is anything other than 2D composite mode. Silly name to avoid starting with a numeral
+#define IS_3D_POSTCOMPOSITE ( COMPOSITEMODE == 2 )
+
+#define USE_HALF_LAMBERT false
+
+#define SSAO_EFFECT_MULTIPLIER 0.9f
+
+// SAMPLERS
+sampler			BaseSampler							: register( s0 );
+sampler			NormalMapSampler					: register( s1 );
+
+#if AO_MODE == 0
+	sampler			SSAOMapSampler					: register( s10 );
+#endif
+
+#if NEED_COMPOSITE_INPUTS
+	sampler			AOMapSampler					: register( s2 );
+	sampler			MaskMapSampler					: register( s3 );
+	#if USE_PATTERN1
+		sampler			Pattern1Sampler				: register( s4 );
+	#endif
+	#if USE_PATTERN2
+		sampler			Pattern2Sampler				: register( s6 );
+	#endif
+	sampler			GrimeSampler					: register( s7 );
+	#if USE_PATTERN_OFFSET
+		sampler			OffsetSampler				: register( s8 );
+	#endif
+	#if USE_LOGO1
+		sampler			LogoSampler					: register( s9 );
+	#endif
+#endif
+
+#if IS_3D_MODE
+	sampler		NormalizeSampler					: register( s5 );
+#endif
+
+#if ( CASCADED_SHADOW_MAPPING == 1 )
+	sampler CSMDepthAtlasSampler					: register( s15 );
+	#undef CASCADE_SIZE
+	#define CASCADE_SIZE 3
+	#define CSM_ENABLED 1
+	//#define CSM_VERTEXLIT_AND_UNLIT_GENERIC_BUMP //use the same CSM const registers?
+	#include "csm_common_fxc.h"
+#endif
+
+
+// REGISTERS
+#if IS_3D_MODE
+	const float3			g_cAmbientCube[6]		: register( PSREG_AMBIENT_CUBE ); // 4 through 9
+	PixelShaderLightInfo	cLightInfo[3]			: register( PSREG_LIGHT_INFO_ARRAY ); // 20 through 25
+
+	//for normalized screen-space coords
+	const float4			g_fvConstRegister17			: register( c17 );
+
+	const float4			g_fvConstRegister18			: register( c18 );
+	#define g_vEyePos		g_fvConstRegister18.xyz
+	#define g_flElementDistance g_fvConstRegister18.w
+
+#endif
+
+#if NEED_COMPOSITE_INPUTS
+	const float4	g_fvConstRegister0					: register( c0 );
+	const float4	g_fvConstRegister1					: register( c1 );
+	const float4	g_fvConstRegister2					: register( c2 );
+	const float4	g_fvConstRegister10					: register( c10 );
+	const float4	g_fvConstRegister11					: register( c11 );
+	const float4	g_fvConstRegister12					: register( c12 );
+	
+	#define g_vPattern1Color1 float3( g_fvConstRegister0.x, g_fvConstRegister0.y, g_fvConstRegister0.z )
+	#define g_vPattern1Color2 float3( g_fvConstRegister1.x, g_fvConstRegister1.y, g_fvConstRegister1.z )
+	#define g_vPattern1Color3 float3( g_fvConstRegister2.x, g_fvConstRegister2.y, g_fvConstRegister2.z )
+	#define g_vPattern1Color4 float3( g_fvConstRegister0.w, g_fvConstRegister1.w, g_fvConstRegister2.w )
+	
+	#define g_vPattern2Color1 float3( g_fvConstRegister10.x, g_fvConstRegister10.y, g_fvConstRegister10.z )
+	#define g_vPattern2Color2 float3( g_fvConstRegister11.x, g_fvConstRegister11.y, g_fvConstRegister11.z )
+	#define g_vPattern2Color3 float3( g_fvConstRegister12.x, g_fvConstRegister12.y, g_fvConstRegister12.z )
+	#define g_vPattern2Color4 float3( g_fvConstRegister10.w, g_fvConstRegister11.w, g_fvConstRegister12.w )
+	
+	const float4	g_fvConstRegister13					: register( c13 );
+	#define g_vPattern1Scale	g_fvConstRegister13.x
+	#define g_vPattern2Scale	g_fvConstRegister13.y
+	#define g_flCavityPower		g_fvConstRegister13.z
+	#define g_flOffsetAmount	g_fvConstRegister13.w
+	
+	const float4	g_fvConstRegister14					: register( c14 );
+	#define g_vLogoOffset		g_fvConstRegister14.xy
+	#define g_fLogoScale		g_fvConstRegister14.z
+	#define g_fLogoRotation		g_fvConstRegister14.w
+	
+	const float4	g_fvConstRegister15					: register( c15 );
+	#define g_vLogo2Offset		g_fvConstRegister15.xy
+	#define g_fLogo2Scale		g_fvConstRegister15.z
+	#define g_fLogo2Rotation	g_fvConstRegister15.w
+	
+	const float4	g_fvConstRegister16					: register( c16 );
+	#define g_fLogoMaskCrispnessMin	g_fvConstRegister16.x
+	#define g_fLogoMaskCrispnessMax	g_fvConstRegister16.y
+	#define g_fLogoWear				g_fvConstRegister16.z
+#endif
+
+#define DESAT float3( 0.3f, 0.59f, 0.11f )
+
+float2 rotate( float2 inputUV, float rotateTau )
+{
+   return float2( inputUV.x * cos(rotateTau) - inputUV.y * sin(rotateTau),
+                  inputUV.x * sin(rotateTau) + inputUV.y * cos(rotateTau) );
+}
+
+float2 getLogoUV( float2 inputUV, float2 inputOffset, float inputScale, float inputRotation )
+{
+	float2 vLogoUV = inputUV;
+	vLogoUV -= float2( 0.5f , 0.5f );
+	vLogoUV -= inputOffset;
+	vLogoUV *= inputScale;
+	vLogoUV =  rotate( vLogoUV, inputRotation );
+	return (vLogoUV + float2( 0.5f , 0.5f ));
+}
+
+struct PS_INPUT
+{
+	
+	float4 vBaseUV_PatternUV		: TEXCOORD0;
+	float4 vWearUV_GrungeUV			: TEXCOORD1;
+
+	#if IS_3D_MODE
+		float4 lightAtten				: TEXCOORD2;
+		float3 worldPos					: TEXCOORD3;
+		float3x3 tangentSpaceTranspose	: TEXCOORD4;
+		//	     second row				: TEXCOORD5;
+		//	     third row				: TEXCOORD6;
+		float4 vProjPos					: TEXCOORD7;
+	#endif
+};
+
+float3 PhotoshopOverlay( float3 cBase, float3 cBlend )
+{
+	float3 cNew;
+	cNew = step( 0.5, cBase );
+	cNew = lerp( (cBase*cBlend*2), (1.0-(2.0*(1.0-cBase)*(1.0-cBlend))), cNew );
+	return cNew;
+}
+
+float2 PackFloat2( float f)
+{
+	float2 packed;
+	f *= 256.0f;
+	packed.x = floor( f ) * (1.0f / 256.0f);
+	packed.y = frac( f );
+	return packed;
+}
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+
+#if AO_MODE == 1
+
+	float flLocalDistance = smoothstep( g_flElementDistance - 40.0f, g_flElementDistance + 40.0f, length( g_vEyePos.xyz - i.worldPos.xyz ) );
+
+	float3 vNormalTexel = 2.0f * (tex2D( NormalMapSampler, i.vBaseUV_PatternUV.xy ).rgb) - 1.0f;
+	float3 vWorldPixelNormal = normalize( mul( (float3x3)i.tangentSpaceTranspose, vNormalTexel ) );
+
+	float3 vEyeDir = normalize(g_vEyePos.xyz - i.worldPos.xyz);
+	float3 vLeftDir = cross( vEyeDir, float3(0,0,1) );
+	float3 vUpDir = cross( vEyeDir, vLeftDir );
+
+	return float4( (dot( vLeftDir, vWorldPixelNormal ) + 1.0f) * 0.5f, (dot( vUpDir, vWorldPixelNormal ) + 1.0f) * 0.5f, PackFloat2( flLocalDistance ) );
+
+	//return float4( dot( vLeftDir, vWorldPixelNormal ), dot( vUpDir, vWorldPixelNormal ), PackFloat2( flLocalDistance ) );
+
+#else
+
+	float3 vColorTexel = tex2D( BaseSampler, i.vBaseUV_PatternUV.xy ).rgb;
+	
+	#if NEED_COMPOSITE_INPUTS
+
+		float3 vMasksTexel = tex2D( MaskMapSampler, i.vBaseUV_PatternUV.xy ).rgb;
+		
+		float3 vAOTexel = tex2D( AOMapSampler, i.vBaseUV_PatternUV.xy ).rgb;
+		float flCavityPostPow = pow(vAOTexel.g, g_flCavityPower);
+		vAOTexel.b = smoothstep( g_fLogoMaskCrispnessMin, g_fLogoMaskCrispnessMax, vAOTexel.b );
+		
+		float3 vGrime = tex2D( GrimeSampler, i.vBaseUV_PatternUV.xy ).rgb;
+		
+		#if USE_PATTERN1
+
+			#if SWAP_PATTERN_MASKS
+				vMasksTexel.rg = vMasksTexel.gr;
+			#endif
+
+			float2 vPatternUV = i.vBaseUV_PatternUV.xy;
+
+			#if USE_PATTERN_OFFSET
+				float distAlphaMask = tex2D( OffsetSampler, i.vBaseUV_PatternUV.xy ).a;
+				//offset pattern UVs by distance-field offset mask
+				vPatternUV.x += step( 0.5f, distAlphaMask ) * g_flOffsetAmount;
+			#endif
+
+			//sample patterns
+			float3 vColorPattern1 = tex2D( Pattern1Sampler, vPatternUV * g_vPattern1Scale ).rgb;
+			#if USE_PATTERN2
+				float3 vColorPattern2 = tex2D( Pattern2Sampler, vPatternUV * g_vPattern2Scale ).rgb;
+			#endif
+
+			//bash pattern1 by solid color mask (fixme)
+			vColorPattern1 = lerp( vColorPattern1, float3(0,1,0), vMasksTexel.b );
+			#if USE_PATTERN2
+				vColorPattern2 = lerp( vColorPattern2, float3(0,0,1), vMasksTexel.b );
+			#endif
+
+			//colorize patterns
+			vColorPattern1 = lerp( lerp( lerp( g_vPattern1Color1, g_vPattern1Color2, vColorPattern1.r ), g_vPattern1Color3, vColorPattern1.g ), g_vPattern1Color4, vColorPattern1.b );
+			#if USE_PATTERN2
+				vColorPattern2 = lerp( lerp( lerp( g_vPattern2Color1, g_vPattern2Color2, vColorPattern2.r ), g_vPattern2Color3, vColorPattern2.g ), g_vPattern2Color4, vColorPattern2.b );
+			#endif
+			
+			//apply colorized patterns using per-pattern masks
+			vColorTexel = lerp( vColorTexel, vColorPattern1, vMasksTexel.r );
+			#if USE_PATTERN2
+				vColorTexel = lerp( vColorTexel, vColorPattern2, vMasksTexel.g );
+			#endif
+
+			#if USE_PATTERN_OFFSET
+				//darken seams caused by pattern offset
+				float flPatternOffsetSeamMask = saturate( (abs(distAlphaMask - 0.5f) * 8.0f) + 0.5f);
+				vColorTexel *= flPatternOffsetSeamMask;
+			#endif
+
+		#endif //USE_PATTERN1
+		
+		#if USE_LOGO1
+			float fLogoMaskCavity = vAOTexel.b * pow( (1.0f - flCavityPostPow), g_fLogoWear );
+
+			//logo1
+			float4 vLogoColor = tex2D( LogoSampler, getLogoUV( i.vBaseUV_PatternUV.xy, g_vLogoOffset, g_fLogoScale, g_fLogoRotation ) );
+			//apply logo with alpha
+			vColorTexel.rgb = lerp( vColorTexel.rgb, vLogoColor.rgb, vLogoColor.a * fLogoMaskCavity );
+
+			#if USE_LOGO2
+				//logo2	
+				float4 vLogo2Color = tex2D( LogoSampler, getLogoUV( i.vBaseUV_PatternUV.xy, g_vLogo2Offset, g_fLogo2Scale, g_fLogo2Rotation ) );
+				//apply logo2 with alpha
+				vColorTexel.rgb = lerp( vColorTexel.rgb, vLogo2Color.rgb, vLogo2Color.a * fLogoMaskCavity );
+			#endif
+
+		#endif //USE_LOGO1
+
+		//desaturate by cavity and apply grime
+		vColorTexel = lerp( vColorTexel, dot(DESAT, vColorTexel) * vGrime.rgb, flCavityPostPow );
+		
+		//apply ao
+		vColorTexel *= (2.0f * vAOTexel.r);
+
+	#endif // NEED_COMPOSITE_INPUTS
+
+
+
+	#if !(IS_3D_MODE) // (2d compositing)
+
+		// draw pink squares onto the composite to make sure it's working
+		//if ( fmod( i.vBaseUV_PatternUV.x, 0.1f ) < 0.05f && fmod( i.vBaseUV_PatternUV.y, 0.1f ) < 0.05f )
+		//{
+		//	vColorTexel = float3(1,0,1);
+		//}
+
+		float4 cOut = float4( vColorTexel.rgb, 1 );
+		return cOut;
+
+	#else // (any 3d mode)
+
+		// apply normal map driven lighting in 3d mode
+
+		float3 vNormalTexel = 2.0f * (tex2D( NormalMapSampler, i.vBaseUV_PatternUV.xy ).rgb) - 1.0f;
+		float3 vWorldPixelNormal = normalize( mul( (float3x3)i.tangentSpaceTranspose, vNormalTexel ) );
+
+		//return float4( vNormalTexel, 1 );
+
+		#if ( (CASCADED_SHADOW_MAPPING == 1) && (DYN_CSM_ENABLED == 1) )
+			float flCSMShadow = CSMComputeShadowing( i.worldPos );
+		#else
+			float flCSMShadow = 1.0f;
+		#endif
+
+		float3 linearColor =	PixelShaderDoLighting( i.worldPos, vWorldPixelNormal, float3( 0.1f, 0.1f, 0.1f), 
+								false, true, i.lightAtten, g_cAmbientCube, NormalizeSampler, NUM_LIGHTS, cLightInfo, 
+								USE_HALF_LAMBERT, false, NULL, flCSMShadow );
+		
+
+		#if IS_3D_POSTCOMPOSITE
+
+			//incorporate AO from the offscreen buffer rendered earlier in the frame
+
+			float2 vScreenPos = (i.vProjPos.xy / i.vProjPos.w) * g_fvConstRegister17.xy + g_fvConstRegister17.zw;
+			vScreenPos += float2( 0.0005f, 0.0005f );
+			float3 vAO = tex2D( SSAOMapSampler, vScreenPos).rgb;
+			
+			float flCenterDepth = length( g_vEyePos.xyz - i.worldPos.xyz );
+			float flDepthFadeDistance = smoothstep( 500.0f, 400.f, flCenterDepth );
+
+			linearColor = lerp( linearColor, linearColor * vAO, flDepthFadeDistance * SSAO_EFFECT_MULTIPLIER );
+
+		#endif // IS_3D_POSTCOMPOSITE
+
+
+		vColorTexel *= linearColor;
+		//vColorTexel = linearColor;
+
+		float4 cOut = float4( vColorTexel.rgb, 1 );
+		return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR );
+		
+	#endif // any 3D mode
+
+#endif // not AO_MODE
+}

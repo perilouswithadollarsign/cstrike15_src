@@ -1,0 +1,45 @@
+//-----------------------------------------------------------------------------
+//	MDLLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_win32_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE,$SRCDIR\ps3sdk\cell\host-common\include,$SRCDIR\ps3sdk\cell\target\common\include"	[$PS3SDKINSTALLED]
+	}
+
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE libedgegeomtool.Release.Win32.vs8.lib"	[$PS3SDKINSTALLED]
+		$AdditionalLibraryDirectories	"$BASE;$(XEDK)\lib\win32\vs2010"
+		$AdditionalLibraryDirectories	"$BASE;$SRCDIR\ps3sdk\cell\host-win32\lib"		[$PS3SDKINSTALLED]
+	}		
+}
+
+$Project "mdllib"
+{
+	$Folder	"Source Files"
+	{
+		$File	"mdllib.cpp"
+		$File	"mdllib_stripinfo.cpp"
+		$File	"mdllib_stripmodel.cpp"
+		$File	"mdllib_preparemodelps3.cpp"	[$PS3SDKINSTALLED]
+		$File	"mdllib_utils.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\mdllib\mdllib.h"
+		$File	"mdllib_common.h"
+		$File	"mdllib_stripinfo.h"
+		$File	"mdllib_utils.h"
+	}
+}

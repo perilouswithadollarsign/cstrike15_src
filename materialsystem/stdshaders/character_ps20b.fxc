@@ -1,0 +1,740 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:	"MASKS1"					"0..1"		
+// STATIC:	"MASKS2"					"0..1"
+// STATIC:	"FRESNELRANGESTEXTURE"		"0..1"		
+// STATIC:	"PHONGWARPTEXTURE"			"0..1"		[ps30]
+// STATIC:	"ENVMAP"					"0..1"
+// STATIC:	"AMBIENTREFLECTION"			"0..1"		
+// STATIC:	"USEBOUNCECOLOR"			"0..1"		[ps30]
+// STATIC:	"ANISOTROPY"				"0..1"		[ps30]
+// STATIC:	"BASEALPHAPHONGMASK"		"0..1"		[ps30]
+// STATIC:	"BASEALPHAENVMASK"			"0..1"
+// STATIC:	"BUMPALPHAENVMASK"			"0..1"
+// STATIC:	"SHADOWSATURATION"			"0..1"		[ps30]
+// STATIC:  "BASEALPHASELFILLUMMASK"	"0..1"	
+// STATIC:  "FAKERIM"					"0..1"
+// STATIC:  "CASCADED_SHADOW_MAPPING"	"0..1"		[ps30]
+// STATIC:	"CSM_MODE"					"0..3"		[ps30]
+// STATIC:  "DOPREVIEW"					"0..1"
+// STATIC:  "USEPATTERN"				"0..4"
+// STATIC:  "FLASHLIGHT"				"0..1"
+// STATIC:  "FLASHLIGHTDEPTHFILTERMODE" "0..3"
+
+// DYNAMIC: "NUM_LIGHTS"				"0..4"		[ps30]
+// DYNAMIC: "DYN_CSM_ENABLED"			"0..1"		
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"
+// DYNAMIC: "WRITEWATERFOGTODESTALPHA"	"0..1"
+
+#include "common_fog_ps_fxc.h"
+
+// SKIP: ( $AMBIENTREFLECTION == 0 ) && ( $USEBOUNCECOLOR == 1 )
+// SKIP: ( $BASEALPHAENVMASK == 1 ) && ( $ENVMAP == 0 )
+// SKIP: ( $BUMPALPHAENVMASK == 1 ) && ( $ENVMAP == 0 )
+// SKIP: ( $BASEALPHAENVMASK == 1 ) && ( $BUMPALPHAENVMASK == 1 )
+// SKIP: ( $BASEALPHASELFILLUMMASK == 1) && ( $BASEALPHAENVMASK == 1 )
+// SKIP: ( $BASEALPHASELFILLUMMASK == 1) && ( $BASEALPHAPHONGMASK == 1 )
+// SKIP: ( $BASEALPHAENVMASK == 1 ) && ( $BASEALPHASELFILLUMMASK )
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $DYN_CSM_ENABLED == 1 )
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CSM_MODE != 0 ) 
+// SKIP: ( $DOPREVIEW == 0 ) && ( $USEPATTERN != 0 )
+// SKIP: ( $DOPREVIEW == 1 ) && ( $USEBOUNCECOLOR == 1 )
+// SKIP: ( $DOPREVIEW == 1 ) && ( $BASEALPHASELFILLUMMASK == 1)
+// SKIP: ( $DOPREVIEW == 1 ) && ( $FAKERIM == 1 )
+// SKIP: ( $DOPREVIEW == 1 ) && ( $CSM_MODE > 0 )
+// SKIP: ( $DOPREVIEW == 1 ) && ( $DYN_CSM_ENALBED == 1 )
+// SKIP: ( $DOPREVIEW == 1 ) && ( $NUM_LIGHTS > 1 )
+// SKIP: ( $DOPREVIEW == 1 ) && ( $FLASHLIGHT == 1 )
+// SKIP: ( $CASCADED_SHADOW_MAPPING > 0) && ( $FLASHLIGHT == 1 )
+// SKIP: ( $DYN_CSM_ENALBED == 1 ) && ( $FLASHLIGHT == 1 )
+// SKIP: ( $CSM_MODE > 0 ) && ( $FLASHLIGHT == 1 )
+// SKIP: ( $FLASHLIGHTDEPTHFILTERMODE > 0 ) && ( $FLASHLIGHT == 0 )
+// SKIP: ( $FLASHLIGHT == 1 ) && ( $FAKERIM == 1 )
+
+#define PHONG 1
+#define RIMLIGHT 1
+#define BUMPMAP 1
+#define HALFLAMBERT 0
+ 
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+#if ( DOPREVIEW == 1 )
+	#define GENERATEBASETEXTURE 1
+	#if ( BUMPMAP == 1 )
+		#define GENERATENORMAL 1
+	#endif
+	#if( MASKS1 == 1 )
+		#define GENERATEMASKS1 1
+	#endif
+	#define CHEAPFILTERING 1
+	#include "custom_character_fxc.h"
+#endif
+
+sampler BaseTextureSampler			: register( s0 );
+sampler NormalMapSampler			: register( s1 );
+#if ( DOPREVIEW == 1 )
+	sampler Masks1Sampler				: register( s2 );
+#else
+	sampler Masks1Sampler				: register( s10 );
+#endif
+sampler Masks2Sampler				: register( s3 );
+sampler FresnelRangesSampler		: register( s4 );
+sampler NormalizeSampler			: register( s5 );
+sampler EnvmapSampler				: register( s6 );
+sampler PhongWarpSampler			: register( s7 );
+
+
+#if ( FLASHLIGHT == 1 )
+#include "common_flashlight_fxc.h"
+	sampler FlashlightSampler			: register( s8 );
+	sampler ShadowDepthSampler			: register( s11 );
+#else
+	sampler CSMDepthAtlasSampler		: register( s8 );
+#endif
+
+//#undef CASCADED_SHADOW_MAPPING
+//#define CASCADED_SHADOW_MAPPING 1
+
+#if ( CASCADED_SHADOW_MAPPING == 1 )
+	#define CASCADE_SIZE 3
+	#define CSM_ENABLED 1
+	#include "csm_common_fxc.h"
+#endif
+
+const float4 g_vBounceTerms							: register( c0 );
+#define		 g_cBounce								g_vBounceTerms.rgb
+#define		 g_fAmbientBounceBoost					g_vBounceTerms.w
+
+const float4 g_vDiffuseModulation					: register( c1 );
+
+const float4 g_vDiffuseTerms						: register( c101 );
+#define		 g_fEnvmapLightScale					g_vDiffuseTerms.x
+#define		 g_fShadowSaturation					g_vDiffuseTerms.y
+#define		 g_fMetalness							g_vDiffuseTerms.z
+#define		 g_fRimLightAlbedo						g_vDiffuseTerms.w
+
+const float4 g_vShadowSaturationBounds				: register( c2 );
+const float3 g_vEyePos								: register( c3 );
+
+const float3 g_cAmbientCube[6]						: register( PSREG_AMBIENT_CUBE ); // (c4-c9)
+
+const float4 g_vPhongTerms							: register( c10 );
+#define		 g_fPhongBoost							g_vPhongTerms.x
+#define		 g_fPhongAlbedoBoost					g_vPhongTerms.y
+#define		 g_fPhongExponent						g_vPhongTerms.z
+#define		 g_fAnisotropyAmount					g_vPhongTerms.w
+
+const float4 g_vPhongTint_ShadowRimBoost			: register( c11 );
+#define		 g_cPhongTint							g_vPhongTint_ShadowRimBoost.rgb
+#define		 g_fShadowRimBoost						g_vPhongTint_ShadowRimBoost.w
+
+const float3 g_vFresnelRanges						: register( c12 );
+const float4 g_cShadowTint							: register( c102 );
+
+const float4 g_vEnvmapTerm							: register( c103 );
+#define		 g_vEnvmapLightScaleMin					g_vEnvmapTerm.xxx
+#define		 g_vEnvmapLightScaleMax					g_vEnvmapTerm.yyy
+#define		 g_fEnvmapContrast						g_vEnvmapTerm.z
+#define		 g_fEnvmapSaturation					g_vEnvmapTerm.w
+
+const float3 g_cEnvmapTint							: register( c104 );
+
+const float4 g_vRimTerms_SelfIllumTerms				: register( c105 );
+#define		 g_fRimLightExponent					g_vRimTerms_SelfIllumTerms.x
+#define		 g_fRimLightBoost						g_vRimTerms_SelfIllumTerms.y
+#define		 g_fSelfIllumBoost						g_vRimTerms_SelfIllumTerms.z
+#define		 g_fWarpIndex							g_vRimTerms_SelfIllumTerms.w
+
+const float4 g_cRimLightTint_fRimHaloBoost			: register( c106 );
+#define		 g_cRimLightTint						g_cRimLightTint_fRimHaloBoost.xyz
+#define		 g_fRimHaloBoost						g_cRimLightTint_fRimHaloBoost.w
+
+
+const float4 g_vFakeRimTint_ShadowScale				: register( c107 );
+#define		 g_cFakeRimTint							g_vFakeRimTint_ShadowScale.rgb
+#define		 g_fShadowScale							g_vFakeRimTint_ShadowScale.w
+
+const float4 g_FogParams							: register( c19 );
+
+PixelShaderLightInfo g_cLightInfo[3]				: register( PSREG_LIGHT_INFO_ARRAY ); // (c20-c25)
+
+const float4 g_vRimHaloBounds						: register( c33 );
+
+//const float4 cFlashlightColor						: register( PSREG_FLASHLIGHT_COLOR ); // c28 - 31
+const float4 g_FlashlightAttenuationFactors			: register( PSREG_FLASHLIGHT_ATTENUATION );
+const float4 g_FlashlightPos_RimBoost				: register( PSREG_FLASHLIGHT_POSITION_RIM_BOOST );  
+#define		 g_FlashlightPos						g_FlashlightPos_RimBoost.xyz
+const float4x4 g_FlashlightWorldToTexture			: register( PSREG_FLASHLIGHT_TO_WORLD_TEXTURE );
+const float4 g_vShadowTweaks						: register( c109 );
+
+#define g_fRetroReflectivityBoost 5.0f
+#define g_fRetroReflectivityPower 4.0f
+
+struct PS_INPUT
+{
+	float4 vTexCoord0							: TEXCOORD0;
+	float4 lightAtten							: TEXCOORD1;
+	float4 tangentSpaceTranspose0_FakeRimx		: TEXCOORD2;  // when flashlight is on, the .w components
+	float4 tangentSpaceTranspose1_FakeRimy		: TEXCOORD3;  // hold the projection position
+	float4 tangentSpaceTranspose2_FakeRimz		: TEXCOORD4;  // instead of rim params
+	float4 vWorldPos_projZ						: TEXCOORD5;
+	float4 cAmbient_fRimBoost					: TEXCOORD6;
+	#if defined( SHADER_MODEL_PS_3_0 )
+		float4 vWorldTangentS_vBounceCenterx	: TEXCOORD7;
+		float4 vWorldTangentT_vBounceCentery	: TEXCOORD8;
+		float4 vBounceCenterDir_vBounceCenterz	: TEXCOORD9;
+	#endif
+};
+
+float3 saturateColor( float3 c1, float fsat )
+{
+	float3 finalColor = c1;
+
+	if ( fsat != 0 )
+	{
+
+		// perceptual luminance
+		float3 lum = float3( 0.299, 0.587, 0.114 );
+
+		float3 c2 = pow( c1, 4 );
+		float luminance1 = dot( c1, lum );
+
+		if ( fsat < 0 )
+		{
+			finalColor = lerp( c1, luminance1, -fsat );
+		}
+		else
+		{
+			float luminance2 = dot( c2, lum );
+			luminance2 = max( luminance2, 0.000001f );
+			c2 = c2 * luminance1 / luminance2;
+			finalColor = lerp( c1, c2, fsat );
+		}
+	}
+	return finalColor;
+}
+
+float3 tintColor( float3 c1, float3 tint, float amt )
+{
+   // perceptual luminance
+   float3 lum = float3( 0.299, 0.587, 0.114 ); 
+
+   float3 c2 = tint;
+   float luminance1 = dot( c1, lum );
+   float luminance2 = dot( c2, lum );
+   luminance2 = max( luminance2, 0.000001f );
+   c2 = c2 * luminance1 / luminance2 ;
+   return lerp( c1, c2, amt );
+}
+
+void CharacterSpecularAndRimTerms( const float3 vWorldNormal, const float3 vLightDir, const float fSpecularExponent, const float3 vEyeDir,
+						  const bool bDoSpecularWarp, in sampler specularWarpSampler,
+						  const float3 color, const bool bDoRimLighting, const float fRimExponent, const float fWarpIndex,
+						  const bool bDoAnisotropy, const float fAnisoAmount, const float VdotT, const float sVdotT, const float vTangent,
+						  const bool bDoRetroReflectivity, const float fRetroReflectivityAmount, const float fRetroReflectivityFresnel,
+
+						  // Outputs
+						  out float3 specularLighting, out float3 rimLighting, out float rimHalo )
+{
+	float3 vHalfAngle = normalize( vEyeDir.xyz + vLightDir.xyz );
+	float flNDotH = saturate( dot( vWorldNormal.xyz, vHalfAngle.xyz ) );
+	float flNDotL = saturate( dot( vWorldNormal, vLightDir ) );
+	specularLighting = float3( 0.0f, 0.0f, 0.0f );
+	
+	if ( bDoAnisotropy )
+	{
+		float LdotT = dot( vLightDir, vTangent );
+		float sLdotT = sqrt( 1 - LdotT * LdotT );
+
+		float anisotropicSpecular = saturate( VdotT * LdotT + sVdotT * sLdotT );
+		/*if ( bDoSpecularWarp )
+		{
+			anisotropicSpecular = pow( anisotropicSpecular, 16.0f ); // need to raise it to a power to keep anisotropic feel, otherwise the falloff is too abrupt
+		}*/
+		flNDotH = lerp( flNDotH, anisotropicSpecular, fAnisoAmount );
+	}
+
+	// Optionally warp as function of scalar specular
+	if ( bDoSpecularWarp )
+	{
+		specularLighting = tex2D( specularWarpSampler, float2( flNDotH, fWarpIndex ) ).rgb;
+	}
+	else
+	{
+		specularLighting = pow( flNDotH, fSpecularExponent );
+	}
+
+	if ( bDoRetroReflectivity )
+	{
+		float flVDotL = saturate( dot( vEyeDir.xyz, vLightDir.xyz ) );
+		specularLighting = lerp( specularLighting, fRetroReflectivityFresnel * flVDotL * g_fRetroReflectivityBoost, fRetroReflectivityAmount );
+	}
+
+	specularLighting *= pow( flNDotL, 0.5 );
+	specularLighting *= color;													// Modulate with light color
+
+	// Optionally do rim lighting
+	rimLighting = float3( 0.0, 0.0, 0.0 );
+	rimHalo = 0;
+	if ( bDoRimLighting )
+	{
+		float flNDotV = 1.0f - saturate( dot( vWorldNormal.xyz, vEyeDir.xyz ) );
+
+		rimHalo  = flNDotH * flNDotL;													
+		rimHalo *=  pow( flNDotV, fRimExponent );							
+		rimHalo *= pow( flNDotL, 0.5 );
+
+		rimLighting = rimHalo * color;
+	}
+}
+
+void CharacterDoSpecularLighting( const float3 worldPos, const float3 vWorldNormal, const float fSpecularExponent, const float3 vEyeDir,
+								  const float4 lightAtten, const int nNumLights, PixelShaderLightInfo cLightInfo[3],
+								  const bool bDoSpecularWarp, in sampler specularWarpSampler,
+								  const bool bDoRimLighting, const float fRimExponent, const float flDirectShadow, const float fWarpIndex,
+								  const bool bDoAnisotropy, const float fAnisoAmount, const float fAnisotropyAngle, 
+								  const float3 vTangent,
+								  const bool bDoRetroReflectivity, const float fRetroReflectivityAmount, const float3 ambient,
+
+								  // Outputs
+								  out float3 specularLighting, out float3 rimLighting, out float rimHalo )
+{
+	specularLighting = rimLighting = float3( 0.0f, 0.0f, 0.0f );
+	rimHalo = 0.0f;
+	float3 localSpecularTerm, localRimTerm = float3( 0.0f, 0.0f, 0.0f );
+	float localRimHalo = 0.0f;
+	float flVDotN = 0.0f;
+	if ( bDoRetroReflectivity )
+	{
+		flVDotN = saturate( dot( vWorldNormal.xyz, vEyeDir.xyz ) );
+		flVDotN = pow( flVDotN, g_fRetroReflectivityPower );
+		specularLighting += fRetroReflectivityAmount * flVDotN * ambient * g_fRetroReflectivityBoost;
+	}
+
+	float VdotT = 1;
+	float sVdotT = 1;
+	if ( bDoAnisotropy )
+	{
+	
+		VdotT = dot( vEyeDir, vTangent );
+		sVdotT = sqrt( 1 - VdotT * VdotT );
+	}
+
+	if( nNumLights > 0 )
+	{
+		// First local light will always be forced to a directional light in CS:GO (see CanonicalizeMaterialLightingState() in shaderapidx8.cpp) - it may be completely black.
+		CharacterSpecularAndRimTerms( vWorldNormal, PixelShaderGetLightVector( worldPos, cLightInfo, 0 ), fSpecularExponent, vEyeDir,
+							 bDoSpecularWarp, specularWarpSampler, PixelShaderGetLightColor( cLightInfo, 0 ) * lightAtten[0],
+							 bDoRimLighting, fRimExponent, fWarpIndex,
+							 bDoAnisotropy, fAnisoAmount, VdotT, sVdotT, vTangent,
+							 bDoRetroReflectivity, fRetroReflectivityAmount, flVDotN,
+							 localSpecularTerm, localRimTerm, localRimHalo );
+
+
+		specularLighting += localSpecularTerm * flDirectShadow;		// Accumulate specular and rim terms
+		rimLighting += localRimTerm * flDirectShadow;
+		rimHalo += localRimHalo;
+	}
+
+	if( nNumLights > 1 )
+	{
+		CharacterSpecularAndRimTerms( vWorldNormal, PixelShaderGetLightVector( worldPos, cLightInfo, 1 ), fSpecularExponent, vEyeDir,
+							 bDoSpecularWarp, specularWarpSampler, PixelShaderGetLightColor( cLightInfo, 1 ) * lightAtten[1],
+							 bDoRimLighting, fRimExponent, fWarpIndex,
+							 bDoAnisotropy, fAnisoAmount, VdotT, sVdotT, vTangent,
+							 bDoRetroReflectivity, fRetroReflectivityAmount, flVDotN,
+							 localSpecularTerm, localRimTerm, localRimHalo );
+
+		specularLighting += localSpecularTerm;		// Accumulate specular and rim terms
+		rimLighting += localRimTerm;
+		rimHalo += localRimHalo;
+	}
+
+
+	if( nNumLights > 2 )
+	{
+		CharacterSpecularAndRimTerms( vWorldNormal, PixelShaderGetLightVector( worldPos, cLightInfo, 2 ), fSpecularExponent, vEyeDir,
+							 bDoSpecularWarp, specularWarpSampler, PixelShaderGetLightColor( cLightInfo, 2 ) * lightAtten[2],
+							 bDoRimLighting, fRimExponent, fWarpIndex,
+							 bDoAnisotropy, fAnisoAmount, VdotT, sVdotT, vTangent,
+							 bDoRetroReflectivity, fRetroReflectivityAmount, flVDotN,
+							 localSpecularTerm, localRimTerm, localRimHalo );
+
+		specularLighting += localSpecularTerm;		// Accumulate specular and rim terms
+		rimLighting += localRimTerm;
+		rimHalo += localRimHalo;
+	}
+
+	if( nNumLights > 3 )
+	{
+		CharacterSpecularAndRimTerms( vWorldNormal, PixelShaderGetLightVector( worldPos, cLightInfo, 3 ), fSpecularExponent, vEyeDir,
+							 bDoSpecularWarp, specularWarpSampler, PixelShaderGetLightColor( cLightInfo, 3 ) * lightAtten[3],
+							 bDoRimLighting, fRimExponent, fWarpIndex,
+							 bDoAnisotropy, fAnisoAmount, VdotT, sVdotT, vTangent,
+							 bDoRetroReflectivity, fRetroReflectivityAmount, flVDotN,
+							 localSpecularTerm, localRimTerm, localRimHalo );
+
+		specularLighting += localSpecularTerm;		// Accumulate specular and rim terms
+		rimLighting += localRimTerm;
+		rimHalo += localRimHalo;
+	}
+}
+
+float3 desaturateColor( float3 c1 )
+{
+   // perceptual luminance
+   float3 lum = float3( 0.299, 0.587, 0.114 ); 
+
+
+   return dot( c1, lum );
+}
+
+
+// ======================= MAIN ======================= //
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 vBaseTextureSample = tex2D( BaseTextureSampler, i.vTexCoord0.xy );
+	#if ( MASKS1 )
+		float4 vMasks1Params = tex2D( Masks1Sampler, i.vTexCoord0.xy );
+	#else
+		float4 vMasks1Params = float4( 1.0f, 0.0f, 1.0f, 0.0f );
+	#endif
+	#if ( BUMPMAP )
+		float4 vNormalSample = tex2D( NormalMapSampler, i.vTexCoord0.xy );
+	#else
+		float4 vNormalSample = float4( 0.0f, 0.0f, 1.0f, 1.0f );
+	#endif
+	#if ( DOPREVIEW )
+		customizeCharacter( i.vTexCoord0.xy, vBaseTextureSample, vNormalSample, vMasks1Params );
+	#endif
+	float fAlpha = vBaseTextureSample.a;
+	float3 cBase = vBaseTextureSample.rgb;
+	float fSpecMask = 1.0f;
+	float fEnvMask = 1.0f;
+	float fSelfIllumMask = 0.0f;
+	#if ( BASEALPHAPHONGMASK == 1 )
+		fSpecMask =  vBaseTextureSample.a;
+		fAlpha = 1.0f;
+	#endif
+	#if ( BASEALPHAENVMASK == 1 )
+		fEnvMask =  vBaseTextureSample.a;
+		fAlpha = 1.0f;
+	#endif
+	#if ( BASEALPHASELFILLUMMASK == 1 )
+		fSelfIllumMask = vBaseTextureSample.a;
+	#endif
+
+	float fRimMask = 1.0f;
+	float fMetalnessMask = 1.0f;
+	float fPhongAlbedoMask = 0.0f;
+	float fWarpIndex = g_fWarpIndex;
+	#if ( MASKS1 )
+	{
+		fRimMask = vMasks1Params.r;
+		fPhongAlbedoMask = vMasks1Params.g;
+		fMetalnessMask = vMasks1Params.b;
+		fWarpIndex = vMasks1Params.a;
+	}
+	#else
+		fMetalnessMask = g_fMetalness;
+	#endif
+
+	float3 vTangentNormal = float3( 0.0f, 0.0f, 1.0f );
+	#if ( BUMPMAP )
+	{
+		vTangentNormal = vNormalSample.xyz * 2.0f - 1.0f;
+		#if ( BASEALPHAPHONGMASK == 0 )
+			fSpecMask = vNormalSample.a;
+		#endif
+		#if ( BUMPALPHAENVMASK )
+			fEnvMask = vNormalSample.a;
+		#endif	
+	}
+	#endif
+	
+	float3x3 mTangentSpaceTranspose = float3x3( i.tangentSpaceTranspose0_FakeRimx.xyz, i.tangentSpaceTranspose1_FakeRimy.xyz, i.tangentSpaceTranspose2_FakeRimz.xyz );
+	float3 vWorldNormal = normalize( mul( mTangentSpaceTranspose, vTangentNormal ) );
+	float3 vEyeDir = normalize( g_vEyePos - i.vWorldPos_projZ.xyz );
+
+	#if ( FRESNELRANGESTEXTURE )
+		float fFresnel = saturate( dot( vEyeDir, vWorldNormal ) );
+
+		float3 vFresnelParams = tex2D( FresnelRangesSampler, float2( fFresnel, fWarpIndex ) );
+		fFresnel = vFresnelParams.y;
+		float fAmbientReflectionMask = vFresnelParams.z * fRimMask;
+	#else
+		float fFresnel = Fresnel( vWorldNormal, vEyeDir, g_vFresnelRanges );
+		float fAmbientReflectionMask = fFresnel * fRimMask;
+	#endif
+
+	float fCSMShadow = 1.0f;
+	#if ( CASCADED_SHADOW_MAPPING && DYN_CSM_ENABLED ) && defined( SHADER_MODEL_PS_3_0 )
+		fCSMShadow = CSMComputeShadowing( i.vWorldPos_projZ.xyz );
+	#endif
+
+	float3 linearLightColor = PixelShaderDoLighting( i.vWorldPos_projZ.xyz, vWorldNormal, 
+				float3( 0.0f, 0.0f, 0.0f), false,
+				true, i.lightAtten, g_cAmbientCube, 
+				NormalizeSampler, NUM_LIGHTS, g_cLightInfo, ( HALFLAMBERT == 1 ),
+				false, NULL, fCSMShadow );
+
+	float fShadowSaturationMask = 1.0f;
+	float fAnisotropyAmount = g_fAnisotropyAmount;
+	float fAnisotropyAngle = 1.57;
+	
+	float fRetroReflectivityMask = 0.0f;
+	float fEnvmapLightScale = g_fEnvmapLightScale;
+	#if ( MASKS2 )
+		float4 vMasks2Params = tex2D( Masks2Sampler, i.vTexCoord0.xy );
+		fShadowSaturationMask *= vMasks2Params.x;
+		fAnisotropyAmount *= ( vMasks2Params.g > 0 );
+		fAnisotropyAngle = vMasks2Params.g * 3.14159;
+		fEnvmapLightScale *= vMasks2Params.b;
+		fRetroReflectivityMask = 1.0f - vMasks2Params.a;
+	#endif
+
+	float3 cSpecularLight = float3( 0.0f, 0.0f, 0.0f );
+	float3 cRimLight = float3( 0.0f, 0.0f, 0.0f );
+	float3 cAdditiveRimlight = float3( 0.0f, 0.0f, 0.0f );
+	float3 vTangent = float3( 0.0f, 0.0f, 0.0f );
+	float3 vReflectionEyeVec = vEyeDir;
+	float fRimHalo = 0;
+
+	#if ( FLASHLIGHT )
+		float4 flashlightSpacePosition = TransformFlashlightWorldToTexture( i.vWorldPos_projZ.xyz, g_FlashlightWorldToTexture );
+		float3 vProjPos = float3( i.tangentSpaceTranspose0_FakeRimx.w, i.tangentSpaceTranspose1_FakeRimy.w, i.tangentSpaceTranspose2_FakeRimz.w );
+		float3 vProjCoords = flashlightSpacePosition.xyz / flashlightSpacePosition.w;
+		float2 vScreenPos = vProjPos.xy / vProjPos.z;
+		bool bShadows = true;
+
+		linearLightColor += DoFlashlight( g_FlashlightPos, i.vWorldPos_projZ.xyz, flashlightSpacePosition, vWorldNormal,
+					  g_FlashlightAttenuationFactors.xyz, g_FlashlightAttenuationFactors.w, FlashlightSampler, ShadowDepthSampler,
+					  NormalizeSampler, FLASHLIGHTDEPTHFILTERMODE, bShadows,
+					  vProjCoords.xy, false, g_vShadowTweaks, true );
+
+		#if ( PHONG )
+			float3 cSpecularFlashlight = float3( 0.0f, 0.0f, 0.0f );
+			float3 flashlightColor = tex2D( FlashlightSampler, vProjCoords.xy ).rgb;
+			flashlightColor *= flashlightSpacePosition.www > float3(0,0,0);
+			float3 vFlashlightDir = g_FlashlightPos - i.vWorldPos_projZ.xyz;
+			float distSquared = dot( vFlashlightDir, vFlashlightDir );
+			float dist = sqrt( distSquared );
+			float fAtten = saturate( dot( g_FlashlightAttenuationFactors.xyz, float3( 1.0f, 1.0f/dist, 1.0f/distSquared ) ) );
+			vFlashlightDir = normalize( vFlashlightDir );
+			float endFalloffFactor = RemapNormalizedValClamped( dist, g_FlashlightAttenuationFactors.w, 0.6f * g_FlashlightAttenuationFactors.w );
+			flashlightColor *= fAtten * endFalloffFactor * cFlashlightColor;
+			float VdotT = 0;
+			float sVdotT = 0;
+			float NdotL = dot( vFlashlightDir, vWorldNormal );
+
+			if ( bShadows )
+			{
+				float flShadow = DoFlashlightShadow( ShadowDepthSampler, NormalizeSampler, vProjCoords.xyz, vScreenPos, FLASHLIGHTDEPTHFILTERMODE, g_vShadowTweaks, NdotL );
+				float flAttenuated = lerp( flShadow, 1.0f, g_vShadowTweaks.y );	// Blend between fully attenuated and not attenuated
+				flShadow = saturate( lerp( flAttenuated, flShadow, fAtten ) );	// Blend between shadow and above, according to light attenuation
+				flashlightColor *= flShadow;									// Shadow term
+			}
+
+			if ( ANISOTROPY == 1 )
+			{
+				VdotT = dot( vEyeDir, vTangent );
+				sVdotT = sqrt( 1 - VdotT * VdotT );
+			}
+
+			CharacterSpecularAndRimTerms( vWorldNormal, vFlashlightDir, g_fPhongExponent, vEyeDir,
+										  ( PHONGWARPTEXTURE == 1 ), PhongWarpSampler,
+										  flashlightColor, false, g_fRimLightExponent, fWarpIndex,
+										  ( ANISOTROPY == 1 ), fAnisotropyAmount, VdotT, sVdotT, vTangent,
+										  false, 0, 0, // TODO: enable retroreflectivity with flashlight
+
+										  // Outputs
+										  cSpecularFlashlight, cAdditiveRimlight, fRimHalo );
+
+
+		#endif
+
+	#endif
+
+	#if ( FAKERIM )
+	{
+		float3 localRimTerm, localSpecularTerm = float3( 0.0f, 0.0f, 0.0f );
+		float localRimHalo = 0;
+		float3 vFakeRimDir = float3( i.tangentSpaceTranspose0_FakeRimx.w, i.tangentSpaceTranspose1_FakeRimy.w, i.tangentSpaceTranspose2_FakeRimz.w );
+		float3 cFakeRimColor = i.cAmbient_fRimBoost.rgb * i.cAmbient_fRimBoost.a * g_cFakeRimTint;
+
+		CharacterSpecularAndRimTerms( vWorldNormal, vFakeRimDir, 1.0f, vEyeDir,
+								false, NULL, cFakeRimColor,
+								true, g_fRimLightExponent, 0.0f,
+								false, 0.0f, 0.0f, 0.0f, float3( 0.0f, 0.0f, 0.0f ),
+								false, 0.0f, 0.0f,
+								localSpecularTerm, localRimTerm, localRimHalo );						
+		cAdditiveRimlight += localRimTerm * fRimMask;
+		// TODO: add rim saturation here?
+	}
+	#endif
+
+	#if ( ANISOTROPY )
+		float3 vnWorldTangentS = normalize( cross( vWorldNormal, i.vWorldTangentT_vBounceCentery.xyz ) );
+		float3 vnWorldTangentT = normalize( cross( vWorldNormal, vnWorldTangentS ) );
+
+		float cr, sr;
+		sincos( fAnisotropyAngle, cr, sr );
+		vTangent = normalize( cr * vnWorldTangentT + sr * vnWorldTangentS );
+
+		float3 rvec = cross( vTangent, vWorldNormal.xyz );
+		float3 uvec = cross( vEyeDir, rvec );
+		float3 evec = normalize( cross( rvec, vTangent ) );
+		vReflectionEyeVec = lerp( vEyeDir, evec, fAnisotropyAmount );
+	#endif
+
+	#if ( PHONG )
+		CharacterDoSpecularLighting( i.vWorldPos_projZ.xyz, vWorldNormal, g_fPhongExponent, vEyeDir,
+										i.lightAtten, NUM_LIGHTS, g_cLightInfo,
+										( PHONGWARPTEXTURE == 1 ), PhongWarpSampler,
+										( RIMLIGHT == 1 ), g_fRimLightExponent, fCSMShadow, fWarpIndex,
+										( ANISOTROPY == 1 ), fAnisotropyAmount, fAnisotropyAngle,
+										vTangent, 
+										( ( MASKS2 == 1 ) && ( fRetroReflectivityMask > 0 ) ), fRetroReflectivityMask, i.cAmbient_fRimBoost.xyz,
+									 
+										// Outputs
+										cSpecularLight, cRimLight, fRimHalo ); 
+		#if ( FLASHLIGHT )
+			cSpecularLight += cSpecularFlashlight;
+		#endif
+		#if ( RIMLIGHT )
+			float fRimModulation = g_fRimLightBoost * fRimMask;
+			float fRimBoost = i.cAmbient_fRimBoost.w * g_fShadowRimBoost;
+			fRimBoost += 1.0f;
+			fRimModulation *= fRimBoost;
+			cRimLight *=  fRimModulation;
+		#endif
+		float fPhongBoost = g_fPhongBoost;
+		cSpecularLight *= fSpecMask;
+
+		#if ( MASKS1 )
+			fPhongBoost = lerp( g_fPhongBoost, g_fPhongAlbedoBoost, fPhongAlbedoMask );
+		#endif
+
+		cSpecularLight *= fPhongBoost;
+	#endif
+
+	#if ( AMBIENTREFLECTION || ENVMAP )
+		float3 vReflection = CalcReflectionVectorUnnormalized( vWorldNormal, vReflectionEyeVec );
+	#endif
+
+	#if ( ENVMAP )
+		float3 cEnvmap = ENV_MAP_SCALE * texCUBE( EnvmapSampler, vReflection ).rgb;
+
+		cEnvmap = saturateColor( cEnvmap, g_fEnvmapSaturation );
+
+		float3 cEnvmapLight = saturate( ( ( linearLightColor + i.cAmbient_fRimBoost.xyz ) - g_vEnvmapLightScaleMin ) * g_vEnvmapLightScaleMax );
+		cEnvmap = lerp( cEnvmap, cEnvmap * cEnvmapLight, fEnvmapLightScale );
+
+		cEnvmap = lerp( cEnvmap, cEnvmap * cEnvmap, g_fEnvmapContrast );
+
+		cEnvmap *= fEnvMask * g_cEnvmapTint;
+
+		cSpecularLight += cEnvmap;
+	#endif
+
+	#if ( PHONG || ENVMAP )
+		#if ( MASKS2 )
+			fFresnel = lerp( fFresnel, 1.0f, fRetroReflectivityMask );
+		#endif
+		cSpecularLight *= fFresnel;
+	#endif
+
+	#if ( AMBIENTREFLECTION )
+		float3 cAmbientReflection = AmbientLight( vReflection, g_cAmbientCube );
+
+		float3 cAmbientLightColor = PixelShaderDoLighting( i.vWorldPos_projZ.xyz, float3( 0.0f, 0.0f, 1.0f ), 
+				float3( 0.0f, 0.0f, 0.0f), false,
+				false, i.lightAtten, g_cAmbientCube, 
+				NormalizeSampler, min( NUM_LIGHTS, 1 ), g_cLightInfo, false,
+				false, NULL, 1.0f );
+
+		cAmbientReflection *= cAmbientLightColor;	
+												 
+		#if ( USEBOUNCECOLOR )
+			float3 vBounceCenter = float3( i.vWorldTangentS_vBounceCenterx.w, i.vWorldTangentT_vBounceCentery.w, i.vBounceCenterDir_vBounceCenterz.w );
+
+			float3 linearLightBounceModulate = PixelShaderDoLighting( vBounceCenter, -i.vBounceCenterDir_vBounceCenterz.xyz, 
+				float3( 0.0f, 0.0f, 0.0f), false,
+				false, i.lightAtten, g_cAmbientCube, 
+				NormalizeSampler, min( NUM_LIGHTS, 1 ), g_cLightInfo, false,
+				false, NULL, 1.0f );
+
+			float fBounceTerm = saturate( dot( vWorldNormal, i.vBounceCenterDir_vBounceCenterz.xyz ) );
+			float3 cBounce = g_cBounce * i.cAmbient_fRimBoost.xyz * linearLightBounceModulate;
+
+			cAmbientReflection = lerp( cAmbientReflection, cBounce, fBounceTerm );
+		#endif
+
+		cAmbientReflection *= g_fAmbientBounceBoost * fAmbientReflectionMask;
+		
+		cSpecularLight += cAmbientReflection;
+	#endif
+
+	float fRimLightAlbedo = g_fRimLightAlbedo;
+	#if ( MASKS1 )
+		cSpecularLight *= lerp( float3( 1.0f, 1.0f, 1.0f ), cBase, fPhongAlbedoMask );
+		fRimLightAlbedo = g_fRimLightAlbedo * fPhongAlbedoMask;
+	#endif
+	cRimLight *= lerp( g_cRimLightTint, cBase * fRimLightAlbedo, saturate( fRimLightAlbedo ) );
+
+	float fShadowScale = saturate( g_fShadowScale + i.cAmbient_fRimBoost.w ); // If we darken shadows to increase contrast, don't do it in very dark areas
+
+	float lightIntensity = desaturateColor( linearLightColor + cRimLight );
+	float fShadeLevels = smoothstep( 0.3, 0.0, lightIntensity );
+
+	#if ( SHADOWSATURATION )
+		lightIntensity = desaturateColor( linearLightColor ).g;
+		// dark-to-mid blend
+		float fShadeLevelsDark = smoothstep( g_vShadowSaturationBounds.x, g_vShadowSaturationBounds.y, lightIntensity );
+		// mid-to-light blend
+		float fShadeLevelsLight = smoothstep( g_vShadowSaturationBounds.w, g_vShadowSaturationBounds.z, lightIntensity );
+		#if ( RIMLIGHT )
+			// don't just use linear lighting, make a nice saturated halo on the rimlight too  
+			float rimHalo = smoothstep( g_vRimHaloBounds.x, g_vRimHaloBounds.y, fRimHalo );
+			rimHalo *= smoothstep( g_vRimHaloBounds.w, g_vRimHaloBounds.z, fRimHalo );
+			rimHalo *= desaturateColor( cRimLight ).g;
+			rimHalo *= g_fRimHaloBoost;
+			lightIntensity += rimHalo;
+			fShadeLevelsLight = fShadeLevelsLight +  rimHalo;
+		#endif
+		
+		cBase = lerp( cBase, saturateColor( cBase, g_fShadowSaturation ), fShadeLevelsDark * fShadeLevelsLight * fShadowSaturationMask );
+		cBase = lerp( cBase, tintColor( cBase, g_cShadowTint.rgb, g_cShadowTint.a ) * fShadowScale, fShadeLevels );
+	#else
+		cBase = lerp( cBase, tintColor( cBase, g_cShadowTint.rgb, g_cShadowTint.a ) * fShadowScale, fShadeLevels );
+	#endif
+
+	linearLightColor += i.cAmbient_fRimBoost.xyz;
+
+	cBase *= fMetalnessMask;
+
+	float3 finalColor = ( cBase * linearLightColor ) + cSpecularLight + cRimLight + cAdditiveRimlight;
+
+	#if ( BASEALPHASELFILLUMMASK )
+		finalColor = lerp( finalColor, vBaseTextureSample.rgb * ( 1.0f + g_fSelfIllumBoost ), fSelfIllumMask );
+	#endif
+
+	float flVertexFogFactor = 0.0f;
+	#if ( !HARDWAREFOGBLEND && !DOPIXELFOG )
+		flVertexFogFactor = i.worldPos_vertexFogFactor.w;
+	#endif
+
+	fAlpha *= g_vDiffuseModulation.a;
+	finalColor *= g_vDiffuseModulation.rgb;
+
+	float fogFactor = CalcPixelFogFactorSupportsVertexFog( PIXELFOGTYPE, g_FogParams, g_vEyePos.xyz, i.vWorldPos_projZ.xyz, i.vWorldPos_projZ.w, flVertexFogFactor );
+
+	#if ( WRITEWATERFOGTODESTALPHA && ( PIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT ) )
+		fAlpha = fogFactor;
+	#endif
+
+	return FinalOutput( float4( finalColor, fAlpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, false, i.vWorldPos_projZ.w );
+
+
+}

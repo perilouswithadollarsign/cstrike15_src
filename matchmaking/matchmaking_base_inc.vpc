@@ -1,0 +1,149 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_base_inc.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE,..\common,$SRCDIR\gcsdk\steamextra,$SRCDIR\game\shared,$SRCDIR\thirdparty\protobuf-2.5.0\src"
+		$PreprocessorDefinitions		"$BASE;NO_STRING_T;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;NO_STEAM_GAMECOORDINATOR"
+		$PreprocessorDefinitions		"$BASE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead" [!$PS3]
+	}
+}
+
+$Project
+{
+	$Folder "Matchmaking"
+	{
+		$Folder "Headers"
+		{
+			$File	"matchmakingqos.h"
+			$File	"mm_framework.h"
+			$File	"mm_netmsgcontroller.h"
+			$File	"mm_events.h"
+			$File	"mm_extensions.h"
+			$File	"mm_session.h"
+			$File	"mm_title_main.h"
+			$File	"mm_voice.h"
+		}
+		$File	"matchmakingqos.cpp"
+		$File	"mm_events.cpp"
+		$File	"mm_extensions.cpp"
+		$File	"mm_framework.cpp"
+		$File	"mm_netmsgcontroller.cpp"
+		$File	"mm_session.cpp"
+		$File	"mm_voice.cpp"
+	}
+
+	$Folder "Sessions"
+	{
+		$File	"ds_searcher.h"
+		$File	"ds_searcher.cpp"
+		$File	"match_searcher.h"
+		$File	"match_searcher.cpp"
+		$File	"mm_netmgr.h"
+		$File	"mm_netmgr.cpp"
+		$File	"mm_session_offline_custom.h"
+		$File	"mm_session_offline_custom.cpp"
+		$File	"mm_session_online_client.h"
+		$File	"mm_session_online_client.cpp"
+		$File	"mm_session_online_host.h"
+		$File	"mm_session_online_host.cpp"
+		$File	"mm_session_online_search.h"
+		$File	"mm_session_online_search.cpp"
+		$File	"mm_session_online_teamsearch.h"
+		$File	"mm_session_online_teamsearch.cpp"
+		$File	"sys_session.h"
+		$File	"sys_session.cpp"
+	}
+
+	$Folder "Platform - Steam"
+	{
+		$File	"steam_apihook.cpp"
+		$File	"steam_apihook.h"
+		$File	"steam_datacenterjobs.h"
+		$File	"steam_datacenterjobs.cpp" [!$X360]
+		$File	"steam_lobbyapi.cpp" [!$NO_STEAM && !$DEDICATED && !$X360]
+		$File	"steam_lobbyapi.h"
+	}
+
+	$Folder "Platform - Xbox 360"
+	{
+		$File	"x360_lobbyapi.cpp" [$X360]
+		$File	"x360_lobbyapi.h"
+		$File	"x360_netmgr.cpp" [$X360]
+		$File	"x360_netmgr.h"
+		$File	"x360_xlsp_cmd.cpp"
+		$File	"x360_xlsp_cmd.h"
+	}
+
+	$Folder "Systems"
+	{
+		$Folder "Headers"
+		{
+			$File	"datacenter.h"
+			$File	"leaderboards.h"
+			$File	"matchsystem.h"
+			$File	"mm_dlc.h"
+			$File	"player.h"
+			$File	"playermanager.h"
+			$File	"searchmanager.h"
+			$File	"servermanager.h"
+			$File   "playerrankingdata.h"
+		}
+		$File	"datacenter.cpp"
+		$File	"mm_dlc.cpp"
+		$File	"leaderboards.cpp"
+		$File	"matchsystem.cpp"
+		$File	"player.cpp"
+		$File	"playermanager.cpp"
+		$File	"searchmanager.cpp"
+		$File	"servermanager.cpp"
+		$File   "playerrankingdata.cpp"
+	}
+
+	$Folder "Utils"
+	{
+		$File	"extkeyvalues.h"
+		$File	"extkeyvalues.cpp"
+	}
+
+	$Folder	"Public Headers"
+	{
+		$File	"$SRCDIR\public\matchmaking\idatacenter.h"
+		$File	"$SRCDIR\public\matchmaking\imatchasync.h"
+		$File	"$SRCDIR\public\matchmaking\imatchextensions.h"
+		$File	"$SRCDIR\public\matchmaking\imatchevents.h"
+		$File	"$SRCDIR\public\matchmaking\imatchframework.h"
+		$File	"$SRCDIR\public\matchmaking\imatchtitle.h"
+		$File	"$SRCDIR\public\matchmaking\imatchnetworkmsg.h"
+		$File	"$SRCDIR\public\matchmaking\imatchsystem.h"
+		$File	"$SRCDIR\public\matchmaking\imatchvoice.h"
+		$File	"$SRCDIR\public\matchmaking\iplayer.h"
+		$File	"$SRCDIR\public\matchmaking\iplayermanager.h"
+		$File	"$SRCDIR\public\matchmaking\isearchmanager.h"
+		$File	"$SRCDIR\public\matchmaking\iservermanager.h"
+		$File   "$SRCDIR\public\matchmaking\iplayerrankingdata.h"
+	}
+
+	$Folder "Source Files"
+	{
+		$File	"$SRCDIR\public\filesystem_helpers.cpp"
+		$File	"main.cpp"
+	}
+	
+	$Folder "Link Libraries"
+	{
+		$Lib gcsdk [!$X360 && !$PS3]
+	}
+}
+
+
+

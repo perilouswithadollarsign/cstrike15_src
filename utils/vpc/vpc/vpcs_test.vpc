@@ -1,0 +1,3 @@
+$Conditional VPC_STATIC_LINK_TEST 1
+
+$Include "vpcs.vpc"

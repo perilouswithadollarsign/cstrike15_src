@@ -1,0 +1,25 @@
+//-----------------------------------------------------------------------------
+//	DEFAULT.VGC
+//
+//	Configurations for all Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+////////////////
+// Game Names //
+////////////////
+
+$Games
+{
+//	"CSTRIKE"
+	"CSGO"
+//	"EPISODIC"
+//	"SDK"
+//	"TF"
+//	"PORTAL2"
+//	"SWARM"
+//	"DOTA"
+}
+
+$Include "vpc_scripts\projects.vgc"
+$Include "vpc_scripts\groups.vgc"
+

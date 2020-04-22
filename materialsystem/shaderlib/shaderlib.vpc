@@ -1,0 +1,51 @@
+//-----------------------------------------------------------------------------
+//	SHADERLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		"..\.."
+$Macro SHADERLIBDIR "."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;..\"
+		$PreprocessorDefinitions		"$BASE;FAST_MATERIALVAR_ACCESS"
+	}
+}
+
+$include "shaderlib_inc.vpc"
+
+$Project "shaderlib"
+{
+	$Folder "External Header Files"
+	{
+		$File	"$SRCDIR\public\tier0\basetypes.h"
+		$File	"$SRCDIR\public\tier0\dbg.h"
+		$File	"$SRCDIR\public\tier0\fasttimer.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\tier0\icommandline.h"
+		$File	"$SRCDIR\public\icvar.h"
+		$File	"$SRCDIR\public\materialsystem\imaterial.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialsystem.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialsystemhardwareconfig.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialvar.h"
+		$File	"$SRCDIR\public\materialsystem\imesh.h"
+		$File	"$SRCDIR\public\materialsystem\IShader.h"
+		$File	"$SRCDIR\public\materialsystem\ishaderapi.h"
+		$File	"$SRCDIR\public\materialsystem\itexture.h"
+		$File	"$SRCDIR\public\materialsystem\materialsystem_config.h"
+		$File	"$SRCDIR\public\tier0\memdbgoff.h"
+		$File	"$SRCDIR\public\tier0\memdbgon.h"
+		$File	"$SRCDIR\public\tier0\platform.h"
+		$File	"$SRCDIR\public\string_t.h"
+		$File	"$SRCDIR\public\tier1\strtools.h"
+		$File	"$SRCDIR\public\tier1\utlmemory.h"
+		$File	"$SRCDIR\public\tier1\utlvector.h"
+		$File	"$SRCDIR\public\vstdlib\vstdlib.h"
+	}
+}

@@ -1,0 +1,260 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+// paired with lightmappedgeneric_vs##
+
+// STATIC: "DETAILTEXTURE"					"0..1"
+// STATIC: "BUMPMAP"						"0..1"
+// STATIC: "VERTEXCOLOR"					"0..1"
+// STATIC: "SELFILLUM"						"0..1"
+// STATIC: "DETAIL_ALPHA_MASK_BASE_TEXTURE"	"0..1"
+// STATIC: "FLASHLIGHT"						"0..1"
+// STATIC: "SEAMLESS"						"0..1"
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"		"0..3"	[ps20b] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"		"0..2"	[ps30]  [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"		"0..0"	[ps20b] [CONSOLE]
+// STATIC: "SHADER_SRGB_READ"				"0..1"	[XBOX]
+// STATIC: "SHADER_SRGB_READ"				"0..0"	[PC]
+// STATIC: "SHADER_SRGB_READ"				"0..0"	[SONYPS3]
+
+// diffuse bump map is always true when bumpmapping is enabled, so just set it to 1
+#define DIFFUSEBUMPMAP 1
+
+// DYNAMIC: "WRITEWATERFOGTODESTALPHA"		"0..1"
+#include "common_fog_ps_fxc.h"
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"		"0..1" [ps20b] [ps30] [PC]
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"		"0..0" [ps20b] [CONSOLE]
+// DYNAMIC: "FLASHLIGHTSHADOWS"				"0..1" [ps20b] [ps30]
+// DYNAMIC: "UBERLIGHT"						"0..1" [ps30] [PC]
+
+//	SKIP: $DETAILTEXTURE && ( $BUMPMAP && !$DETAIL_ALPHA_MASK_BASE_TEXTURE )
+//	SKIP: $VERTEXCOLOR && $BUMPMAP
+//  SKIP: $FLASHLIGHT && $SELFILLUM
+//  SKIP: $FLASHLIGHT && $DETAIL_ALPHA_MASK_BASE_TEXTURE
+//  SKIP: $FLASHLIGHT && $BUMPMAP
+
+// We don't care about flashlight depth unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )	[ps20b] [ps30]
+
+// We don't care about uberlight unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $UBERLIGHT == 1 )	[ps30]
+
+
+#if defined( SHADER_MODEL_PS_2_0 )
+#	define WRITE_DEPTH_TO_DESTALPHA 0
+#endif
+
+
+#define HDRTYPE HDR_TYPE_NONE
+#include "shader_constant_register_map.h"
+#include "common_flashlight_fxc.h"
+#include "common_ps_fxc.h"
+
+#define PIXELSHADER
+#include "common_lightmappedgeneric_fxc.h"
+
+const float4 g_SelfIllumTint						: register( c7 );
+static const float g_OverbrightFactor = 2.0f;
+
+const float3 g_EyePos							: register( c10 );
+const float4 g_FogParams							: register( c11 );
+
+const float3 g_FlashlightPos						: register( c15 );
+// flashlightfixme: Move this math into the vertex shader.
+const float4x4 g_FlashlightWorldToTexture		: register( c16 );
+
+const float4 g_FlashlightAttenuationFactors		: register( c20 );
+
+#if UBERLIGHT && defined( SHADER_MODEL_PS_3_0 )
+const float3 g_vSmoothEdge0							: register( PSREG_UBERLIGHT_SMOOTH_EDGE_0 );		// ps_3_0 and up (over 32 registers)
+const float3 g_vSmoothEdge1							: register( PSREG_UBERLIGHT_SMOOTH_EDGE_1 );
+const float3 g_vSmoothOneOverWidth					: register( PSREG_UBERLIGHT_SMOOTH_EDGE_OOW );
+const float4 g_vShearRound							: register( PSREG_UBERLIGHT_SHEAR_ROUND );
+const float4 g_aAbB									: register( PSREG_UBERLIGHT_AABB );
+const float4x4 g_FlashlightWorldToLight				: register( PSREG_UBERLIGHT_WORLD_TO_LIGHT );
+#endif
+
+sampler BaseTextureSampler			: register( s0 );
+sampler LightmapSampler				: register( s1 );
+sampler FlashlightSampler			: register( s2 );
+sampler DetailSampler				: register( s3 );
+sampler BumpmapSampler				: register( s4 );
+sampler NormalizeSampler			: register( s6 );
+sampler ShadowDepthSampler			: register( s7 );
+
+#if defined(_PS3)
+// Needed for optimal shadow filter code generation on PS3.
+#pragma texformat ShadowDepthSampler DEPTH_COMPONENT24
+#endif
+
+#if (BUMPMAP == 1) && defined( _PS3 )
+// Causes the Cg compiler to automatically produce _bx2 modifier on the texture load instead of producing a MAD to range expand the vector, saving one instruction.
+#pragma texsign BumpmapSampler
+#pragma texformat BumpmapSampler RGBA8
+#endif
+
+//PS_INPUT defined in common_lightmappedgeneric_fxc.h"
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	bool bDetailTexture = DETAILTEXTURE ? true : false;
+	bool bBumpmap = BUMPMAP ? true : false;
+	bool bDiffuseBumpmap = DIFFUSEBUMPMAP ? true : false;
+	bool bVertexColor = VERTEXCOLOR ? true : false;
+	bool bSelfIllum = SELFILLUM ? true : false;
+	bool bDetailAlphaMaskBaseTexture = DETAIL_ALPHA_MASK_BASE_TEXTURE ? true : false;
+	bool bFlashlight = FLASHLIGHT ? true : false;
+	float2 vBaseTexCoord;
+	#if ( SEAMLESS )
+	{
+		vBaseTexCoord = i.SeamlessTexCoord.xy;
+	}
+	#else
+	{
+		vBaseTexCoord = i.BASETEXCOORD;
+	}
+	#endif
+
+	float3 worldPos = i.worldPos_projPosZ.xyz;
+
+	float3 lightmapColor1 = float3( 1.0f, 1.0f, 1.0f );
+	float3 lightmapColor2 = float3( 1.0f, 1.0f, 1.0f );
+	float3 lightmapColor3 = float3( 1.0f, 1.0f, 1.0f );
+	if( bBumpmap && bDiffuseBumpmap )
+	{
+		float2 bumpCoord1;
+		float2 bumpCoord2;
+		float2 bumpCoord3;
+		ComputeBumpedLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3_bumpTexCoord.xy,
+			bumpCoord1, bumpCoord2, bumpCoord3 );
+		
+		float4 lightmapSample1 = tex2D( LightmapSampler, bumpCoord1 );
+		lightmapColor1 = lightmapSample1.rgb;
+		lightmapColor2 = tex2D( LightmapSampler, bumpCoord2 ).rgb;
+		lightmapColor3 = tex2D( LightmapSampler, bumpCoord3 ).rgb;
+	}
+	else
+	{
+		if( !bFlashlight )
+		{
+			float2 bumpCoord1 = ComputeLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3_bumpTexCoord.xy );
+			float4 lightmapSample1 = tex2D( LightmapSampler, bumpCoord1 );
+			lightmapColor1 = lightmapSample1.rgb;
+		}
+	}
+
+	float4 detailColor = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+	if( bDetailTexture )
+	{
+		detailColor = tex2D( DetailSampler, i.DETAILCOORD );
+	}
+
+	float4 baseColor = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+	baseColor = tex2Dsrgb( BaseTextureSampler, vBaseTexCoord );
+	if ( bDetailAlphaMaskBaseTexture )
+	{
+		// This is what WorldTwoTextureBlend_DX6 does.
+		baseColor.rgb = saturate( saturate( baseColor.rgb * 2 ) * detailColor.a + (1 - detailColor.a) );
+		baseColor.rgb *= detailColor.rgb;
+	}
+	else
+	{
+		baseColor.rgb = lerp( baseColor.rgb, detailColor.rgb, detailColor.a );
+	}
+	
+	float3 normal = float3( 0.0f, 0.0f, 1.0f );
+	if( bBumpmap )
+	{
+		float3 normalTexel;
+		normalTexel = tex2D( BumpmapSampler, i.BUMPCOORD ).xyz;
+		normal = 2.0f * normalTexel - 1.0f;
+	}
+
+	float3 albedo = float3( 1.0f, 1.0f, 1.0f );
+	float alpha = 1.0f;
+	albedo *= baseColor.rgb;
+	if( !bSelfIllum )
+	{
+		alpha *= baseColor.a;
+	}
+
+	// The vertex color contains the modulation color + vertex color combined
+	albedo *= i.vertexColor.rgb;
+	alpha  *= i.vertexColor.a; // not sure about this one
+
+	float3 diffuseLighting;
+	if( bFlashlight )
+	{
+		float3 worldSpaceNormal;
+		if ( bBumpmap )
+		{
+			worldSpaceNormal = mul( normal, float3x3( i.tangentSpaceTranspose0_vertexBlendX.xyz, i.tangentSpaceTranspose1_bumpTexCoord2u.xyz, i.tangentSpaceTranspose2_bumpTexCoord2v.xyz ) );
+		}
+		else
+		{
+			worldSpaceNormal = i.tangentSpaceTranspose2_bumpTexCoord2v.xyz;
+		}
+
+		int nShadowSampleLevel = 0;
+		bool bDoShadows = false;
+// On ps_2_b, we can do shadow mapping
+#if ( FLASHLIGHTSHADOWS && (defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0) ) )
+		nShadowSampleLevel = FLASHLIGHTDEPTHFILTERMODE;
+		bDoShadows = true;
+#endif
+		
+		float4 flashlightSpacePosition = TransformFlashlightWorldToTexture( worldPos, g_FlashlightWorldToTexture );
+
+		diffuseLighting = DoFlashlight( g_FlashlightPos, worldPos, flashlightSpacePosition,
+			worldSpaceNormal, g_FlashlightAttenuationFactors.xyz, 
+			g_FlashlightAttenuationFactors.w, FlashlightSampler, ShadowDepthSampler, NormalizeSampler,
+			nShadowSampleLevel, bDoShadows, float2(0, 0), false );
+
+#if UBERLIGHT && defined( SHADER_MODEL_PS_3_0 )
+	float4 uberLightPosition = mul( float4( worldPos, 1.0f ), g_FlashlightWorldToLight ).yzxw;
+	diffuseLighting *= uberlight( uberLightPosition, g_vSmoothEdge0, g_vSmoothEdge1,
+			    g_vSmoothOneOverWidth, g_vShearRound.xy, g_aAbB, g_vShearRound.zw );
+#endif
+
+	}
+	else
+	{
+		if( bBumpmap && bDiffuseBumpmap )
+		{
+			float dot1 = saturate( dot( normal, bumpBasis[0] ) );
+			float dot2 = saturate( dot( normal, bumpBasis[1] ) );
+			float dot3 = saturate( dot( normal, bumpBasis[2] ) );
+
+			float sum = dot1 + dot2 + dot3;
+			diffuseLighting = dot1 * lightmapColor1 +
+							  dot2 * lightmapColor2 +
+							  dot3 * lightmapColor3;
+			diffuseLighting *= 1.0f / sum;
+		}
+		else
+		{
+			diffuseLighting = lightmapColor1;
+		}
+
+		// Only scale here since the flashlight will already be scaled properly
+		diffuseLighting *= g_OverbrightFactor;
+	}
+
+	float3 diffuseComponent = albedo * diffuseLighting;
+
+	if( bSelfIllum )
+	{
+		float3 selfIllumComponent = g_SelfIllumTint.rgb * albedo;
+		diffuseComponent = lerp( diffuseComponent, selfIllumComponent, baseColor.a );
+	}
+
+	float3 specularLighting = float3( 0.0f, 0.0f, 0.0f );
+	float3 result = diffuseComponent + specularLighting;
+
+	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, worldPos, i.worldPos_projPosZ.w );
+
+#if WRITEWATERFOGTODESTALPHA && (PIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT)
+	alpha = fogFactor;
+#endif
+
+	return FinalOutput( float4( result, alpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, (WRITE_DEPTH_TO_DESTALPHA != 0), i.worldPos_projPosZ.w );
+}
+

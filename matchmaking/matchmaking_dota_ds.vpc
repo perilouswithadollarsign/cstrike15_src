@@ -1,0 +1,49 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_dota_ds.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro OUTBINNAME "matchmaking_ds"
+
+$Include "matchmaking_dota_inc.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;MATCHMAKING_DS_DLL;SWDS" 
+	}
+}
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$OutputDirectory			".\Debug_$GAMENAME_DS"			[$WIN32||$POSIX]
+		$IntermediateDirectory		".\Debug_$GAMENAME_DS"			[$WIN32||$POSIX]
+
+		$OutputDirectory			".\Debug_$GAMENAME_DS_360"		[$X360]
+		$IntermediateDirectory		".\Debug_$GAMENAME_DS_360"		[$X360]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$OutputDirectory			".\Release_$GAMENAME_DS"		[$WIN32||$POSIX]
+		$IntermediateDirectory		".\Release_$GAMENAME_DS"		[$WIN32||$POSIX]
+
+		$OutputDirectory			".\Release_$GAMENAME_DS_360"	[$X360]
+		$IntermediateDirectory		".\Release_$GAMENAME_DS_360"	[$X360]
+	}
+}
+
+$Project "Matchmaking_DS (DOTA)"
+{
+	$Folder	"Link Libraries"
+	{
+		$Lib	matchmakingbase_ds
+	}
+}

@@ -1,0 +1,118 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+//
+// Purpose: 
+//
+//===========================================================================//
+
+//  STATIC: "MODEL"				"0..1"
+
+#include "common_fog_vs_fxc.h"
+//	DYNAMIC: "SKINNING"			"0..1"
+//  DYNAMIC: "MORPHING"			"0..0" [ = false ]
+//  STATIC: "SPECULAR"			"0..1"
+
+#include "common_vs_fxc.h"
+
+static const bool g_bSkinning		= SKINNING ? true : false;
+static const int g_FogType			= DOWATERFOG;
+
+const float4 cBaseTexCoordTransform[ 2 ]			: register( SHADER_SPECIFIC_CONST_6 );
+const float4 g_vFoWWorldSize						: register( c26 );
+const float4 g_vRotations							: register( c27 );
+const float4 g_vScales								: register( c28 );
+const float4 g_vLightDir							: register( c29 );	// xyz = light dir, w = spec power
+
+struct VS_INPUT
+{
+	float3 vPos							: POSITION;
+	float4 vNormal						: NORMAL;
+	float2 vBaseTexCoord				: TEXCOORD0;
+	float2 vLightmapTexCoord			: TEXCOORD1;
+//	float2 vLightmapTexCoordOffset		: TEXCOORD2;
+	float4 vAlphaBlend					: TEXCOORD3;
+	float4 vColorBlend1					: TEXCOORD4;
+	float4 vColorBlend2					: TEXCOORD5;
+	float4 vColorBlend3					: TEXCOORD6;
+	float4 vColorBlend4					: TEXCOORD7;
+};
+
+struct VS_OUTPUT
+{
+	float4 vProjPos							: POSITION;	
+	float4 vBaseTexCoord					: TEXCOORD0;	// xy = blend 1 coord, zw = lightmap cord
+	float4 worldPos_projPosZ				: TEXCOORD1;
+//	float3 vWorldNormal						: TEXCOORD2;
+	float  flSpecPower						: TEXCOORD2;
+	float4 vFowCoord						: TEXCOORD3;	// xy = fow, zw = blend4 coord
+	float4 vAlphaBlend						: TEXCOORD4;
+//	float3 worldVertToEyeVector				: TEXCOORD5;
+	float4 vBlendCoords23					: TEXCOORD5;
+	float4 vColorBlend1						: COLOR0;
+	float4 vColorBlend2						: COLOR1;
+	float4 vColorBlend3						: TEXCOORD6;
+	float4 vColorBlend4						: TEXCOORD7;
+};
+
+float2 ComputeTexCoord( const float2 vBaseCoord, const float flRotation, const float flScale )
+{
+	float2 	vAdjust = vBaseCoord - float2( 0.5, 0.5 );
+	float2 	vResult;
+	float 	c = cos( flRotation );
+	float 	s = sin( flRotation );
+	
+   	vResult.x = ( vAdjust.x * c ) + ( vAdjust.y * -s );
+   	vResult.y = ( vAdjust.x * s ) + ( vAdjust.y * c );
+   	
+   	return ( vResult / flScale ) + float2( 0.5, 0.5 );
+}
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	float3 vObjNormal;
+	DecompressVertex_Normal( v.vNormal, vObjNormal );
+
+	float4 vProjPos;
+	float3 vWorldPos;
+
+	vWorldPos = mul( float4( v.vPos, 1 ), cModel[0] );
+	vProjPos = mul( float4( vWorldPos, 1 ), cViewProj );
+	o.vProjPos = vProjPos;
+	
+	o.worldPos_projPosZ.w = vProjPos.z;
+	o.worldPos_projPosZ.xyz = vWorldPos;
+	
+	o.vFowCoord.xy = float2( 0.0, 0.0 );
+
+	float3 vWorldNormal = mul( vObjNormal, ( float3x3 )cModel[0] );
+
+	o.vBaseTexCoord.xy = ComputeTexCoord( v.vBaseTexCoord, g_vRotations.x, g_vScales.x );
+	o.vBlendCoords23.xy = ComputeTexCoord( v.vBaseTexCoord, g_vRotations.y, g_vScales.y );
+	o.vBlendCoords23.zw = ComputeTexCoord( v.vBaseTexCoord, g_vRotations.z, g_vScales.z );
+	o.vFowCoord.zw = ComputeTexCoord( v.vBaseTexCoord, g_vRotations.w, g_vScales.w );
+	
+	o.vBaseTexCoord.zw = v.vLightmapTexCoord; // + v.vLightmapTexCoordOffset;
+	
+	o.vColorBlend1 = v.vColorBlend1;
+	o.vColorBlend2 = v.vColorBlend2;
+	o.vColorBlend3 = v.vColorBlend3;
+	o.vColorBlend4 = v.vColorBlend4;
+	o.vAlphaBlend = v.vAlphaBlend;
+	
+#if ( SPECULAR == 1 )
+
+	float3 vWorldVertToEyeVector = cEyePos - vWorldPos;
+	float3	vView = normalize( vWorldVertToEyeVector );
+	float3	vReflect = reflect( g_vLightDir, vWorldNormal );
+	float	fDot = dot( vView, vReflect );
+	o.flSpecPower = saturate( pow( saturate( fDot ), g_vLightDir.w ) );
+
+#else
+
+	o.flSpecPower = 0;
+
+#endif
+
+	return o;
+}

@@ -1,0 +1,168 @@
+//============ Copyright (c) Valve Corporation, All rights reserved. ============
+
+// STATIC: "BASETEXTURE"				"0..1"
+// STATIC: "MULTITEXTURE"				"0..1"
+// STATIC: "FLASHLIGHT"					"0..1"
+// STATIC: "LIGHTMAPWATERFOG"           "0..1"
+// STATIC: "FLOWMAP"					"0..1"
+
+// Multitexture and basetexture are mutually exclusive.
+// SKIP: $MULTITEXTURE && $BASETEXTURE
+
+// flowmap doesn't play with multitexture or basetexture
+// SKIP: $FLOWMAP && $MULTITEXTURE
+
+// Have to have the flashlight on to get flashlightshadows.
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )
+
+// basetexture doesn't work with flashlight or lightmapwaterfog.  multitexture doesn't either.  We don't use basetexture or multitexture in newer code and instead use flowmap and flashlight.
+// SKIP: ( $FLASHLIGHT || $LIGHTMAPWATERFOG ) && ( ( $BASETEXTURE && !$FLOWMAP ) || $MULTITEXTURE )
+
+#include "common_vs_fxc.h"
+
+const float4 cBumpTexCoordTransform[2]	:  register( SHADER_SPECIFIC_CONST_1 );
+const float4 TexOffsets	:  register( SHADER_SPECIFIC_CONST_3 );
+
+#if FLASHLIGHT
+	const float4x4 g_FlashlightWorldToTexture : register( SHADER_SPECIFIC_CONST_4 );
+#endif
+
+struct VS_INPUT
+{
+	float4 vPos							: POSITION;
+	float4 vNormal						: NORMAL;
+	float4 vBaseTexCoord				: TEXCOORD0;
+	float2 vLightmapTexCoord			: TEXCOORD1;
+	float2 vLightmapTexCoordOffset		: TEXCOORD2;
+	float3 vTangentS					: TANGENT;
+	float3 vTangentT					: BINORMAL0;
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPos_POSITION		: POSITION;
+	#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+		float  fog						: FOG;
+	#endif
+	float2 vBumpTexCoord			: TEXCOORD0;
+	float3 vPositionToCameraRayWs	: TEXCOORD1;
+	float4 vReflectXY_vRefractYX	: TEXCOORD2;
+	float4 vProjPos					: TEXCOORD3;
+	float3 worldPos					: TEXCOORD4;
+	#if FLASHLIGHT
+		float4 flashlightSpacePos       : TEXCOORD5;
+	#endif
+	#if MULTITEXTURE
+		float4 vExtraBumpTexCoord		: TEXCOORD5;
+	#endif
+	#if ( BASETEXTURE && !FLOWMAP )
+		float4 lightmapTexCoord1And2	: TEXCOORD5;
+		float2 lightmapTexCoord3		: TEXCOORD6;
+	#endif
+
+	#if LIGHTMAPWATERFOG
+		float2 lightmapTexCoord			: TEXCOORD7;
+	#endif
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	float3 vObjNormal;
+	DecompressVertex_Normal( v.vNormal, vObjNormal );
+
+	// Projected position
+	float3 vWorldPos = mul4x3( v.vPos, cModel[0] );
+	float4 vProjPos = mul( float4( vWorldPos, 1 ), cViewProj );
+	
+	o.vProjPos = o.vProjPos_POSITION = vProjPos;
+
+
+	// Project tangent basis
+	float2 vProjTangentS = mul( v.vTangentS, cViewProj ).xy;
+	float2 vProjTangentT = mul( v.vTangentT, cViewProj ).xy;
+
+	// Map projected position to the reflection texture
+	float2 vReflectPos;
+	vReflectPos = (vProjPos.xy + vProjPos.w) * 0.5f;
+
+	// Map projected position to the refraction texture
+	float2 vRefractPos;
+	vRefractPos.x = vProjPos.x;
+	vRefractPos.y = -vProjPos.y; // invert Y
+	vRefractPos = (vRefractPos + vProjPos.w) * 0.5f;
+
+	// Reflection transform
+	o.vReflectXY_vRefractYX = float4( vReflectPos.x, vReflectPos.y, vRefractPos.y, vRefractPos.x );
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.vProjPos_POSITION.y = -o.vProjPos_POSITION.y;
+	o.vProjPos_POSITION.z = 2.0f * o.vProjPos_POSITION.z - o.vProjPos_POSITION.w;
+#endif // _PS3
+
+	// Compute fog based on the position
+	o.worldPos = vWorldPos;
+	
+	#if ( !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 ) )
+	{
+		o.fog = CalcFixedFunctionFog( vWorldPos, FOGTYPE_RANGE );
+	}
+	#endif
+
+	// Eye vector
+	float3 vPositionToCameraRayWs = cEyePos.xyz - vWorldPos.xyz;
+
+	// Transform to the tangent space
+	//o.vTangentEyeVect.x = dot( vPositionToCameraRayWs, v.vTangentS );
+	//o.vTangentEyeVect.y = dot( vPositionToCameraRayWs, v.vTangentT );
+	//o.vTangentEyeVect.z = dot( vPositionToCameraRayWs, vObjNormal );
+
+	o.vPositionToCameraRayWs.xyz = vPositionToCameraRayWs.xyz;
+
+	// Tranform bump coordinates
+	o.vBumpTexCoord.x = dot( v.vBaseTexCoord, cBumpTexCoordTransform[0] );
+	o.vBumpTexCoord.y = dot( v.vBaseTexCoord, cBumpTexCoordTransform[1] );
+	float f45x=v.vBaseTexCoord.x+v.vBaseTexCoord.y;
+	float f45y=v.vBaseTexCoord.y-v.vBaseTexCoord.x;
+	#if ( MULTITEXTURE )
+	{
+		o.vExtraBumpTexCoord.x=f45x*0.1+TexOffsets.x;
+		o.vExtraBumpTexCoord.y=f45y*0.1+TexOffsets.y;
+		o.vExtraBumpTexCoord.z=v.vBaseTexCoord.y*0.45+TexOffsets.z;
+		o.vExtraBumpTexCoord.w=v.vBaseTexCoord.x*0.45+TexOffsets.w;
+	}
+	#endif
+
+	#if ( BASETEXTURE && !FLOWMAP )
+	{
+		o.lightmapTexCoord1And2.xy = v.vLightmapTexCoord + v.vLightmapTexCoordOffset;
+	
+		float2 lightmapTexCoord2 = o.lightmapTexCoord1And2.xy + v.vLightmapTexCoordOffset;
+		float2 lightmapTexCoord3 = lightmapTexCoord2 + v.vLightmapTexCoordOffset;
+	
+		// reversed component order
+		o.lightmapTexCoord1And2.w = lightmapTexCoord2.x;
+		o.lightmapTexCoord1And2.z = lightmapTexCoord2.y;
+	
+		o.lightmapTexCoord3.xy = lightmapTexCoord3;
+	}
+	#endif
+
+	#if LIGHTMAPWATERFOG
+	{
+		o.lightmapTexCoord.xy = v.vLightmapTexCoord.xy;
+	}
+	#endif
+	
+	#if FLASHLIGHT
+	{
+		o.flashlightSpacePos = TransformFlashlightWorldToTexture( vWorldPos, g_FlashlightWorldToTexture );
+	}
+	#endif
+
+	return o;
+}
+
+

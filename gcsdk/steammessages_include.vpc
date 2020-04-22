@@ -1,0 +1,13 @@
+$MacroRequired	PROTOBUF_BUILDER_INCLUDED
+
+$Project
+{
+	$Folder "Protobuf Files"
+	{
+		$File "$SRCDIR/gcsdk/steammessages.proto"
+		$Folder "Generated Files"
+		{
+			$DynamicFile "$GENERATED_PROTO_DIR/steammessages.pb.h"
+		}
+	}
+}

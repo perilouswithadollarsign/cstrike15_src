@@ -1,0 +1,62 @@
+LIBRARY     WINTAB
+EXPORTS
+
+;Table 5.1. Ordinal Function Numbers for Dynamic Linking
+;Function Name              Ordinal Parameter-words
+WTInfo                      @20     4
+
+WTOpen                      @21     4
+
+WTClose                     @22     1
+WTPacketsGet                @23     4
+WTPacket                    @24     4
+
+WTEnable                    @40     2
+WTOverlap                   @41     2
+WTConfig                    @60     2
+WTGet                       @61     3
+
+WTSet                       @62     3
+
+WTExtGet                    @63     4
+WTExtSet                    @64     4
+WTSave                      @65     3
+WTRestore                   @66     4
+
+WTPacketsPeek               @80     4
+WTDataGet                   @81     8
+WTDataPeek                  @82     8
+WTQueuePackets              @83     1
+WTQueuePacketsEx            @200    5
+WTQueueSizeGet              @84     1
+WTQueueSizeSet              @85     2
+
+WTMgrOpen                   @100    2
+WTMgrClose                  @101    1
+
+WTMgrContextEnum            @120    5
+WTMgrContextOwner           @121    2
+WTMgrDefContext             @122    2
+WTMgrDefContextEx           @206    3
+
+WTMgrDeviceConfig           @140    3
+WTMgrConfigReplace          @141    4
+WTMgrConfigReplaceEx        @202    6
+
+
+WTMgrPacketHook             @160    5
+WTMgrPacketHookEx           @203    6
+
+WTMgrPacketUnhook           @204    1
+WTMgrPacketHookDefProc      @161    6
+WTMgrPacketHookNext         @205    5
+WTMgrExt                    @180    4
+WTMgrCsrEnable              @181    3
+WTMgrCsrButtonMap           @182    6
+WTMgrCsrPressureBtnMarks    @183    6
+WTMgrCsrPressureBtnMarksEx  @201    6
+WTMgrCsrPressureResponse    @184    6
+WTMgrCsrExt                 @185    5
+
+
+

@@ -1,0 +1,87 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// DYNAMIC:	"DZONE"				"0..1"
+
+#include "common_fog_vs_fxc.h"
+#include "common_vs_fxc.h"
+
+const float4 vConst0						: register(SHADER_SPECIFIC_CONST_0);
+#define g_time vConst0.x
+#define g_scale vConst0.y
+
+const float4 vConst3						: register(SHADER_SPECIFIC_CONST_3);
+#define g_dzCenter vConst3.xyz
+#define g_dzRadius vConst3.w
+
+static const int g_FogType			= DOWATERFOG;
+
+struct VS_INPUT
+{
+	float4 vPos				: POSITION;
+	float4 vColor			: COLOR0;
+	float4 vTexCoord0		: TEXCOORD0;
+	//float4 vTexCoord1		: TEXCOORD1;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos					: POSITION;			// Projection-space position
+	float2 baseTexCoord				: TEXCOORD0;		// Base texture coordinate
+	float4 color					: TEXCOORD2;		// Vertex color (from lighting or unlit)
+
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float  fog		: FOG;
+#endif
+
+	float4 worldPos_projPosZ		: TEXCOORD7;		// Necessary for pixel fog
+};
+
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	float3 worldPos;
+	worldPos = mul( v.vPos, cModel[0] );
+	
+	float3 v2p = worldPos - cEyePos;
+	float l = length(v2p);
+	
+	float3 up = float3(0,0,1);
+	float3 right = normalize(cross(up, normalize(v2p)));
+	
+	float flScale = smoothstep( 2500, 2200, l ) * g_scale;
+	float flCrush = smoothstep( 20, 60, l );
+
+	#if ( DZONE == 1 )
+		flScale *= smoothstep( g_dzRadius, g_dzRadius - 200, length( worldPos - g_dzCenter ) );
+	#endif
+
+	worldPos.z -= v.vTexCoord0.w * flScale * flCrush;
+	worldPos.xy -= right.xy * v.vTexCoord0.z * flScale;
+
+	float flRipple = 4 * sin( g_time + worldPos.x ) + sin( 2 * g_time + worldPos.y );
+
+	float flZscale = (v.vTexCoord0.w * -0.01f);
+	worldPos.xy -= right.xy * flRipple * flZscale;
+	
+	// Transform into projection space
+	o.projPos = mul( float4( worldPos, 1 ), cViewProj );
+	o.worldPos_projPosZ = float4( worldPos.xyz, o.projPos.z );
+	
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	o.fog = CalcFixedFunctionFog( worldPos, g_FogType );
+#endif
+	
+	o.color.rgba = v.vColor.rgba;
+
+	// darken bottom of grass - TODO: make material params
+	o.color.rgb *= saturate( pow( flZscale, 0.01 ) + 0.5 );
+	
+	// Base texture coordinates
+	o.baseTexCoord.xy = v.vTexCoord0.xy;
+
+	return o;
+}
+
+

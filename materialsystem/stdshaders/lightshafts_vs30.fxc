@@ -1,0 +1,56 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_vs_fxc.h"
+
+
+const float4x4 g_FlashlightWorldToTexture	: register( SHADER_SPECIFIC_CONST_0 );
+//														SHADER_SPECIFIC_CONST_1
+//														SHADER_SPECIFIC_CONST_2
+//														SHADER_SPECIFIC_CONST_3
+const float4x4 g_FlashlightWorldToLight		: register( SHADER_SPECIFIC_CONST_4 );
+//														SHADER_SPECIFIC_CONST_5
+//														SHADER_SPECIFIC_CONST_6
+//														SHADER_SPECIFIC_CONST_7
+
+
+//-----------------------------------------------------------------------------
+// Input vertex format
+//-----------------------------------------------------------------------------
+struct VS_INPUT
+{
+	// This is all of the stuff that we ever use.
+	float4 vPos			: POSITION;
+};
+
+struct VS_OUTPUT
+{
+	float4 projPos		: POSITION;	
+	float3 vWorldPos	: TEXCOORD0;
+	float4 vProjPos		: TEXCOORD1;
+	float4 spotTexCoord	: TEXCOORD2;
+	float4 uberLightPos	: TEXCOORD3;
+};
+
+//-----------------------------------------------------------------------------
+// Main shader entry point
+//-----------------------------------------------------------------------------
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = (VS_OUTPUT) 0;
+	float4 vPosition = v.vPos;
+
+	// Transform to world space
+	float3 worldPos = vPosition;
+
+	// Transform into projection space
+	float4 vProjPos = mul( float4( worldPos, 1 ), cViewProj );
+	o.projPos = vProjPos;
+	o.vWorldPos.xyz = worldPos;
+
+	o.vProjPos = vProjPos;
+
+	o.spotTexCoord = mul( float4( worldPos, 1.0f ), g_FlashlightWorldToTexture );
+	o.uberLightPos = mul( float4( worldPos, 1.0f ), g_FlashlightWorldToLight ).yzxw;
+
+	return o;
+}

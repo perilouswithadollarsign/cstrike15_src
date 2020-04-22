@@ -1,0 +1,62 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+sampler g_sDepth		: register( s0 );
+float4x4 g_mInvVP		: register( c0 );
+float2 g_vInvScreenSize	: register( c4 );
+
+struct PS_INPUT
+{
+#ifdef _X360
+	float2 vPos : VPOS;
+#else
+	float2 uv	: TEXCOORD0;
+#endif
+
+};
+
+struct PSOutput
+{
+	float4 vColor	: COLOR0;
+	float  fDepth	: DEPTH;
+};
+
+PSOutput main( PS_INPUT i)
+{
+#ifdef _X360
+	float2 vUV = 4.0 * i.vPos + 0.5;
+	vUV *= g_vInvScreenSize;
+#else
+	float2 vUV = i.uv;
+#endif
+
+	float4 vDepths;
+	vDepths.x = tex2D( g_sDepth, vUV );
+	vDepths.y = tex2D( g_sDepth, vUV + float2(g_vInvScreenSize.x, 0.0) );
+	vDepths.z = tex2D( g_sDepth, vUV + float2(0.0, g_vInvScreenSize.y) );
+	vDepths.w = tex2D( g_sDepth, vUV + g_vInvScreenSize );
+
+	// convert sample to world-space
+	float4 vClipPos;
+	vClipPos.xy = 2.0 * vUV.xy - 1.0;
+	vClipPos.y = -vClipPos.y;
+	vClipPos.z = 1.0 - vDepths.x;
+	vClipPos.w = 1.0;
+	float4 vWorldPos = mul( vClipPos, g_mInvVP );
+	vWorldPos /= vWorldPos.w;
+
+	// Derive normal from depth buffer. Ideally I'd compute a world space pos from vDepths.x, y, and z and then cross the deltas of that,
+	// but that's a lot of work.
+	float3 vNormal = cross( ddx(vWorldPos.xyz), ddy(vWorldPos.xyz) );
+
+	PSOutput o;
+
+	// TODO: output normal
+	o.vColor = 1.0;//-vPos.x/320.0;//float4( 0.5 * vNormal + 0.5, 0.0 );
+
+	// get max depth
+	vDepths.xy = min( vDepths.xy, vDepths.zw );
+	o.fDepth = min( vDepths.x, vDepths.y );
+	//o.fDepth = dot( vDepths, float4( 0.25, 0.25, 0.25, 0.25 ) );
+
+	return o;
+}

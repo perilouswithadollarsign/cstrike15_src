@@ -1,0 +1,121 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"
+$MacroRequired				"OUTBINDIR"
+$MacroRequired				"SCE_LIBROOT"
+
+$IgnoreRedundancyWarning	"ON"
+
+$Configuration "Release"
+{
+	$General	
+	{
+		// General
+		$OutputDirectory						".\Release_PS3"
+		$IntermediateDirectory					".\Release_PS3"
+		$ExtensionsToDeleteOnClean
+		$BuildLogFile
+		$SystemIncludeDependencies
+		$SaveDebuggerPropertiesInProject
+		
+		$ConfigurationType						"ELF"
+	}
+
+	$SNCCompiler
+	{
+		// General
+		$AdditionalIncludeDirectories
+		$PreprocessorDefinitions				"SN_TARGET_PS3;NDEBUG;__SNC__;POSIX"
+		$ForceIncludes							"tier0/platform.h"
+		$GenerateDebugInformation			"yes"
+		$Warnings							"Generate Warnings (=1)"
+		$TreatMessagesAsErrors				"Reported Errors Only (=0)"
+		$DisableSpecificWarnings
+		$ObjectFileName						"$(IntDir)\"
+		$CallprofHierarchicalProfiling		"No"
+
+		// Optimization
+		$OptimizationLevel					"Optimize for Size (-Os)"
+		$FastMath							"Yes"
+		$RelaxAliasChecking					"Default"
+		$BranchlessCompares					"Always Use Branches (=0)"
+		$UnrollLoops						"30"
+		$AssumeAlignedPointers				"No"
+		$AssumeCorrectSign					"Yes"
+
+		// Code Generation
+		$TOCPointerPreservation				"Preserve the TOC for all Function Calls (=0)"
+		$InitializedDataPlacement			"Automatic .bss and .data Placement (=1)"
+		$PromoteFPConstantsToDoubles		"No"
+
+		// Language
+		$CC++Dialect						"Mixed with GNU Extensions"
+		$C++ExceptionsAndRTTIUsage			"Using RTTI only"
+		$DefaultCharUnsigned				"No"
+		$DefaultFPConstantsAsTypeFloat		"No"
+		$BuiltInDefinitionForWCHAR_TType	"unsigned short (=ushort)"
+
+		// Precompiled Headers
+		$Create/UsePrecompiledHeader		"Not Using Precompiled Header File(s)"
+		$PrecompiledHeaderFile
+
+		// Command Line
+		$AdditionalOptions 
+	}
+
+	$SNCLinker
+	{
+		// General
+		$OutputFile							$(OutDir)/$(ProjectName)_ps3.elf
+		$OutputFormat                       "ELF file"
+		$AdditionalDependencies				"$SCE_LIBROOT\libgcm_cmd.a $SCE_LIBROOT\libgcm_sys_stub.a $SCE_LIBROOT\libsysmodule_stub.a $SCE_LIBROOT\libsysutil_stub.a $SCE_LIBROOT\libusbd_stub.a $SCE_LIBROOT\libresc_stub.a $SCE_LIBROOT\libio_stub.a $SCE_LIBROOT\fno-exceptions\libc_libent.o $SCE_LIBROOT\fno-exceptions\libm_libent.o $SCE_LIBROOT\fno-exceptions\libstdc++_libent.o $SCE_LIBROOT\fno-exceptions\libc.a $SCE_LIBROOT\fno-exceptions\libm.a $SCE_LIBROOT\fno-exceptions\libstdc++.a libfios.a libfs_stub.a libsysutil_stub.a libsysutil_np_stub.a libsysmodule_stub.a"
+		$AdditionalLibraryDirectories
+		$IgnoreAllDefaultLibraries			"No"
+		$UsingExceptionHandling				"No"
+		$TOCPointerElimination				"No"
+		$ForceSymbolReferences
+		$CallprofHierarchicalProfiling		"No"
+		$DebugInfoAndSymbolStripping		"No Symbol Stripping"
+		$UnusedFunctionAndDataStripping		"Strip Unused Functions and Data"
+		$ImportLibrary
+		$GenerateMapFile					"No Map File"
+		$MapFileName
+		$LinkLibraryDependencies			"Yes"
+
+		// Command Line
+		$AdditionalOptions					"--strip-duplicates --ppuguid"
+	}
+ 
+	$PreBuildEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PreLinkEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PostBuildEvent
+	{
+		$CommandLine						"$(SCE_PS3_ROOT)\host-win32\bin\make_fself -c &quot;$(TargetPath)&quot; &quot;$(TargetDir)$(TargetName).self&quot;"
+		$Description						"Fake Signing ELF (compressed) &quot;$(TargetDir)$(TargetName).self&quot;"
+		$ExcludedFromBuild					"No"
+	}
+
+	$CustomBuildStep
+	{
+		// General
+		$CommandLine
+		$Description
+		$Outputs
+		$AdditionalDependencies
+	}
+}

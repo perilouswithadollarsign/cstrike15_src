@@ -1,0 +1,28 @@
+//-----------------------------------------------------------------------------
+//	gcsdk_include.vpc
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$MacroRequired "PLATFORM"
+$MacroRequired GENERATED_PROTO_DIR
+
+$include "$SRCDIR\gcsdk\steammessages_include.vpc"
+
+$MacroRequired	PROTOBUF_BUILDER_INCLUDED
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\gcsdk\steamextra"
+	}
+}
+
+$Project
+{
+	$Folder	"Link Libraries"
+	{
+		$Lib	gcsdk
+	}
+}

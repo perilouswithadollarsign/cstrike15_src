@@ -1,0 +1,158 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "KERNEL"					"0..4"
+// STATIC: "CLEAR_COLOR"			"0..1"
+// STATIC: "APPROX_SRGB_ADAPTER"	"0..1" [ps20b] [PC]
+// STATIC: "APPROX_SRGB_ADAPTER"	"0..0" [ps20b] [CONSOLE]
+
+// We only support our approximate sRGB adapter on the Gaussian kernels
+// SKIP: ( $APPROX_SRGB_ADAPTER == 1 ) && ( $KERNEL == 0 ) [ps20b] [PC]
+
+// Don't bother with our approximate sRGB adapter if we're clearing
+// SKIP: ( $APPROX_SRGB_ADAPTER == 1 ) && ( $CLEAR_COLOR == 1 ) [ps20b] [PC]
+
+#include "common_ps_fxc.h"
+
+sampler TexSampler	: register( s0 );
+
+struct PS_INPUT
+{
+	float2 coordTap0					: TEXCOORD0;
+	#if ( KERNEL == 0 ) // Original kernel that has a '+' plus shape
+		float2 coordTap1				: TEXCOORD1;
+		float2 coordTap2				: TEXCOORD2;
+		float2 coordTap3				: TEXCOORD3;
+		float2 coordTap1Neg				: TEXCOORD4;
+		float2 coordTap2Neg				: TEXCOORD5;
+		float2 coordTap3Neg				: TEXCOORD6;
+	#endif
+};
+
+float2 g_vPsTapOffset[3] : register( c0 );
+float3 g_vScaleFactor : register( c3 );
+
+float2 g_vUvOffsetToNeighborPixel : register( c4 );
+float3 g_vClearColor	: register( c5 );
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	#if ( KERNEL == 0 ) // Original kernel that has a '+' plus shape (used for bloom?)
+	{
+		float4 s0, s1, s2, s3, s4, s5, s6, color;
+
+		// Sample taps with coordinates from VS
+		s0 = saturate( tex2D( TexSampler, i.coordTap0 ) );
+		s1 = saturate( tex2D( TexSampler, i.coordTap1 ) );
+		s2 = saturate( tex2D( TexSampler, i.coordTap2 ) );
+		s3 = saturate( tex2D( TexSampler, i.coordTap3 ) );
+		s4 = saturate( tex2D( TexSampler, i.coordTap1Neg ) );
+		s5 = saturate( tex2D( TexSampler, i.coordTap2Neg ) );
+		s6 = saturate( tex2D( TexSampler, i.coordTap3Neg ) );
+
+		color = s0 * 0.2013f;
+		color += ( s1 + s4 ) * 0.2185f;
+		color += ( s2 + s5 ) * 0.0821f;
+		color += ( s3 + s6 ) * 0.0461f;
+
+		// Compute tex coords for other taps
+		float2 coordTap4 = i.coordTap0 + g_vPsTapOffset[0];
+		float2 coordTap5 = i.coordTap0 + g_vPsTapOffset[1];
+		float2 coordTap6 = i.coordTap0 + g_vPsTapOffset[2];
+		float2 coordTap4Neg = i.coordTap0 - g_vPsTapOffset[0];
+		float2 coordTap5Neg = i.coordTap0 - g_vPsTapOffset[1];
+		float2 coordTap6Neg = i.coordTap0 - g_vPsTapOffset[2];
+
+		// Sample the taps
+		s1 = saturate( tex2D( TexSampler, coordTap4 ) );
+		s2 = saturate( tex2D( TexSampler, coordTap5 ) );
+		s3 = saturate( tex2D( TexSampler, coordTap6 ) );
+		s4 = saturate( tex2D( TexSampler, coordTap4Neg ) );
+		s5 = saturate( tex2D( TexSampler, coordTap5Neg ) );
+		s6 = saturate( tex2D( TexSampler, coordTap6Neg ) );
+
+		color += ( s1 + s4 ) * 0.0262f;
+		color += ( s2 + s5 ) * 0.0162f;
+		color += ( s3 + s6 ) * 0.0102f;
+		#if ( CLEAR_COLOR == 1 )
+		{
+			color.rgb = g_vClearColor.rgb;
+		}
+		#else
+		{
+			color.xyz *= g_vScaleFactor.xyz;
+		}
+		#endif
+
+		return color;
+	}
+	#else // Gaussian kernel
+	{
+		#if ( KERNEL == 1 )
+			// Gaussian kernel 7 pixels wide
+			int kNumSamples = 5;
+			float vKernel[5] = { 0.004433f, 0.296042f, 0.399050f, 0.296042f, 0.004433f };
+			float vUvOffset[5] = { -3.000000f, -1.182425f, 0.000000f, 1.182425f, 3.000000f };
+		#elif ( KERNEL == 2 )
+			// Gaussian kernel 9 pixels wide
+			int kNumSamples = 5;
+			float vKernel[5] = { 0.019827f, 0.320561f, 0.319224f, 0.320561f, 0.019827f };
+			float vUvOffset[5] = { -3.096215f, -1.276878f, 0.000000f, 1.276878f, 3.096215f };
+		#elif ( KERNEL == 3 )
+			// Gaussian kernel 13 pixels wide
+			int kNumSamples = 7;
+			float vKernel[7] = { 0.004487f, 0.069185f, 0.312325f, 0.228005f, 0.312325f, 0.069185f, 0.004487f };
+			float vUvOffset[7] = { -5.142349f, -3.241796f, -1.379942f, 0.000000f, 1.379942f, 3.241796f, 5.142349f };
+		#elif ( KERNEL == 4 )
+			// Gaussian kernel 25 pixels wide
+			int kNumSamples = 13;
+			float vKernel[13] = { 0.000534f, 0.003733f, 0.018004f, 0.059928f, 0.137740f, 0.218677f, 0.122765f, 0.218677f, 0.137740f, 0.059928f, 0.018004f, 0.003733f, 0.000534f };
+			float vUvOffset[13] = { -11.251852f, -9.289172f, -7.329586f, -5.372686f, -3.417910f, -1.464557f, 0.000000f, 1.464557f, 3.417910f, 5.372686f, 7.329586f, 9.289172f, 11.251852f };
+		#endif
+
+		float2 vStartUv = i.coordTap0.xy;
+
+		float4 cColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+		for ( int j = 0; j < kNumSamples; j++ )
+		{
+			// Calculate uv
+			float2 vUvTmp = vStartUv.xy + ( vUvOffset[j].xx * g_vUvOffsetToNeighborPixel.xy );
+
+			// Sample pixel
+			float4 cSample = tex2D( TexSampler, vUvTmp.xy );
+
+			#if ( APPROX_SRGB_ADAPTER )
+			{
+				cSample.rgb = max( cSample.rgb, float3( 0.00001f, 0.00001f, 0.00001f ) ); // rsqrt doesn't like inputs of zero
+
+				float3 ooSQRT;					//
+				ooSQRT.r = rsqrt( cSample.r );	//
+				ooSQRT.g = rsqrt( cSample.g );	// Approximate linear-to-sRGB conversion
+				ooSQRT.b = rsqrt( cSample.b );	//
+				cSample.rgb *= ooSQRT.rgb;		//
+			}
+			#endif
+
+			// Weight the sample
+			cColor.rgba += vKernel[j] * cSample;
+		}
+
+		#if ( CLEAR_COLOR == 1 )
+		{
+			cColor.rgb = g_vClearColor.rgb;
+		}
+		#else
+		{
+			cColor.rgb = cColor.rgb * g_vScaleFactor.rgb;
+
+			#if ( APPROX_SRGB_ADAPTER )
+			{
+				cColor.rgb *= cColor.rgb; // Approximate sRGB-to-linear conversion
+			}
+			#endif
+		}
+		#endif
+
+		return cColor.rgba;
+	}
+	#endif
+}

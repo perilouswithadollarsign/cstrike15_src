@@ -1,0 +1,39 @@
+$Project
+{
+	$Folder "Protobuf Files"
+	{
+		// This file will be fully used only when/if we integrate Yahn's CL 1791453 from dota
+		/*$File "$SRCDIR/common/networkbasetypes.proto"
+		$Folder "Generated Files"
+		{
+			$DynamicFile "$GENERATED_PROTO_DIR/networkbasetypes.pb.h"
+			$DynamicFile "$GENERATED_PROTO_DIR/networkbasetypes.pb.cc"
+			{
+				$Configuration
+				{
+					$Compiler 
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers" [$WINDOWS]
+					}
+				}
+			}
+		}*/
+
+		$File "$SRCDIR/common/network_connection.proto"
+		$Folder "Generated Files"
+		{
+			$DynamicFile "$GENERATED_PROTO_DIR/network_connection.pb.h"
+			$DynamicFile "$GENERATED_PROTO_DIR/network_connection.pb.cc"
+			{
+				$Configuration
+				{
+					$Compiler [$WINDOWS]
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+					}
+				}
+			}
+		}
+	}
+
+}

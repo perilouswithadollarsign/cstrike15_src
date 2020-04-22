@@ -1,0 +1,77 @@
+//====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======
+//
+// Purpose: 
+//
+//=============================================================================
+
+//  STATIC: "MODEL"				"0..1"
+
+#include "common_fog_vs_fxc.h"
+
+#include "common_vs_fxc.h"
+
+//const float4 cBaseTexCoordTransform[ 2 ]			: register( SHADER_SPECIFIC_CONST_6 );
+
+const float4 g_flProjectedSizeRotation				: register( c49 );
+const float4 g_vProjectionOrigin					: register( c48 );
+
+struct VS_INPUT
+{
+	float3 vPos							: POSITION;
+	float4 vNormal						: NORMAL;
+};
+
+struct VS_OUTPUT
+{
+	float4 vProjPos							: POSITION;	
+	float2 vBaseTexCoord					: TEXCOORD0;
+};
+
+static const float3 Normal = float3( 0, 0, -1.0 );
+
+float3 ClosestPointOnPlane( float3 TestPoint )
+{
+    float distance = dot( Normal, TestPoint - g_vProjectionOrigin );
+    
+    return TestPoint - distance*Normal;
+}
+
+float2 ComputeTexCoord( const float3 vWorldPos, const float flRotation, const float flScale )
+{
+	float3 vTest = ClosestPointOnPlane( vWorldPos );
+	float2 vBaseCoord = ( ( vTest - g_vProjectionOrigin ) / g_flProjectedSizeRotation.x ) + 0.5f;
+	
+	float2 	vAdjust = vBaseCoord - float2( 0.5, 0.5 );
+	float2 	vResult;
+	float 	c = cos( flRotation );
+	float 	s = sin( flRotation );
+	
+   	vResult.x = ( vAdjust.x * c ) + ( vAdjust.y * -s );
+   	vResult.y = ( vAdjust.x * s ) + ( vAdjust.y * c );
+   	
+   	return ( vResult / flScale ) + float2( 0.5, 0.5 );
+}
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	float3 vNewPos = v.vPos;
+//	vNewPos.z += 128.0;
+	
+	float3 vObjNormal;
+	DecompressVertex_Normal( v.vNormal, vObjNormal );
+
+	float4 vProjPos;
+	float3 vWorldPos;
+
+	vWorldPos = mul( float4( vNewPos, 1 ), cModel[0] );
+	vProjPos = mul( float4( vWorldPos, 1 ), cViewProj );
+	o.vProjPos = vProjPos;
+	
+//	float3 worldNormal = mul( vObjNormal, ( float3x3 )cModel[0] );
+
+	o.vBaseTexCoord = ComputeTexCoord( vWorldPos, g_flProjectedSizeRotation.y, 1.0 );
+	
+	return o;
+}

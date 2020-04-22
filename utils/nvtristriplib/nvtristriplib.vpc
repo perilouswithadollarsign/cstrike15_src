@@ -1,0 +1,26 @@
+//-----------------------------------------------------------------------------
+//	NVTRISTRIPLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTLIBNAME	"nvtristrip"
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Project "NVTriStripLib"
+{
+	$Folder	"Source Files"
+	{
+		$File	"nvtristrip.cpp"
+		$File	"nvtristripobjects.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"nvtristrip.h"
+		$File	"nvtristripobjects.h"
+		$File	"vertexcache.h"
+	}
+}

@@ -1,0 +1,59 @@
+ //-----------------------------------------------------------------------------
+//	MATHLIB_EXTENDED.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro INTERMEDIATESUBDIR "extended"
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;..\public\mathlib"
+		$PreprocessorDefinitions		"$BASE;MATHLIB_EXTENDED_LIB;SOURCE1"
+	}
+}
+
+$Project "mathlib_extended"
+{
+	$Folder	"Source Files"
+	{
+		$File	"disjoint_set_forest.cpp"
+		$File	"dynamictree.cpp"
+		$File   "eigen.cpp"
+		$File	"simdvectormatrix.cpp"
+		$File	"femodel.cpp"
+		$File	"femodelbuilder.cpp"
+		$File	"feagglomerator.cpp"
+		$File	"svd.cpp"
+		$File	"transform.cpp"
+		$File	"femodeldesc.cpp"
+		$File	"softbody.cpp"
+		$File	"softbodyenvironment.cpp"
+	}
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR/public/mathlib/aabb.h"
+		$File	"$SRCDIR/public/mathlib/transform.h"
+		$File	"$SRCDIR/public/mathlib/disjoint_set_forest.h"
+		$File	"$SRCDIR/public/mathlib/dynamictree.h"
+		$File	"$SRCDIR/public/mathlib/dynamictree.inl"
+		$File	"$SRCDIR/public/mathlib/eigen.h"
+		$File	"$SRCDIR/public/mathlib/simdvectormatrix.h"
+		$File	"$SRCDIR/public/mathlib/femodel.h"
+		$File	"$SRCDIR/public/mathlib/ssequaternion.h"		
+		$File	"$SRCDIR/public/mathlib/femodeldesc.h"
+		$File	"$SRCDIR/public/mathlib/femodel.inl"
+		$File	"$SRCDIR/public/mathlib/femodelbuilder.h"
+		$File	"$SRCDIR/public/mathlib/feagglomerator.h"
+		$File	"$SRCDIR/public/mathlib/svd.h"
+		$File	"$SRCDIR/public/mathlib/softbody.h"
+		$File	"$SRCDIR/public/mathlib/softbody.inl"
+		$File	"$SRCDIR/public/mathlib/softbodyenvironment.h"
+	}
+}

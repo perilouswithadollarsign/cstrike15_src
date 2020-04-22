@@ -1,0 +1,118 @@
+// STATIC: "MODEL"				"0..1"
+// STATIC: "PORTALGHOSTOVERLAY"	"0..2"
+
+// DYNAMIC: "SKINNING"		"0..1"
+
+#include "common_vs_fxc.h"
+
+static const bool g_bSkinning	= SKINNING ? true : false;
+static const bool g_bModel		= MODEL ? true : false;
+
+struct VS_INPUT
+{
+	float4 vPos							: POSITION;
+	float3 vNormal						: NORMAL;
+
+	#if ( PORTALGHOSTOVERLAY )
+		float4 vGhostTintColor			: COLOR;
+	#endif
+
+	float4 vBoneWeights					: BLENDWEIGHT;
+	float4 vBoneIndices					: BLENDINDICES;
+	float2 vTexCoord					: TEXCOORD0;
+};
+
+
+struct VS_OUTPUT
+{
+	float4 vProjPos					: POSITION;
+	float4 vColor					: COLOR;
+	float2 vTexCoord1				: TEXCOORD0;
+	float2 vTexCoord2				: TEXCOORD1; //just a copy of vTexCoord1, ps11 compatibility issue
+	
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float fog						: FOG;
+#endif
+	
+	float4 worldPos_projPosZ		: TEXCOORD7;		// Necessary for pixel fog
+};
+
+
+VS_OUTPUT main( VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	#if ( PORTALGHOSTOVERLAY )
+	{
+		// Offset these by one unit so we can do a z-fail render and force it to be in front of the wall.
+		// I don't want to modify the mesh since we're getting close to shipping. This ensures the offset
+		// is isolated to the ghost render only and not the other portal render passes.
+		v.vPos.xyz += v.vNormal.xyz;
+	}
+	#endif
+
+	float3 worldPos;
+	if( MODEL == 1 )
+	{
+		SkinPosition( 
+				g_bSkinning, 
+				v.vPos,
+				v.vBoneWeights, v.vBoneIndices,
+				worldPos );
+	}
+	else
+	{
+		worldPos = mul3x3( v.vPos.xyz, ( float3x3 )cModel[0] );
+	}
+	
+	o.vProjPos = mul( float4( worldPos, 1 ), cViewProj );
+	
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.vProjPos.y = -o.vProjPos.y;
+	o.vProjPos.z = 2.0f * o.vProjPos.z - o.vProjPos.w;
+#endif // _PS3
+
+
+	o.worldPos_projPosZ = float4( worldPos.xyz, o.vProjPos.z );
+	o.vTexCoord1 = v.vTexCoord.xy;
+	o.vTexCoord2 = v.vTexCoord.xy;
+	
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	o.fog = CalcFixedFunctionFog( worldPos, FOGTYPE_RANGE );
+#endif
+
+	o.vColor.rgba = float4( 1, 1, 1, 1 );
+
+#if ( PORTALGHOSTOVERLAY )
+	{
+		#if ( PORTALGHOSTOVERLAY == 1 )
+		{
+			o.vColor.rgba = float4( v.vGhostTintColor.rgb, 1 );
+		}
+		#endif
+
+		float3 vViewRayWs = worldPos.xyz - cEyePos.xyz;
+
+		// If we're facing away, always be full strength
+		float flDot = dot( v.vNormal.xyz, vViewRayWs.xyz );
+
+		if ( flDot <= 0.0f )
+		{
+			// if we're facing towards the viewer, take distance into account
+
+			float flDistSqr = dot( vViewRayWs.xyz, vViewRayWs.xyz );
+			o.vColor.a = saturate( ( flDistSqr - ( 120.0f * 120.0f ) ) / ( ( 240.0f * 240.0f ) - ( 120.0f * 120.0f ) ) );	// Remap 120..240 distance to 0..1
+		}	
+
+		// Factor how "open" this portal is, but don't lerp in the visibility until the portal is 85% open...otherwise
+		//    the colored oval becomes visible before the portal's firey border is fully open.
+		o.vColor.a *= v.vGhostTintColor.a;
+	}
+#endif
+
+
+	return o;
+}
+
+	

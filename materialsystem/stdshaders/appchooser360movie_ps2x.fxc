@@ -1,0 +1,26 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler TexSampler	: register( s0 );
+
+struct PS_INPUT
+{
+	float2 baseTexCoord				: TEXCOORD0;		// Base texture coordinate
+	float4 vColor					: TEXCOORD1;
+};
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	// Read PC sRGB color without using the HW sRGB read
+	float4 vTextureColor = tex2D( TexSampler, i.baseTexCoord );
+
+	// Do a PC sRGB gamma->linear conversion
+	vTextureColor.rgb = SrgbGammaToLinear( vTextureColor.rgb );
+
+	float4 result;
+	result.rgb = vTextureColor.rgb * i.vColor.rgb;
+	result.a = i.vColor.a;
+
+	return result;
+}

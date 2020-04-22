@@ -1,0 +1,66 @@
+//-----------------------------------------------------------------------------
+//	COMMEDIT.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin\tools"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_win32_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE,.\,..\common,$SRCDIR\game\shared"
+		$PreprocessorDefinitions			"$BASE;COMMEDIT_EXPORTS"
+	}
+
+	$Linker
+	{
+		$AdditionalDependencies				"$BASE Psapi.lib"
+	}
+}
+
+$Project "Commedit"
+{
+	$Folder	"Source Files"
+	{
+		$File	"commeditdoc.cpp"
+		$File	"commedittool.cpp"
+		$File	"commentarynodebrowserpanel.cpp"
+		$File	"commentarypropertiespanel.cpp"
+		$File	"dmecommentarynodeentity.cpp"
+		$File	"$SRCDIR\public\interpolatortypes.cpp"
+		$File	"$SRCDIR\public\registry.cpp"
+		$File	"$SRCDIR\public\vgui_controls\vgui_controls.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"commeditdoc.h"
+		$File	"commedittool.h"
+		$File	"commentarynodebrowserpanel.h"
+		$File	"commentarypropertiespanel.h"
+		$File	"dmecommentarynodeentity.h"
+		$File	"$SRCDIR\public\mathlib\mathlib.h"
+	}
+
+	$Folder "Link Libraries"
+	{
+		$File	"$SRCDIR\lib\public\bonesetup.lib"
+		$File	"$SRCDIR\lib\public\datamodel.lib"
+		$File	"$SRCDIR\lib\public\dmxloader.lib"
+		$File	"$SRCDIR\lib\public\dme_controls.lib"
+		$File	"$SRCDIR\lib\public\dmserializers.lib"
+		$File	"$SRCDIR\lib\public\dmxloader.lib"
+		$File	"$SRCDIR\lib\public\mathlib.lib"
+		$File	"$SRCDIR\lib\public\matsys_controls.lib"
+		$File	"$SRCDIR\lib\public\movieobjects.lib"
+		$File	"$SRCDIR\lib\public\tier2.lib"
+		$File	"$SRCDIR\lib\public\tier3.lib"
+		$File	"$SRCDIR\lib\public\toolutils.lib"
+		$File	"$SRCDIR\lib\public\vgui_controls.lib"
+	}
+}

@@ -1,0 +1,69 @@
+//-----------------------------------------------------------------------------
+//	TIER0_staticlib.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTLIBNAME	"tier0_staticlib"
+$Macro NOSCHEMACOMPILER "1"
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;TIER0_DLL_EXPORT;CROSS_PLATFORM_VERSION=1"[$WINDOWS||$X360||$PS3||$POSIX]
+		$PreprocessorDefinitions		"$BASE;POSIX" [$PS3||$POSIX]
+		$PreprocessorDefinitions		"$BASE;TIER0_FPO_DISABLED"				[$NOFPO]
+	}
+	$Compiler [$PS3]
+	{
+		$AdditionalIncludeDirectories	"$BASE;&quot;$(SN_PS3_PATH)/ppu/include&quot;"
+		$PreprocessorDefinitions		"$BASE;PLATFORM_OVERRIDE_TIER0"
+	}
+	$SNCCompiler [$PS3]
+	{
+		$ForceIncludes				"platform_override.h"
+	}
+
+}
+
+$Configuration "Release"
+{
+	$Librarian
+	{
+		$OutputFile							"Release_tier0staticlib_PS3\$OUTLIBNAME_ps3.lib"
+	}
+
+	$General
+	{
+		$OutputDirectory			".\Release_tier0staticlib_PS3"		[$PS3]
+		$IntermediateDirectory		".\Release_tier0staticlib_PS3"		[$PS3]
+	}
+}
+
+$Configuration "Debug"
+{
+	$Librarian
+	{
+		$OutputFile							"Debug_tier0staticlib_PS3\$OUTLIBNAME_ps3.lib"
+	}
+
+	$General
+	{
+		$OutputDirectory			".\Debug_tier0staticlib_PS3"		[$PS3]
+		$IntermediateDirectory		".\Debug_tier0staticlib_PS3"		[$PS3]
+	}
+}
+
+$Include "tier0.inc"
+
+$Project "tier0_staticlib"
+{
+	$Folder	"Source Files"
+	{
+		-$File	"prxexport.cpp"		[$PS3]
+	}
+}

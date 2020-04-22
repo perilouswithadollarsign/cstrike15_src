@@ -1,0 +1,145 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "VERTEXCOLOR"		"0..1"
+// STATIC: "BUMPMAP"			"0..2"
+
+// DYNAMIC: "NUM_LIGHTS"		"0..4"					[ps20b]
+// DYNAMIC: "NUM_LIGHTS"		"0..4"					[ps30]
+// DYNAMIC: "AMBIENT_LIGHT"		"0..1"
+
+// Includes =======================================================================================
+#include "common_vertexlitgeneric_dx9.h"
+
+// Texture Samplers ===============================================================================
+sampler g_tColorSampler				: register( s0 );
+sampler g_tBumpSampler				: register( s1 );
+sampler g_tDummySampler				: register( s2 );
+
+// Shaders Constants and Globals ==================================================================
+const float4 g_mViewProj0			: register( c0 );	// 1st row of matrix
+const float4 g_mViewProj1			: register( c1 );	// 2nd row of matrix
+const float4 g_vCameraPosition		: register( c2 );
+const float3 g_ambientCube[6]		: register( c3 );
+								  //: register( c4 );
+								  //: register( c5 );
+								  //: register( c6 );
+								  //: register( c7 );
+								  //: register( c8 );
+
+PixelShaderLightInfo g_lightInfo[3]	: register( c9 ); // 2 registers each - 6 registers total
+								  //: register( c10 );
+								  //: register( c11 );
+								  //: register( c12 );
+								  //: register( c13 );
+								  //: register( c14 );
+
+
+// new-UP
+static const float3 upBumpBasis[3] = {
+	float3(  0.0f, 0.81649661064147949f, OO_SQRT_3 ),
+	float3( -0.70710676908493042f, -0.40824833512306213f, OO_SQRT_3 ),
+	float3(  0.7071068286895752f, -0.40824821591377258f, OO_SQRT_3 )
+};
+
+
+// Interpolated values ============================================================================
+struct PS_INPUT
+{
+	float3 vUv0					: TEXCOORD0;
+	float3 vWorldNormal			: TEXCOORD1;
+	float3 vWorldTangent		: TEXCOORD2;
+	float3 vWorldBinormal		: TEXCOORD3;
+	float3 vWorldPosition		: TEXCOORD4;
+	float4 vLightAtten			: TEXCOORD5;
+	float4 vSpecularPack1		: TEXCOORD6;
+	float4 vSpecularPack2		: TEXCOORD7;
+	#if ( VERTEXCOLOR )
+		float4 vVertexColor		: COLOR0;
+	#endif
+};
+
+// Main ===========================================================================================
+float4 main( PS_INPUT i ) : COLOR
+{
+	// Unpack lighting information
+	float3 vSpecularN1 = i.vSpecularPack1.xyz;
+	float3 vSpecularN2 = i.vSpecularPack2.xyz;
+	float3 vSpecularN3;
+	vSpecularN3.x = i.vSpecularPack1.w;
+	vSpecularN3.y = i.vSpecularPack2.w;
+	vSpecularN3.z = i.vUv0.z;
+
+	// Color
+	float4 cBaseColor = tex2D( g_tColorSampler, i.vUv0.xy );
+
+	#if BUMPMAP == 0
+	// non-bumped case
+		float3 vTangentNormal = float3( 0, 0, 1 );
+	#elif BUMPMAP == 1
+	// Combine bump layers into tangent normal
+		float4 vBumpTexel = tex2D( g_tBumpSampler, i.vUv0.xy );
+		float3 vTangentNormal = ( vBumpTexel * 2.0f ) - 1.0f;
+	#elif BUMPMAP == 2
+	// ssbump case
+		float4 vBumpTexel = tex2D( g_tBumpSampler, i.vUv0.xy );
+		float3 vTangentNormal = vBumpTexel;
+	#endif
+
+	// Lighting
+	float3 cDiffuse = float3( 0.0f, 0.0f, 0.0f );
+	#if ( VERTEXCOLOR )
+	{
+		// Use interpolated vertex colors
+		cDiffuse.rgb = i.vVertexColor.rgb;
+	}
+	#else
+	{
+		// Compute lighting
+//		cDiffuse.rgb = PixelShaderDoLighting( i.vWorldPosition.xyz, normalize( vWorldNormal.xyz ),
+//				float3( 0.0f, 0.0f, 0.0f ), false, AMBIENT_LIGHT, i.vLightAtten.xyzw,
+//				g_ambientCube, g_tDummySampler, NUM_LIGHTS, g_lightInfo, false,
+//				false, g_tDummySampler );
+#if BUMPMAP == 0
+		cDiffuse.rgb = ( vSpecularN1 + vSpecularN2 + vSpecularN3 ) / 3.0f;
+#elif BUMPMAP == 1
+		float3 dp;
+		dp.x = saturate( dot( vTangentNormal, upBumpBasis[0] ) );
+		dp.y = saturate( dot( vTangentNormal, upBumpBasis[1] ) );
+		dp.z = saturate( dot( vTangentNormal, upBumpBasis[2] ) );
+		dp *= dp;
+
+		cDiffuse.rgb = dp.x * vSpecularN1 + dp.y * vSpecularN2 + dp.z * vSpecularN3;
+#elif BUMPMAP == 2
+		float3 dp;
+		dp.x = saturate( dot( vTangentNormal, upBumpBasis[0] ) );
+		dp.y = saturate( dot( vTangentNormal, upBumpBasis[1] ) );
+		dp.z = saturate( dot( vTangentNormal, upBumpBasis[2] ) );
+		dp *= dp;
+
+		cDiffuse.rgb = dp.x * vSpecularN1 + dp.y * vSpecularN2 + dp.z * vSpecularN3;
+
+		// ssbump case needs to construct tangent normal from ssbump vector
+		vTangentNormal.xyz = normalize( bumpBasis[0]*vTangentNormal.x +
+								bumpBasis[1]*vTangentNormal.y + bumpBasis[2]*vTangentNormal.z);
+#endif
+	}
+	#endif
+
+	#if 0
+	// Transform normal into world space
+	float3 vWorldNormal = Vec3TangentToWorld( vTangentNormal.xyz, i.vWorldNormal.xyz, i.vWorldTangent.xyz, i.vWorldBinormal.xyz );
+	#endif
+
+	//===============//
+	// Combine terms //
+	//===============//
+	float4 result;
+	result.rgb = cBaseColor.rgb;
+	result.rgb *= cDiffuse.rgb;
+
+	// Set alpha to...
+	result.a = 0.0f;
+
+	return FinalOutput( result, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR ); //go back to final output when it'll fit.
+}
+  

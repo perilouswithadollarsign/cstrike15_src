@@ -1,0 +1,64 @@
+//	DYNAMIC: "ALPHACLIP"					"0..1"
+//  STATIC: "COLOR_DEPTH"					"0..1"
+
+
+const float g_AlphaThreshold : register( c0 );
+
+struct PS_INPUT
+{
+#ifdef _PS3
+	float unused; // empty structures not supported on Cg??
+#endif // _PS3
+#if ALPHACLIP
+	float2 texCoord0	:	TEXCOORD0;
+#endif
+
+#if 0
+#if !defined( _X360 ) && !defined( _PS3 ) && defined(SHADER_MODEL_PS_3_0)
+	float2 vScreenPos : VPOS;
+#endif
+#endif
+
+#if COLOR_DEPTH
+	float4 vWorldPos_projPosZ	: TEXCOORD1;
+#endif
+
+};
+
+sampler BaseTextureSampler	: register( s0 );
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 color = float4( 1, 0, 0, 1 );	// opaque alpha....the color doesn't matter for this shader
+
+	#if ALPHACLIP
+	{
+		color = tex2D( BaseTextureSampler, i.texCoord0 );
+		float threshold = g_AlphaThreshold;
+
+#if 0
+		// rg - shadow buffer dithering - experimental, but shows promise on large transparent shadow casters. May put this on a combo in CS:GO.
+		#if !defined( _X360 ) && !defined( _PS3 ) && defined(SHADER_MODEL_PS_3_0)
+		{
+			float2 vScreenPos = frac( i.vScreenPos * .5f ) * 2.0f;
+			threshold = ( ( vScreenPos.y * 3.0f + ( vScreenPos.y * 2.0f - 1.0f ) * vScreenPos.x * -2.0f ) - 2.0f ) * ( 1.0f / 4.0f );
+			threshold = lerp( min( .4f, g_AlphaThreshold ), .9f, threshold );
+		}
+		#endif
+#endif		
+
+		clip( color.a - threshold );
+	}	
+	#endif
+
+#if ( COLOR_DEPTH == 1 )
+
+	return float4( i.vWorldPos_projPosZ.z / i.vWorldPos_projPosZ.w , 1.0, 1.0, 1.0 );
+
+#else
+
+	return color;
+
+#endif
+}
+

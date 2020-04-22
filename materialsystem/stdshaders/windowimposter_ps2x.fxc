@@ -1,0 +1,30 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_fog_ps_fxc.h"
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+sampler EnvmapSampler		: register( s0 );
+
+const float4 g_FogParams				: register( PSREG_FOG_PARAMS );
+const float4 g_EyePos_SpecExponent		: register( PSREG_EYEPOS_SPEC_EXPONENT );
+
+struct PS_INPUT
+{
+	float3 eyeToVertVector			: TEXCOORD0;
+	float4 vertexColor				: COLOR;
+	
+	float4 worldPos_projPosZ		: TEXCOORD7;		// Necessary for pixel fog
+};
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 color;
+	color.xyz = ( float3 )( ENV_MAP_SCALE * texCUBE( EnvmapSampler, i.eyeToVertVector ) );
+	color.a = 1.0f;
+	color *= i.vertexColor;
+	
+	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos_SpecExponent.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+	return FinalOutput( color, fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+}

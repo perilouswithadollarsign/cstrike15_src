@@ -1,0 +1,111 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "VERTEXCOLOR"					"0..1"
+// STATIC: "FLATTEN_STATIC_CONTROL_FLOW"	"0..1" [vs20] [PC]
+// STATIC: "FLATTEN_STATIC_CONTROL_FLOW"	"0..0" [CONSOLE]
+
+// DYNAMIC: "SKINNING"						"0..1"
+// DYNAMIC: "COMPRESSED_VERTS"				"0..1"
+// DYNAMIC: "DYNAMIC_LIGHT"					"0..1"
+// DYNAMIC: "STATIC_LIGHT"					"0..1"
+// DYNAMIC: "NUM_LIGHTS"					"0..4"
+
+// If using static control flow on Direct3D, we should use the NUM_LIGHTS=0 combo
+//  SKIP: ( $FLATTEN_STATIC_CONTROL_FLOW == 0 ) && ( $NUM_LIGHTS > 0 ) [vs20] [PC]
+
+// Includes =======================================================================================
+#include "common_vs_fxc.h"
+
+// Structs ========================================================================================
+struct VS_INPUT
+{
+	float4 vPos					: POSITION;		// Position
+	float4 vNormal				: NORMAL;		// Normal
+	float4 vBoneWeights			: BLENDWEIGHT;	// Skin weights
+	float4 vBoneIndices			: BLENDINDICES;	// Skin indices
+	float4 vTexCoord0			: TEXCOORD0;	// Base texture coordinates
+	float4 vTangent				: TANGENT;
+	#if ( VERTEXCOLOR )
+		float4 vVertexColor			: COLOR0;
+	#endif
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPosition		: POSITION; // Projection-space position
+	float2 vUv0					: TEXCOORD0;
+	float3 vWorldNormal			: TEXCOORD1;
+	float3 vWorldTangent		: TEXCOORD2;
+	float3 vWorldBinormal		: TEXCOORD3;
+	float3 vWorldPosition		: TEXCOORD4;
+	float4 vLightAtten			: TEXCOORD5;
+	#if ( VERTEXCOLOR )
+		float4 vVertexColor			: COLOR0;
+	#endif
+};
+
+// Main ===========================================================================================
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	float4 vObjPosition = i.vPos;
+	float4 vObjTangent = i.vTangent;
+	float3 vObjNormal;
+	DecompressVertex_Normal( i.vNormal, vObjNormal );
+
+	// Transform the position
+	float3 vWorldPosition = { 0.0f, 0.0f, 0.0f };
+	float3 vWorldNormal = { 0.0f, 0.0f, 0.0f };
+	float3 vWorldTangent = { 0.0f, 0.0f, 0.0f };
+	float3 vWorldBinormal = { 0.0f, 0.0f, 0.0f };
+	SkinPositionNormalAndTangentSpace( SKINNING, vObjPosition, vObjNormal.xyz, vObjTangent.xyzw, i.vBoneWeights, i.vBoneIndices, vWorldPosition, vWorldNormal, vWorldTangent, vWorldBinormal );
+	vWorldNormal.xyz = normalize( vWorldNormal.xyz );
+	vWorldTangent.xyz = normalize( vWorldTangent.xyz );
+	vWorldBinormal.xyz = normalize( vWorldBinormal.xyz );
+
+	o.vWorldNormal.xyz = vWorldNormal.xyz;
+	o.vWorldTangent.xyz = vWorldTangent.xyz;
+	o.vWorldBinormal.xyz = vWorldBinormal.xyz;
+	o.vWorldPosition.xyz = vWorldPosition.xyz;
+
+	// Transform into projection space
+	float4 vProjPosition = mul( float4( vWorldPosition, 1.0f ), cViewProj );
+	o.vProjPosition.xyzw = vProjPosition.xyzw;
+
+	// View vector
+	float3 vWorldViewVector = normalize( vWorldPosition.xyz - cEyePos.xyz );
+
+	// Texture coordinates
+	o.vUv0.xy = i.vTexCoord0.xy;
+
+#if ( defined ( SHADER_MODEL_VS_2_0 ) && FLATTEN_STATIC_CONTROL_FLOW )
+	o.vLightAtten = float4( 0, 0, 0, 0 );
+	#if ( NUM_LIGHTS > 0 )
+		o.vLightAtten.x = GetVertexAttenForLight( vWorldPosition.xyz, 0, false );
+	#endif
+	#if ( NUM_LIGHTS > 1 )
+		o.vLightAtten.y = GetVertexAttenForLight( vWorldPosition.xyz, 1, false );
+	#endif
+	#if ( NUM_LIGHTS > 2 )
+		o.vLightAtten.z = GetVertexAttenForLight( vWorldPosition.xyz, 2, false );
+	#endif
+	#if ( NUM_LIGHTS > 3 )
+		o.vLightAtten.w = GetVertexAttenForLight( vWorldPosition.xyz, 3, false );
+	#endif
+#else
+	o.vLightAtten.x = GetVertexAttenForLight( vWorldPosition.xyz, 0, true );
+	o.vLightAtten.y = GetVertexAttenForLight( vWorldPosition.xyz, 1, true );
+	o.vLightAtten.z = GetVertexAttenForLight( vWorldPosition.xyz, 2, true );
+	o.vLightAtten.w = GetVertexAttenForLight( vWorldPosition.xyz, 3, true );
+#endif
+
+	#if ( VERTEXCOLOR )
+	{
+		o.vVertexColor.rgb = GammaToLinear( i.vVertexColor.rgb );
+		o.vVertexColor.a = i.vVertexColor.a;
+	}
+	#endif
+
+	return o;
+}

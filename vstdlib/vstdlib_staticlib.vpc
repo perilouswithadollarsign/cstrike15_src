@@ -1,0 +1,56 @@
+//-----------------------------------------------------------------------------
+//	VSTDLIB_STATICLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTLIBNAME	"vstdlib_staticlib"
+$Macro NOSCHEMACOMPILER "1"
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;VSTDLIB_DLL_EXPORT"
+	}
+}
+
+$Configuration "Release"
+{
+	$Librarian
+	{
+		$OutputFile							"Release_vstdlibstaticlib_PS3\$OUTLIBNAME_ps3.lib"
+	}
+
+	$General
+	{
+		$OutputDirectory			".\Release_vstdlibstaticlib_PS3"		[$PS3]
+		$IntermediateDirectory		".\Release_vstdlibstaticlib_PS3"		[$PS3]
+	}
+}
+
+$Configuration "Debug"
+{
+	$Librarian
+	{
+		$OutputFile							"Debug_vstdlibstaticlib_PS3\$OUTLIBNAME_ps3.lib"
+	}
+
+	$General
+	{
+		$OutputDirectory			".\Debug_vstdlibstaticlib_PS3"		[$PS3]
+		$IntermediateDirectory		".\Debug_vstdlibstaticlib_PS3"		[$PS3]
+	}
+}
+
+$Include "vstdlib.inc"
+
+$Project "vstdlib_staticlib"
+{
+	$Folder	"Source Files"
+	{
+		-$File	"prxexport.cpp"		[$PS3]
+	}
+}

@@ -1,0 +1,88 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// DYNAMIC: "D_NUM_BLUR_SAMPLES" "0..14"
+
+#ifdef HDRTYPE
+ #undef HDRTYPE
+#endif
+#define HDRTYPE HDR_TYPE_NONE
+
+// Includes =======================================================================================
+#include "common_ps_fxc.h"
+
+// Texture Samplers ===============================================================================
+sampler g_tTexSampler : register( s0 );
+
+// Shaders Constants and Globals ==================================================================
+float g_flMaxMotionBlur : register( c0 );
+float4 g_vConst5 : register( c1 );
+#define g_vGlobalBlurVector        g_vConst5.xy
+#define g_flFallingMotionIntensity g_vConst5.z
+#define g_flRollBlurIntensity      g_vConst5.w
+
+float4 g_vViewport : register( c2 );
+
+// Interpolated values ============================================================================
+struct PS_INPUT
+{
+	float2 vUv0 : TEXCOORD0;
+};
+
+// Main ===========================================================================================
+float4 main( PS_INPUT i ) : COLOR
+{
+	// Calculate blur vector
+	float2 vFallingMotionBlurVector = ( ( i.vUv0.xy * 2.0f ) - 1.0f );
+	float2 vRollBlurVector = cross( float3( vFallingMotionBlurVector.xy, 0.0f ), float3( 0.0f, 0.0f, 1.0f ) ).xy;
+	float2 vGlobalBlurVector = g_vGlobalBlurVector;
+	vGlobalBlurVector.y = -vGlobalBlurVector.y;
+	//vGlobalBlurVector.xy = float2( 1.0f, 0.0f ); // For debugging
+
+	float flFallingMotionBlurIntensity = -abs( g_flFallingMotionIntensity ); // Keep samples on screen by keeping vector pointing in
+	//flFallingMotionBlurIntensity = step( 10, abs(g_flFallingMotionIntensity) ); // For finding the sweet spot in debug mode
+	vFallingMotionBlurVector.xy *= dot( vFallingMotionBlurVector.xy, vFallingMotionBlurVector.xy ); // Dampen the effect in the middle of the screen
+	vFallingMotionBlurVector.xy *= flFallingMotionBlurIntensity;
+
+	float flRollBlurIntensity = g_flRollBlurIntensity;
+	vRollBlurVector.xy *= flRollBlurIntensity;
+
+	float2 vFinalBlurVector = vGlobalBlurVector.xy + vFallingMotionBlurVector.xy + vRollBlurVector.xy;
+	#if defined( _X360 ) // Disable falling blur on the 360 for perf
+		vFinalBlurVector.xy = vGlobalBlurVector.xy + vRollBlurVector.xy;
+	#endif
+
+	// Clamp blur vector to max length
+	if ( length( vFinalBlurVector.xy ) > g_flMaxMotionBlur )
+	{
+		vFinalBlurVector.xy = normalize( vFinalBlurVector.xy ) * g_flMaxMotionBlur;
+	}
+
+	// Clamp fetches to viewport
+	float2 vBlurVectorClamped = i.vUv0.xy + vFinalBlurVector.xy;
+	vBlurVectorClamped.xy = clamp( vBlurVectorClamped.xy, g_vViewport.xy, g_vViewport.wz ) - i.vUv0.xy;
+
+	// Set number of samples
+	int nNumSamples = D_NUM_BLUR_SAMPLES + 1; // Make sure we always fetch 1 texel!
+
+	// Step size
+	float2 vUvOffset = { 0.0f, 0.0f };
+	#if ( D_NUM_BLUR_SAMPLES > 0 )
+		vUvOffset.xy = vBlurVectorClamped.xy / ( nNumSamples - 1 );
+	#endif
+
+	float4 cColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+	#if defined( _X360 )
+		[unroll]
+	#endif
+	for ( int x = 0; x <= D_NUM_BLUR_SAMPLES; x++ )
+	{
+		// Calculate uv
+		float2 vUvTmp = i.vUv0.xy + ( vUvOffset.xy * x );
+
+		// Sample pixel
+		//cColor += kernel[x] * tex2D( g_tTexSampler, vUvTmp ); // Use kernal from above
+		cColor += ( 1.0f / nNumSamples ) * tex2D( g_tTexSampler, vUvTmp.xy ); // Evenly weight all samples
+	}
+
+	return float4( cColor.rgb, 1.0f );
+}

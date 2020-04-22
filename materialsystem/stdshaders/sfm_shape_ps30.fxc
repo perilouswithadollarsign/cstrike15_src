@@ -1,0 +1,32 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+
+struct PS_INPUT
+{
+	float2 vPos				: VPOS;		// Normalized Screenpos, call ComputeScreenPos() to get useful 2D coordinates
+};
+
+sampler TexSampler			: register( s0 );
+
+float3 Shape( float3 cColor )
+{
+	float flLum = saturate(dot( cColor.xyz, float3( 0.3f, 0.59f, 0.11f) ));
+	cColor.xyz *= flLum * flLum * flLum * flLum; // TODO: parametrize this
+	return cColor;
+}
+
+float4 main( PS_INPUT i )	: COLOR
+{
+	// NOTE: Shape simulates what downsample_nohdr does to the pixel color
+	float4 result = tex2D( TexSampler, saturate( ComputeScreenPos( i.vPos ) ) );
+
+	// Local contrast needs gamma luminance in alpha
+	float3 vGamma = SrgbLinearToGamma( result.rgb );
+	result.a = dot( vGamma, float3( 0.299, 0.587, 0.114 ) );
+
+	result.rgb = Shape( result.rgb );
+
+	return max( 0, result );
+}

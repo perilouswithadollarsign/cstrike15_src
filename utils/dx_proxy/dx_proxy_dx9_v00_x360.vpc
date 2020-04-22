@@ -1,0 +1,55 @@
+//
+// dx_proxy_dx9_v00_x360.vpc
+//
+// Base script for generating dx_proxy.dll for specific
+// version of Microsoft DirectX SDK:
+// DirectX9 XBox 360 XDK
+//
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\x360xdk\bin\win32"
+$Macro DX_SDK_VER	"DX9_V00_X360"
+
+$Include "dx_proxy_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$(XEDK)\include\win32"
+	}
+	
+	$Linker
+	{
+		$AdditionalLibraryDirectories	"$BASE;$(XEDK)\lib\win32\vs2010"
+	}
+}
+
+$Configuration "Debug"
+{
+	$Linker
+	{
+		$AdditionalDependencies		"$BASE d3d9d.lib d3dx9d.lib xgraphicsd.lib"
+	}
+
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;_HAS_ITERATOR_DEBUGGING=1"	// _HAS_ITERATOR_DEBUGGING=0 was in source_dll_win32_debug.vpc, but we need it to be 1
+																		// to work with DirectX debug libs. This builds fine for me, and AaronS agrees overriding
+																		// the value here is a better pattern than manually copying everything from all included
+																		// vpc scripts. However, neither of us would be surprised if this breaks.
+																		// -Ted Rivera
+	}
+}
+
+$Configuration "Release"
+{
+	$Linker
+	{
+		$AdditionalDependencies		"$BASE d3d9.lib d3dx9.lib xgraphics.lib"
+	}
+}
+
+$Project "DX_Proxy ($DX_SDK_VER)"
+{
+}

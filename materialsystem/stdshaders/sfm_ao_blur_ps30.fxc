@@ -1,0 +1,65 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler FrontNDBuffer			: register( s0 );
+sampler AOTexture				: register( s1 );
+sampler RandomRotationSampler	: register( s2 );
+
+const float4 cScreenScale		: register( c0 );
+const float4 cNoiseOffset		: register( c1 );
+
+struct PS_INPUT
+{
+	float2 tc					: TEXCOORD0;
+};
+
+float ComputeWeight( float centerDepth, float neighborDepth )
+{
+	return 1 - smoothstep( 0, 0.01, abs( centerDepth - neighborDepth ) );
+}
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float2 rotOffset, texelSize = float2( 0.00078125f, 0.001388f );
+	float4 frontND = tex2D( FrontNDBuffer, i.tc );		// Front-facing Normal & Depth
+
+	float4 vJitter[16] = { float4( 0.0000f,  0.0000f,  0.8744f,  0.1665f), float4( 0.2329f,  0.3995f, -0.7804f,  0.5482f),
+						   float4(-0.4577f,  0.7647f, -0.1936f,  0.5564f), float4( 0.4205f, -0.5768f, -0.0304f, -0.9050f),
+						   float4(-0.5215f,  0.1854f,  0.3161f, -0.2954f), float4( 0.0666f, -0.5564f, -0.2137f, -0.0072f),
+						   float4(-0.4112f, -0.3311f,  0.6438f, -0.2484f), float4(-0.9055f, -0.0360f,  0.8323f,  0.5268f),
+						   float4( 0.5592f,  0.3459f, -0.6797f, -0.5201f), float4(-0.4325f, -0.8857f,  0.8768f, -0.4197f),
+						   float4( 0.3090f, -0.8646f,  0.5034f,  0.8603f), float4( 0.3752f,  0.0627f, -0.0161f,  0.2627f),
+						   float4( 0.0969f,  0.7054f, -0.2291f, -0.6595f), float4(-0.5887f, -0.1100f,  0.7048f, -0.6528f),
+						   float4(-0.8438f,  0.2706f, -0.5061f,  0.4653f), float4(-0.1245f, -0.3302f, -0.1801f,  0.8486f) };
+
+	// 2D Rotation Matrix setup
+	float3 RMatTop = 0, RMatBottom = 0;
+	RMatTop.xy = tex2D( RandomRotationSampler, cScreenScale.xy * i.tc + cNoiseOffset.xy );
+	RMatBottom.xy = float2(-1.0, 1.0) * RMatTop.yx;	// 2x2 rotation matrix in 4-tuple
+	RMatTop *= 3 * 0.00078125f;				// Scale up kernel while accounting for texture resolution
+	RMatBottom *= 3 * 0.001388f;
+	RMatTop.z = i.tc.x;						// To be added in d2adds generated below
+	RMatBottom.z = i.tc.y;
+
+	float aoAccum = 0.0f;
+	float weightAccum = 0.0f;
+
+	[unroll]
+	for( int j=0; j<16; j++ )
+	{
+		rotOffset.x = dot(RMatTop.xy,    vJitter[j].xy) + RMatTop.z;
+		rotOffset.y = dot(RMatBottom.xy, vJitter[j].xy) + RMatBottom.z;
+
+		float d  = tex2D( FrontNDBuffer, rotOffset ).a;	// Depth of neighbor
+		float ao = tex2D( AOTexture, rotOffset ).r;		// Ambient Occlusion at neighbor
+
+		aoAccum += ao;
+		weightAccum += ComputeWeight( frontND.a, d );
+	}
+
+	float result = aoAccum / weightAccum;
+
+	return float4( result.xxx, 1 );
+}
+

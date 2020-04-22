@@ -1,0 +1,110 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"
+$MacroRequired				"OUTBINDIR"
+$MacroRequired				"SCE_LIBROOT"
+
+$IgnoreRedundancyWarning	"ON"
+
+$Configuration "Release"
+{
+	$General	
+	{
+		// General
+		$OutputDirectory						".\Release_SPU"
+		$IntermediateDirectory					".\Release_SPU"
+		$ExtensionsToDeleteOnClean
+		$BuildLogFile
+		$SystemIncludeDependencies
+		
+		$ConfigurationType					"ELF"
+	}
+
+	$GCCCompiler
+	{
+		// General
+		$AdditionalIncludeDirectories		"$SRCDIR\common;$SRCDIR\public;$QUOTE$(SN_PS3_PATH)\spu\include\sn$QUOTE;$QUOTE$(SCE_PS3_ROOT)\target\spu\include$QUOTE;$QUOTE$(SCE_PS3_ROOT)\target\common\include$QUOTE"
+		$PreprocessorDefinitions			"SN_TARGET_PS3_SPU;NDEBUG;__GCC__;SPU;_PS3"
+		$ForceIncludes
+		$GenerateDebugInformation		"Yes"
+		$Warnings							"Generate More Warnings (-Wall)"
+		$ExtraWarnings
+		$TreatWarningsAsErrors
+		$ObjectFileName	
+		$SPURSUsage				"Lightweight Job (-mspurs-job)"
+
+		// Optimization
+		$OptimizationLevel			"Full with Inlining (-O3)"
+		$FastMath
+		$NoStrictAliasing
+		$UnrollLoops		
+		$InlineFunctionSizeLimit
+
+		// Code Generation
+		$Position-IndependentCode		"Yes"
+		$FunctionSections
+		$DataSections			
+		$StackCheck						
+
+		// Language
+		$C++ExceptionsAndRTTIUsage			"Not using Exceptions or RTTI"
+		$CheckANSICompliance
+		$DefaultCharSigned		
+		$Permissive		
+		$RelaxC++Compliance
+
+		// Command Line
+		$AdditionalOptions
+	}
+
+	$GCCLinker
+	{
+		$OutputFile					"$(OutDir)/$(ProjectName)_spu.elf"
+		$AdditionalDependencies				"$(SCE_PS3_ROOT)\target\spu\lib\libspurs.a"    [!$RAWSPU]
+		$AdditionalLibraryDirectories
+		$ImportLibrary					"$(OutDir)/$(TargetName).bin.o"		[!$RAWSPU]
+		$SPURSUsage					"Lightweight Job (-mspurs-job)"
+		$Position-IndependentCode			"Yes"
+		$EmitRelocations				"Yes"
+		$GarbageCollection
+		$GenerateMapFile			
+		$MapFileName			
+		$LinkLibraryDependencies
+
+		// Command Line
+		$AdditionalOptions
+	}
+ 
+	$PreBuildEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PreLinkEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PostBuildEvent
+	{
+		$CommandLine						"spu_elf-to-ppu_obj --format=jobbin2 $QUOTE$(TargetPath)$QUOTE $QUOTE$(TargetDir)$(TargetName).bin.o$QUOTE > $QUOTE$(TargetDir)$(TargetName).bin.log$QUOTE"
+		$Description						"creating jobbin2 PPU object file from the job elf"
+		$ExcludedFromBuild					"No"
+	}
+
+	$CustomBuildStep
+	{
+		// General
+		$CommandLine
+		$Description
+		$Outputs
+		$AdditionalDependencies
+	}
+}

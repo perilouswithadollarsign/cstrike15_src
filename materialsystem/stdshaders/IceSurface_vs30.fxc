@@ -1,0 +1,113 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// DYNAMIC: "COMPRESSED_VERTS"			"0..1"
+// DYNAMIC: "SKINNING"					"0..1"
+
+// Includes
+#include "common_vs_fxc.h"
+
+// Globals
+const float  g_flUVScale		: register( SHADER_SPECIFIC_CONST_0 );
+const float3 g_vUVProjOffset	: register( SHADER_SPECIFIC_CONST_1 );
+const float3 g_vBBMin			: register( SHADER_SPECIFIC_CONST_2 );
+const float3 g_vBBMax			: register( SHADER_SPECIFIC_CONST_3 );
+
+// Structs
+struct VS_INPUT
+{
+	float4 vPos					: POSITION;		// Position
+	float4 vNormal				: NORMAL;		// Normal
+	float4 vBoneWeights			: BLENDWEIGHT;	// Skin weights
+	float4 vBoneIndices			: BLENDINDICES;	// Skin indices
+	float4 vClosestSurfaceDir	: TEXCOORD0;	
+	float4 vTangent				: TANGENT;
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPosition		: POSITION;		// Projection-space position
+	float4 vWorldNormal			: TEXCOORD0;	// w is proj. z coord (for depth stuff)
+	float4 vClosestSurfaceDir	: TEXCOORD1;
+	float4 vWorldPos			: TEXCOORD2;	// w is proj. w coord
+	float4 vUV0					: TEXCOORD3;
+	float4 vUV1					: TEXCOORD4;
+	float4 vLightAtten			: TEXCOORD5;
+	float3 vAmbient				: TEXCOORD6;
+};
+
+float3 CubeUV( float3 vWorldPosition, float3 vWorldNormal, float3 vUVSpacePos )
+{
+	// Generate texcoords for a cubemap wrapped around the ice sculpture's bounding box
+	float3 vDir = normalize( lerp( normalize( vUVSpacePos.xyz ), vWorldNormal.xyz, 0.5 ) );
+	float3 tMins = ( g_vBBMin - vWorldPosition ) / vDir;
+	float3 tMaxs = ( g_vBBMax - vWorldPosition ) / vDir;
+	tMaxs = max( tMaxs, tMins );	// weed out negative t's per axis
+	float t = min( tMaxs.x, min( tMaxs.y, tMaxs.z ) );
+	float3 vIntersectionPos = vWorldPosition + t * vDir;
+	// transform into unit cube
+	float3 vCubeUV = vIntersectionPos;
+	vCubeUV -= 0.5*( g_vBBMax + g_vBBMin );
+	vCubeUV /= 0.5*( g_vBBMax - g_vBBMin );
+	vCubeUV = normalize( vCubeUV );
+	return vCubeUV;
+}
+
+
+// Main
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	float4 vObjPosition = i.vPos;
+	float4 vObjTangent = i.vTangent;
+	float3 vObjNormal;
+	DecompressVertex_Normal( i.vNormal, vObjNormal );
+
+	// Transform the position and normal
+	float3 vWorldPosition = { 0.0f, 0.0f, 0.0f };
+	float3 vWorldNormal   = { 0.0f, 0.0f, 0.0f };
+	float3 vWorldTangent  = { 0.0f, 0.0f, 0.0f };
+	float3 vWorldBinormal = { 0.0f, 0.0f, 0.0f };
+	SkinPositionNormalAndTangentSpace(	SKINNING ? true : false,
+										vObjPosition, vObjNormal.xyz, vObjTangent.xyzw,
+										i.vBoneWeights, i.vBoneIndices, 
+										vWorldPosition, vWorldNormal, vWorldTangent, vWorldBinormal );
+	vWorldNormal.xyz   = normalize( vWorldNormal.xyz );
+
+	o.vWorldNormal.xyz = vWorldNormal.xyz;
+	o.vWorldPos.xyz    = vWorldPosition.xyz;
+
+	// Transform into projection space
+	float4 vProjPosition = mul( float4( vWorldPosition, 1.0f ), cViewProj );
+	o.vProjPosition  = vProjPosition;
+	o.vWorldNormal.w = vProjPosition.z;
+	o.vWorldPos.w    = vProjPosition.w;
+
+	// Seamless texturing UV projections
+	float3 vUVSpacePos = vWorldPosition.xyz - g_vUVProjOffset.xyz;
+	o.vUV0.xy = g_flUVScale * vUVSpacePos.yz;
+	o.vUV0.wz = g_flUVScale * vUVSpacePos.xz;
+	o.vUV1.xy = g_flUVScale * vUVSpacePos.xy;
+
+	// Cubemap UV gen
+	//o.vCubeUVW.xyz = CubeUV( vWorldPosition, vWorldNormal, vUVSpacePos );
+
+	// Screen-space texcoord
+	float2 vScreenPos = float2( 0.5, -0.5 ) * vProjPosition.xy + 0.5 * vProjPosition.w;
+	o.vUV1.wz = vScreenPos;
+
+	// Dynamic light attenuation factors
+	o.vLightAtten.x = GetVertexAttenForLight( vWorldPosition, 0, true );
+	o.vLightAtten.y = GetVertexAttenForLight( vWorldPosition, 1, true );
+	o.vLightAtten.z = GetVertexAttenForLight( vWorldPosition, 2, true );
+	o.vLightAtten.w = GetVertexAttenForLight( vWorldPosition, 3, true );
+
+	// Ambient light
+	o.vAmbient = AmbientLight( vWorldNormal );
+
+	// Closest surface's direction and distance, for contact shadowing
+	o.vClosestSurfaceDir.xyz = i.vClosestSurfaceDir.xyz;
+	o.vClosestSurfaceDir.w   = length( i.vClosestSurfaceDir.xyz );
+
+	return o;
+}

@@ -1,0 +1,68 @@
+//-----------------------------------------------------------------------------
+//	LIBMAD.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTLIBDIR	"$SRCDIR\lib\common\vc8"
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"msvc++"
+		$PreprocessorDefinitions		"$BASE;FPM_INTEL;HAVE_CONFIG_H;ASO_ZEROCHECK"		
+		$FloatingPointModel				"Precise (/fp:precise)"
+		$Detect64bitPortabilityIssues	"No"
+		$CompileAs						"Compile as C Code (/TC)"
+		$WarningLevel					"Level 1 (/W1)"
+	}
+}
+
+$Project "libmad"
+{
+	$Folder	"Source Files"
+	{
+		$File "bit.c"
+		$File "decoder.c"
+		$File "fixed.c"
+		$File "frame.c"
+		$File "huffman.c"
+		$File "layer12.c"
+		$File "layer3.c"
+		$File "stream.c"
+		$File "synth.c"
+		$File "timer.c"
+		$File "version.c"
+	}
+	
+	$Folder	"Header Files"
+	{
+		$File "bit.h"
+		$File "msvc++\config.h"
+		$File "decoder.h"
+		$File "fixed.h"
+		$File "frame.h"
+		$File "global.h"
+		$File "huffman.h"
+		$File "layer12.h"
+		$File "layer3.h"
+		$File "stream.h"
+		$File "synth.h"
+		$File "timer.h"
+		$File "version.h"
+	}
+
+	$Folder	"Data Files"
+	{
+		$File "D.dat"
+		$File "imdct_s.dat"
+		$File "qc_table.dat"
+		$File "rq_table.dat"
+		$File "sf_table.dat"
+	}
+}
+

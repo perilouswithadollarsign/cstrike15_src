@@ -1,0 +1,39 @@
+//-----------------------------------------------------------------------------
+//	VPCCRCCHECK.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\..\.."
+$Macro OUTBINDIR	"$SRCDIR\devtools\bin"
+
+$Conditional NO_STANDARD_VALVE_CODE "true"
+
+$Include "$SRCDIR\vpc_scripts\source_exe_con_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;TIER0_STATIC_LIB"
+	}
+
+	$PreBuildEvent
+	{
+		// This disables the crc check since we are building vpccrccheck.exe
+		$CommandLine		"set VALVE_NO_VPC_CRC_CHECK=1" "\n" \
+							"$BASE" "\n" \
+							"set VALVE_NO_VPC_CRC_CHECK=" "\n"
+	}
+}
+
+$Project "vpccrccheck"
+{
+	$Folder	"Source Files"
+	{
+		$File	"vpccrccheck.cpp"
+		$File	"crccheck_shared.cpp"
+		$File	"$SRCDIR/tier1/checksum_crc.cpp"
+		$File	"$SRCDIR/tier0/tier1_tables.cpp"
+	}
+}

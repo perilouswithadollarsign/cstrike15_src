@@ -1,0 +1,237 @@
+//===================== Copyright (c) Valve Corporation. All Rights Reserved. ======================
+
+//	STATIC: "ENVMAP_MASK"				"0..1"
+//	STATIC: "TANGENTSPACE"				"0..1"
+//  STATIC: "BUMPMAP"					"0..1"
+//	STATIC: "DETAILTEXTURE"				"0..1"
+//  STATIC: "VERTEXCOLOR"				"0..1"
+//  STATIC: "SEAMLESS"                  "0..1"
+
+// diffuse bump map is always true when bumpmapping is enabled, so just set it to 1
+#define DIFFUSEBUMPMAP 1
+
+//	STATIC: "FLASHLIGHT"				"0..1"	[CONSOLE]
+//	STATIC: "SELFILLUM"					"0..1"
+//  STATIC: "LIGHTING_PREVIEW"			"0..3"	[PC]
+//  STATIC: "LIGHTING_PREVIEW"			"0..0"	[CONSOLE]
+
+//  DYNAMIC: "FASTPATH"					"0..1"
+
+//  SKIP: $LIGHTING_PREVIEW && $FLASHLIGHT
+
+#include "common_fog_vs_supportsvertexfog_fxc.h"
+#include "common_vs_fxc.h"
+#include "common_4wayblend_fxc.h"
+
+
+static const int g_FogType						= DOWATERFOG;
+static const bool g_UseSeparateEnvmapMask		= ENVMAP_MASK;
+static const bool g_bTangentSpace				= TANGENTSPACE;
+static const bool g_bBumpmap					= BUMPMAP;
+static const bool g_bBumpmapDiffuseLighting		= DIFFUSEBUMPMAP;
+static const bool g_bVertexColor				= VERTEXCOLOR;
+
+#if SEAMLESS
+const float4 SeamlessScale : register( SHADER_SPECIFIC_CONST_0 );
+#define SEAMLESS_SCALE (SeamlessScale.x)
+#else
+const float4 cBaseTexCoordTransform[2]			:  register( SHADER_SPECIFIC_CONST_0 );
+const float4 cDetailOrBumpTexCoordTransform[2]	:  register( SHADER_SPECIFIC_CONST_2 );
+#endif
+// This should be identity if we are bump mapping, otherwise we'll screw up the lightmapTexCoordOffset.
+const float4 cEnvmapMaskTexCoordTransform[2]	:  register( SHADER_SPECIFIC_CONST_4 );
+
+#if FLASHLIGHT
+const float4x4 g_FlashlightWorldToTexture		:  register( SHADER_SPECIFIC_CONST_6 );
+#endif
+
+#if DETAILTEXTURE && BUMPMAP && !SELFILLUM
+const float4 cBumpTexCoordTransform[2]			:  register( SHADER_SPECIFIC_CONST_10 );	// not contiguous with the rest!
+#endif
+
+#if ( LIGHTING_PREVIEW == 3 )
+const float4 g_vEyeVector						:  register( SHADER_SPECIFIC_CONST_12 );
+#endif
+
+struct VS_INPUT
+{
+	float3 vPos							: POSITION;
+	float4 vNormal						: NORMAL;
+	float2 vBaseTexCoord				: TEXCOORD0;
+	float2 vLightmapTexCoord			: TEXCOORD1;
+	float2 vLightmapTexCoordOffset		: TEXCOORD2;
+	float3 vTangentS					: TANGENT;
+	float3 vTangentT					: BINORMAL;
+	float4 vColor						: COLOR0;
+	float4 vVertexBlends				: COLOR1;
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	float3 vObjNormal;
+	DecompressVertex_Normal( v.vNormal, vObjNormal );
+
+	float4 projPos;
+	float3 worldPos;
+
+	worldPos = mul4x3( float4( v.vPos, 1 ), cModel[0] );
+	projPos = mul( float4( worldPos, 1 ), cViewProj );
+	o.projPos = projPos;
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	o.worldPos_projPosZ.w = projPos.z;
+	o.worldPos_projPosZ.xyz = worldPos;
+
+#if ( LIGHTING_PREVIEW == 3 )
+	o.worldPos_projPosZ.w = dot( g_vEyeVector, worldPos.xyz - cEyePos.xyz );	// Linear depth
+#endif
+	
+	float3 worldNormal = mul3x3( vObjNormal, ( float3x3 )cModel[0] );
+	
+#if TANGENTSPACE || LIGHTING_PREVIEW || defined( _X360 ) || defined( _PS3 )
+	float3 worldTangentS = mul3x3( v.vTangentS, ( const float3x3 )cModel[0] );
+	float3 worldTangentT = mul3x3( v.vTangentT, ( const float3x3 )cModel[0] );
+
+	#if SEAMLESS && BUMPMAP && ( defined( _X360 ) || defined( _PS3 ) )
+		float3 n = normalize( worldNormal );
+		float3 n2 = n * n;           // sums to 1.
+
+		o.tangentSpaceTranspose[0] = normalize( float3( n2.y + n2.z, 0.0f, n2.x ) );
+		o.tangentSpaceTranspose[1] = normalize( float3( 0.0f, n2.x + n2.z, n2.y ) );
+		o.tangentSpaceTranspose[2] = worldNormal;
+	#else
+		o.tangentSpaceTranspose[0] = worldTangentS;
+		o.tangentSpaceTranspose[1] = worldTangentT;
+		o.tangentSpaceTranspose[2] = worldNormal;
+	#endif
+#endif
+
+
+	float3 worldVertToEyeVector = VSHADER_VECT_SCALE * (cEyePos - worldPos);
+
+	#if ( SEAMLESS )
+	{
+		// we need to fill in the texture coordinate projections
+		o.SeamlessTexCoord_fogFactorW.xyz = SEAMLESS_SCALE * worldPos;
+	}
+	#else
+	{
+		if ( FASTPATH )
+		{
+			o.baseTexCoord_fogFactorZ.xy = v.vBaseTexCoord;
+		}
+		else
+		{
+			o.baseTexCoord_fogFactorZ.x = dot( v.vBaseTexCoord.xy, cBaseTexCoordTransform[0].xy ) + cBaseTexCoordTransform[0].w;
+			o.baseTexCoord_fogFactorZ.y = dot( v.vBaseTexCoord.xy, cBaseTexCoordTransform[1].xy ) + cBaseTexCoordTransform[1].w;
+		}
+
+		// calculate detailorbumptexcoord
+		if ( FASTPATH )
+		{
+			o.DETAILORBUMPCOORDS = v.vBaseTexCoord.xy;
+		}
+		else
+		{
+			o.DETAILORBUMPCOORDS = float2( dot( v.vBaseTexCoord.xy, cDetailOrBumpTexCoordTransform[0].xy ) + cDetailOrBumpTexCoordTransform[0].w, 
+											dot( v.vBaseTexCoord.xy, cDetailOrBumpTexCoordTransform[1].xy ) + cDetailOrBumpTexCoordTransform[1].w );
+		}
+	}
+	#endif
+	if ( FASTPATH )
+	{
+		o.lightmapTexCoord3.zw = v.vBaseTexCoord;
+#if DETAILTEXTURE && BUMPMAP && !SELFILLUM
+		o.BUMPCOORDS = v.vBaseTexCoord;
+#endif
+	}
+	else
+	{
+#if DETAILTEXTURE && BUMPMAP && !SELFILLUM
+		o.BUMPCOORDS = float2( dot( v.vBaseTexCoord.xy, cBumpTexCoordTransform[0].xy ) + cBumpTexCoordTransform[0].w,
+							   dot( v.vBaseTexCoord.xy, cBumpTexCoordTransform[1].xy ) + cBumpTexCoordTransform[1].w );
+#endif
+	}
+	
+	//  compute lightmap coordinates
+	if( g_bBumpmap && g_bBumpmapDiffuseLighting )
+	{
+		o.lightmapTexCoord1And2.xy = v.vLightmapTexCoord + v.vLightmapTexCoordOffset;
+
+		float2 lightmapTexCoord2 = o.lightmapTexCoord1And2.xy + v.vLightmapTexCoordOffset;
+		float2 lightmapTexCoord3 = lightmapTexCoord2 + v.vLightmapTexCoordOffset;
+
+		// reversed component order
+		o.lightmapTexCoord1And2.w = lightmapTexCoord2.x;
+		o.lightmapTexCoord1And2.z = lightmapTexCoord2.y;
+
+		o.lightmapTexCoord3.xy = lightmapTexCoord3;
+	}
+	else
+	{
+		o.lightmapTexCoord1And2.xy = v.vLightmapTexCoord;
+	}
+
+	if( g_UseSeparateEnvmapMask )
+	{
+		// reversed component order
+#if FASTPATH
+		o.ENVMAPMASKCOORDS = v.vBaseTexCoord.xy;
+#else
+		o.ENVMAPMASKCOORDS = float2( dot( v.vBaseTexCoord.xy, cEnvmapMaskTexCoordTransform[0].xy ) + cEnvmapMaskTexCoordTransform[0].w,
+									 dot( v.vBaseTexCoord.xy, cEnvmapMaskTexCoordTransform[1].xy ) + cEnvmapMaskTexCoordTransform[1].w );
+#endif
+	}
+	
+	#if ( HARDWAREFOGBLEND )
+	{
+		o.fog = CalcFixedFunctionFog( worldPos, g_FogType );
+	}
+	#endif
+
+	#if ( !DOPIXELFOG && !HARDWAREFOGBLEND )
+	{
+		#if ( SEAMLESS )
+		{
+			o.SeamlessTexCoord_fogFactorW.w = CalcNonFixedFunctionFog( worldPos, g_FogType );
+		}
+		#else
+		{
+			o.baseTexCoord_fogFactorZ.z = CalcNonFixedFunctionFog( worldPos, g_FogType );
+		}
+		#endif
+	}
+	#endif
+
+ 	if ( !g_bVertexColor )
+ 	{
+		o.vertexColor = float4( 1.0f, 1.0f, 1.0f, cModulationColor.a );
+ 	}
+ 	else
+ 	{
+ 		o.vertexColor = v.vColor;
+ 		o.vertexColor.a *= cModulationColor.a;
+ 	}
+#if SEAMLESS
+	// compute belnd weights in rgb
+	float3 vNormal=normalize( worldNormal );
+	o.vertexColor.xyz = vNormal * vNormal;           // sums to 1.
+#endif
+
+	// On 360/PS3, we have extra iterators and can fold the flashlight into this shader
+#if ( defined( _X360 ) || defined( _PS3 ) ) && FLASHLIGHT
+	o.flashlightSpacePos = TransformFlashlightWorldToTexture( worldPos, g_FlashlightWorldToTexture );
+	o.vProjPos = projPos;
+#endif
+
+	o.vertexBlend = v.vVertexBlends;
+	
+	return o;
+}

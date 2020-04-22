@@ -1,0 +1,311 @@
+
+// STATIC: "BUMPMAP"					"0..2"
+// STATIC: "CUBEMAP"					"0..2"
+// STATIC: "SEAMLESS"					"0..1"
+// STATIC: "THICKPAINT"					"0..1"
+
+// DYNAMIC: "FASTPATHENVMAPCONTRAST"	"0..1"
+// DYNAMIC: "FASTPATH"					"0..1"
+
+//	SKIP: ( $BUMPMAP == 0 )
+
+// Turning off 32bit lightmaps on Portal 2 to save shader perf. --Thorsten
+//#define USE_32BIT_LIGHTMAPS_ON_360 // be sure to keep this in sync with the same #define in materialsystem/cmatlightmaps.cpp
+
+#include "common_fog_ps_supportsvertexfog_fxc.h"
+
+#include "common_ps_fxc.h"
+#define PIXELSHADER
+#include "common_lightmappedgeneric_fxc.h"
+
+#if SEAMLESS
+#define USE_FAST_PATH 1
+#else
+#define USE_FAST_PATH FASTPATH
+#endif
+
+const float4 g_EnvmapTint : register( c0 );
+
+#if USE_FAST_PATH == 1
+
+#	if FASTPATHENVMAPCONTRAST == 0
+static const float3 g_EnvmapContrast = { 0.0f, 0.0f, 0.0f };
+#	else
+static const float3 g_EnvmapContrast = { 1.0f, 1.0f, 1.0f };
+#	endif
+static const float3 g_EnvmapSaturation = { 1.0f, 1.0f, 1.0f };
+static const float g_FresnelReflection = 1.0f;
+static const float g_OneMinusFresnelReflection = 0.0f;
+static const float4 g_SelfIllumTint = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+
+#else
+
+const float3 g_EnvmapContrast				: register( c2 );
+const float3 g_EnvmapSaturation				: register( c3 );
+const float4 g_FresnelReflectionReg			: register( c4 );
+#define g_FresnelReflection g_FresnelReflectionReg.a
+#define g_OneMinusFresnelReflection g_FresnelReflectionReg.b
+const float4 g_SelfIllumTint					: register( c7 );
+#endif
+
+
+const float3 g_EyePos						: register( c10 );
+const float4 g_FogParams					: register( c11 );
+const float4 g_TintValuesTimesLightmapScale	: register( c12 );
+
+#define g_flAlpha2 g_TintValuesTimesLightmapScale.w
+
+#if PARALLAX_MAPPING || (CUBEMAP == 2)
+const float4 g_ParallaxMappingControl : register( c20 );
+#endif
+
+#if (CUBEMAP == 2)
+#define g_DiffuseCubemapScale g_ParallaxMappingControl.y
+#endif
+
+const float3 g_TintValuesWithoutLightmapScale	: register( c21 );
+
+// These constants are used to rotate the world space water normals around the up axis to align the
+// normal with the camera and then give us a 2D offset vector to use for reflection and refraction uv's
+const float3 g_vWorldToViewRefract0 : register( c22 );
+const float3 g_vWorldToViewRefract1 : register( c23 );
+
+sampler LightmapSampler			: register( s1 );
+samplerCUBE EnvmapSampler		: register( s2 );
+sampler BubbleLayoutSampler		: register( s4 );
+sampler BubbleSampler			: register( s5 );
+sampler SplatNormalSampler		: register( s7 );
+
+sampler PaintSampler			: register( s9 );
+
+#if defined( _X360 )
+[maxtempreg(36)]
+#endif // _X360
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float3 worldPos = i.worldPos_projPosZ.xyz;
+	float3x3 tangenttranspose = float3x3( i.tangentSpaceTranspose0_vertexBlendX.xyz, i.tangentSpaceTranspose1_bumpTexCoord2u.xyz, i.tangentSpaceTranspose2_bumpTexCoord2v.xyz );
+	float3x3 worldToTangentSpace = transpose( tangenttranspose ); //yay, math both forwards and backwards, for kicks!
+	
+	float3 worldVertToEyeVector = g_EyePos - worldPos;
+
+	float3 lightmapColor1 = float3( 1.0f, 1.0f, 1.0f );
+	float3 lightmapColor2 = float3( 1.0f, 1.0f, 1.0f );
+	float3 lightmapColor3 = float3( 1.0f, 1.0f, 1.0f );
+
+	float2 bumpCoord1;
+	float2 bumpCoord2;
+	float2 bumpCoord3;
+	ComputeBumpedLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3_bumpTexCoord.xy,
+		bumpCoord1, bumpCoord2, bumpCoord3 );
+	
+	float2 paintCoord = bumpCoord1.xy - ( bumpCoord2.xy - bumpCoord1.xy ); // remove offset from 1st of the bumped coords for vanilla coords
+	float4 paintColor = tex2D( PaintSampler, paintCoord );
+
+	#if ( THICKPAINT )
+	{
+		lightmapColor1 = LightMapSample( LightmapSampler, bumpCoord1 ).rgb;
+		lightmapColor2 = LightMapSample( LightmapSampler, bumpCoord2 ).rgb;
+		lightmapColor3 = LightMapSample( LightmapSampler, bumpCoord3 ).rgb;
+	}
+	#else
+	{
+		lightmapColor1 = LightMapSample( LightmapSampler, paintCoord ).rgb; // use vanilla lightmap coords, not bumped
+	}
+	#endif
+
+	float2 coords = paintCoord.xy * 40.0f;
+	coords.y *= 0.5f; // paint map is built scaled in y, so must compensate in other texture fetches
+	
+#if defined( SHADER_MODEL_PS_2_0 )
+	return paintColor;
+#endif
+	
+	float alpha = paintColor.a;	
+	clip( alpha - 0.01f );
+	
+	//paint splat guts
+	float3 fvNormalTs = float3( 0.0f, 0.0f, 1.0f );
+	float4 fvSplats = tex2D( SplatNormalSampler, coords );
+	
+	float3 fvViewDirectionTs = normalize( mul( worldVertToEyeVector, worldToTangentSpace ) );
+	
+	alpha = (paintColor.a + fvSplats.a ) * 0.5f; // vanilla combined alpha
+	float fPaintThickness = smoothstep( 0.34f, 0.63f, alpha );
+	float4 cMixedPaint = paintColor.rgba;
+
+	#if( THICKPAINT )
+	{
+		float4 fvSplatsPushed = tex2D( SplatNormalSampler, coords + fvViewDirectionTs * fvSplats.a * 0.01 );
+
+		float bumpedPaintArea = smoothstep( 0.6f, 0.3f, alpha ); //area in which to super-bump, ie the edges of the paint
+		
+		bumpedPaintArea *= fPaintThickness;
+
+		fvNormalTs = ( fvSplatsPushed.xyz * 2.0f ) - 1.0f ;
+		fvNormalTs.xy *= lerp( 0.1f, 4.0f, bumpedPaintArea );
+		float2 fvPaintCoordsDistorted = paintCoord.xy + ( 0.003 - 0.006 * alpha );
+		cMixedPaint = tex2D( PaintSampler, fvPaintCoordsDistorted ); // use distorted UVs so that the blend between different paint colors isn't blocky
+		cMixedPaint.rgb = lerp( paintColor.rgb, cMixedPaint.rgb, smoothstep( 0.9f, 1.0f, cMixedPaint.a ) ); // avoid fetching too far by fading out distorted paint towards edges
+	}
+	#else
+	{
+
+		fvNormalTs = ( fvSplats.xyz * 2.0f ) - 1.0f;
+	}
+	#endif
+
+	// Always simulate srgb reads in shader code for the tex2Dsrgb calls since the paint textures look better when filtered in gamma space
+	#if ( _X360 )
+	{
+		#if defined( CSTRIKE15 )
+			// [mariod] - no PWL for cstrike15
+			cMixedPaint.rgb = GammaToLinear( cMixedPaint.rgb );
+		#else
+		    cMixedPaint.rgb = X360GammaToLinear( cMixedPaint.rgb );
+		#endif
+	}
+	#else
+	{
+		cMixedPaint.rgb = SrgbGammaToLinear( cMixedPaint.rgb );
+	}
+	#endif
+
+	float3 vNormalWs = mul( fvNormalTs.xyz, tangenttranspose );
+	#if ( THICKPAINT )
+		float4 vN;
+		vN.x = dot( g_vWorldToViewRefract0.xyz, vNormalWs.xyz );
+		vN.y = dot( g_vWorldToViewRefract1.xyz, vNormalWs.xyz );
+		vN.wz = vN.xy;
+
+		float flD = (paintColor.a + fvSplats.a );
+		flD *= smoothstep( 1.0f, 2.0f, flD );
+
+		float4 vDependentTexCoords = vN.xyzw * flD;
+
+		float2 vRefractTexCoord = vDependentTexCoords.wz;
+
+		float2 fvLayoutCoords = coords.xy * 6.5f + fvViewDirectionTs.xy * 0.0014f;
+		float2 fvDeepLayoutCoords = fvLayoutCoords * 1.76f + fvViewDirectionTs.xy * 0.0007f;
+		fvLayoutCoords += fvViewDirectionTs.xy * 0.03; //single-step parallax so that the bubbles look higher than the surface they're on
+		float4 fvLayout = tex2D( BubbleLayoutSampler, fvLayoutCoords  );
+		float4 fvDeepLayout = tex2D( BubbleLayoutSampler, fvDeepLayoutCoords );
+		fvLayout.xy -= 0.5f;
+		fvLayout.z *= smoothstep( 0.750f, 0.80f, alpha );
+		fvDeepLayout.xy -= 0.5f;
+		fvDeepLayout.z *= smoothstep( 0.40f, 0.75f, alpha );
+
+		// generate matrix for transforming UV coordinates to be screen-facing
+		// used by the paint to render bubbles that act like facing particles, but are distributed
+		// using a texture that describes the UV layout.  Causing the UVs to face the camera
+		// ensures the bubbles always appear round
+		
+		float3x3 matCameraFaceUVs;
+		matCameraFaceUVs[2] = fvViewDirectionTs; // new normal
+		matCameraFaceUVs[1] = float3( 0.0f, 1.0f, 0.0f ); // tangent
+		matCameraFaceUVs[0] = normalize( cross( matCameraFaceUVs[1].xyz, matCameraFaceUVs[2].xyz ) ); //binormal
+		matCameraFaceUVs[1] = normalize( cross( matCameraFaceUVs[2].xyz, matCameraFaceUVs[0].xyz ) ); //re-square tangent
+
+		// Should try to do it in vertex shader but lack of tesselation means interpolation is not so pretty
+		//float2x2 matCameraFaceUVs;
+		//matCameraFaceUVs[0].xy = i.detailOrBumpAndEnvmapMaskTexCoord.xy;
+		//matCameraFaceUVs[1].xy = i.detailOrBumpAndEnvmapMaskTexCoord.zw;
+
+		float2 fvBubbleCoords;
+		fvBubbleCoords.x = dot( fvLayout.xy, matCameraFaceUVs[0].xy );
+		fvBubbleCoords.y = dot( fvLayout.xy, matCameraFaceUVs[1].xy );
+
+		float2 fvDeepBubbleCoords;
+		fvDeepBubbleCoords.x = dot( fvDeepLayout.xy, matCameraFaceUVs[0].xy );
+		fvDeepBubbleCoords.y = dot( fvDeepLayout.xy, matCameraFaceUVs[1].xy );
+		
+		float2 fvBubbleSurfaceCoords = fvLayout.xy * 0.5f + 0.5f;
+		fvBubbleCoords.xy = fvBubbleCoords.xy + 0.5f + vRefractTexCoord * 0.05;
+		fvDeepBubbleCoords.xy = fvDeepBubbleCoords.xy + 0.5f  + vRefractTexCoord * 0.2;
+
+		float4 fvDeepBubbles = tex2D( BubbleSampler, fvDeepBubbleCoords.xy );
+		fvDeepBubbles = lerp( float4( 0.5f, 0.5f, 1.0f, 0.0f ), fvDeepBubbles, fvDeepLayout.z );
+		float4 fvBubbles = tex2D( BubbleSampler, fvBubbleCoords.xy );
+		fvBubbles = lerp( float4( 0.5f, 0.5f, 1.0f, 0.0f ), fvBubbles, fvLayout.z );
+		float3 fvSurfaceBubbles = tex2D( BubbleSampler, fvBubbleSurfaceCoords.xy ).xyz;
+		fvSurfaceBubbles.xyz = ( fvSurfaceBubbles.xyz * 2.0f ) - 1.0f;
+		fvSurfaceBubbles.xy *= -2.0f;
+		
+		fvNormalTs.xyz += fvSurfaceBubbles.xyz * pow( fvLayout.z, 3.5f ) * 0.4f;
+		fvNormalTs.xyz = normalize( fvNormalTs.xyz );
+		
+		float4 worldSpaceBubblesNormal =  lerp( fvDeepBubbles * float4( 1.0f, 1.0f, 1.0f, 0.4f ), fvBubbles, fvBubbles.a );
+		worldSpaceBubblesNormal.xyz = 	mul( worldSpaceBubblesNormal.xyz * 2.0f - 1.0f, tangenttranspose );
+		worldSpaceBubblesNormal = normalize( worldSpaceBubblesNormal );
+	#endif
+	
+	float3 diffuseLighting = float3( 0.0f, 0.0f, 0.0f );
+	#if ( THICKPAINT )
+	{
+		float3 dp;
+		dp.x = saturate( dot( fvNormalTs.xyz, bumpBasis[0] ) );
+		dp.y = saturate( dot( fvNormalTs.xyz, bumpBasis[1] ) );
+		dp.z = saturate( dot( fvNormalTs.xyz, bumpBasis[2] ) );
+		dp *= dp;
+		
+		diffuseLighting = dp.x * lightmapColor1 +
+						  dp.y * lightmapColor2 +
+						  dp.z * lightmapColor3;
+		float sum = dot( dp, float3( 1.0f, 1.0f, 1.0f ) );
+		diffuseLighting *= g_TintValuesTimesLightmapScale.rgb / sum;
+	}
+	#else
+	{
+		diffuseLighting =  lightmapColor1 * g_TintValuesTimesLightmapScale.rgb;
+	}
+	#endif
+	
+	float3 diffuseComponent = diffuseLighting;
+
+	float fLum = dot( cMixedPaint.rgb, float3( 0.299f, 0.587f, 0.114f ) ) * 0.5f; //desaturated, darken
+	float3 cPaint =  lerp( float3( fLum, fLum, fLum ), cMixedPaint.rgb, fPaintThickness  ); //less thick areas should be less saturated
+
+	vNormalWs.xyz = mul( fvNormalTs, tangenttranspose );
+
+	float3 specularLighting = float3( 0.0f, 0.0f, 0.0f );
+	// Calc Fresnel factor
+	float3 eyeVect = normalize(worldVertToEyeVector);
+	float fresnel = dot( vNormalWs, eyeVect );
+
+	float3 reflectVect = CalcReflectionVectorUnnormalized( vNormalWs, worldVertToEyeVector );
+	#if ( THICKPAINT )
+		float3 reflectVectBubbles = CalcReflectionVectorUnnormalized( worldSpaceBubblesNormal.xyz, worldVertToEyeVector );
+	#endif
+	float fBubbleReflectLum = 0.0f;
+
+	#if ( CUBEMAP )
+		// Must use environment map scale to get proper behavior across platforms with different texture formats (divide by 16 because code was written on PC where env_map_scale is 16.0)
+		specularLighting += ( ENV_MAP_SCALE / 16.0f )* texCUBE( EnvmapSampler, reflectVect ).rgb * ( 1.5f - fresnel ) * 0.67f; //TODO: remove magic numbers
+		#if ( THICKPAINT )
+			float3 bubbleSpecularLighting = ( ENV_MAP_SCALE / 16.0f )* texCUBE( EnvmapSampler, reflectVectBubbles ).rgb * ( cPaint ) * worldSpaceBubblesNormal.a * fresnel * 2.0f;
+			specularLighting.rgb += bubbleSpecularLighting.rgb;
+		#endif
+		specularLighting *= ( 1.0f + diffuseComponent );
+	#endif
+
+	float3 result;
+	
+	alpha = smoothstep( 0.40f, 0.45f, alpha );
+	#if ( THICKPAINT )
+		float alphaBubbles = fvBubbles.a * 0.3f + fvDeepBubbles.a * 0.2f;
+		alpha = alpha - alphaBubbles * 1.25f;
+	#endif
+	alpha *= 0.85f;
+
+	float3 fvTotalDiffuse = ( ( diffuseComponent * 0.82f ) + 0.04f ) * cPaint.rgb; // Make paint slightly emissive so we can see paint color on darkly lit surfaces
+	fvTotalDiffuse.rgb *= float3( 0.8f, 0.85f, 1.0f ); // This matches the code in paintblob_ps20b.fxc
+	result = fvTotalDiffuse.rgb + specularLighting.rgb;
+
+	float flVertexFogFactor = 0.0f;
+
+	float fogFactor = CalcPixelFogFactorSupportsVertexFog( PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, worldPos, i.worldPos_projPosZ.w, flVertexFogFactor );
+
+	return FinalOutput( float4( result.rgb, alpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, false, i.worldPos_projPosZ.w );
+}
+ 

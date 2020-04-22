@@ -1,0 +1,599 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:	"BACK_SURFACE"				"0..1"
+// STATIC:	"LIGHT_WARP"				"0..1"
+// STATIC:	"FRESNEL_WARP"				"0..1"
+// STATIC:	"HIGH_PRECISION_DEPTH"		"0..1"
+// STATIC:	"INTERIOR_LAYER"			"0..1"
+// STATIC:	"SELF_ILLUM_FRESNEL"		"0..1"
+// STATIC:	"OPACITY_TEXTURE"			"0..1"
+// STATIC:	"FLASHLIGHTDEPTHFILTERMODE"	"0..3"	[ps20b] [PC]
+// STATIC:	"FLASHLIGHTDEPTHFILTERMODE"	"0..2"	[ps30]  [PC]
+// STATIC:	"FLASHLIGHTDEPTHFILTERMODE"	"0..0"	[ps20b] [XBOX]
+// STATIC:	"CONTACT_SHADOW"			"0..1"
+// STATIC:	"SELF_ILLUM_PULSE"			"0..1"
+// STATIC:  "VOLUME_TEXTURE"			"0..1"
+// DYNAMIC: "NUM_LIGHTS"				"0..4"	[ps20b]
+// DYNAMIC: "NUM_LIGHTS"				"0..4"	[ps30]
+// DYNAMIC: "FLASHLIGHT"				"0..1"
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"
+
+// SKIP: ( $CONTACT_SHADOW == 1 ) && ( $SELF_ILLUM_PULSE == 1 )
+
+// For now, 'BACK_SURFACE' is a dead-simple path (just writes depth into dest alpha), so skip all non-HW-config combos:
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $LIGHT_WARP > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $FRESNEL_WARP > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $INTERIOR_LAYER > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $SELF_ILLUM_FRESNEL > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $OPACITY_TEXTURE > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $CONTACT_SHADOW > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $SELF_ILLUM_PULSE > 0 )
+// SKIP: ( $BACK_SURFACE == 1 ) && ( $VOLUME_TEXTURE > 0 )
+
+
+#include "common_ps_fxc.h"
+#include "common_vertexlitgeneric_dx9.h"
+#include "common_flashlight_fxc.h"
+#include "shader_constant_register_map.h"
+
+// SAMPLERS
+sampler g_tBase				: register( s0 );
+sampler g_tBump				: register( s1 );
+sampler g_tScreen			: register( s2 );
+sampler g_tSpecMask			: register( s3 );
+sampler g_tLightWarp		: register( s4 );
+sampler g_tFresnelWarp		: register( s5 );
+sampler g_tOpacity			: register( s6 );
+sampler g_tShadowDepth		: register( s7 );	// Flashlight shadow depth map sampler
+sampler g_tNormalizeRandRot	: register( s8 );	// Normalization / RandomRotation samplers
+sampler g_tFlashlightCookie	: register( s9 );	// Flashlight cookie
+
+// SHADER CONSTANTS
+const float4 g_vMisc								: register( c0 );
+#define g_flBumpStrength			g_vMisc.x
+#define g_flDepthScale				g_vMisc.y
+#define g_flInnerFogStrength		g_vMisc.z
+#define g_flRefractStrength			g_vMisc.w
+
+const float4 g_vTranslucentFresnelParams_InteriorBoost : register( c1 );
+#define g_vTranslucentFresnelParams	g_vTranslucentFresnelParams_InteriorBoost.xyz
+#define g_flInteriorBoost			g_vTranslucentFresnelParams_InteriorBoost.w
+
+const float4 g_vMisc2								: register( c3 );
+#define g_flRimLightExp				g_vMisc2.x
+#define g_flRimLightScale			g_vMisc2.y
+#define g_flSpecScale				g_vMisc2.z
+#define g_flSpecExp2				g_vMisc2.w
+
+const float4 g_vMisc3								: register( c10 );
+#define g_flSpecScale2				g_vMisc3.x
+#define g_flFresnelBumpStrength		g_vMisc3.y
+#define g_flDiffuseScale			g_vMisc3.z
+#define g_flInteriorLightScale		g_vMisc3.w
+
+const float4 g_vEyePos_SpecExp						: register( PSREG_EYEPOS_SPEC_EXPONENT );
+#define g_vEyePos					g_vEyePos_SpecExp.xyz
+#define g_flSpecExp					g_vEyePos_SpecExp.w
+
+const float4 g_ShaderControls						: register( c12 );
+#define g_fWriteDepthToAlpha		g_ShaderControls.x
+
+const float4 g_vBaseTint_InteriorBackLightScale		: register( c19 );
+#define g_cBaseTint					g_vBaseTint_InteriorBackLightScale.rgb
+#define g_flInteriorBackLightScale	g_vBaseTint_InteriorBackLightScale.w
+
+const float4 g_vSelfIllumFresnelParams				: register( c26 );
+#define g_flSelfIllumScale			g_vSelfIllumFresnelParams.x
+#define g_flSelfIllumBias			g_vSelfIllumFresnelParams.y
+#define g_flSelfIllumExp			g_vSelfIllumFresnelParams.z
+#define g_flSelfIllumBrightness		g_vSelfIllumFresnelParams.w
+
+// TODO: pass in FOV so that we can account for it properly
+#define g_flHalfWindowWidth 1 /* tan(fov/2) */
+
+const float4 g_cSelfIllumTint						: register( c27 );
+//#define UNUSED g_cSelfIllumTint.w
+
+const float4 g_vInteriorColor_RefractBlur			: register( c32 );
+#define g_cInteriorColor			g_vInteriorColor_RefractBlur.rgb
+#define g_flRefractBlur				g_vInteriorColor_RefractBlur.w
+
+const float3 cAmbientCube[6]						: register( PSREG_AMBIENT_CUBE );
+
+const PixelShaderLightInfo g_sLightInfo[3]			: register( PSREG_LIGHT_INFO_ARRAY ); // 2 registers each - 6 registers total
+
+const float4 g_vFlashlightAttenuationFactors_FarZ	: register( PSREG_FLASHLIGHT_ATTENUATION );
+#define g_vFlashlightAttenuationFactors		g_vFlashlightAttenuationFactors_FarZ.xyz
+#define g_flFlashlightFarZ					g_vFlashlightAttenuationFactors_FarZ.w
+const float4 g_vFlashlightPos_RimBoost				: register( PSREG_FLASHLIGHT_POSITION_RIM_BOOST );
+#define g_vFlashlightPos					g_vFlashlightPos_RimBoost.xyz
+const float4x4 g_mFlashlightWorldToTexture			: register( PSREG_FLASHLIGHT_TO_WORLD_TEXTURE );
+const float4 g_vShadowTweaks						: register( PSREG_ENVMAP_TINT__SHADOW_TWEAKS );
+
+const float3x3 g_mView								: register( c33 );
+
+const float4 g_vMisc4								: register( c36 );
+#define g_flLimitFogAtten			g_vMisc4.x
+#define g_flFogNormalBoost			g_vMisc4.y
+#define g_flGlowScale				g_vMisc4.z
+//#define UNUSED						g_vMisc4.w
+
+// COMBO-DERIVED CONSTANTS
+static const bool bLightWarp = LIGHT_WARP ? true : false;
+static const bool bFlashLight = FLASHLIGHT ? true : false;
+
+// How we use vertex colour (TEXCOORD2) varies based on static combos:
+#if ( CONTACT_SHADOW == 1 )
+	#define i_ClosestSurfaceDir	i.vClosestSurfaceDir
+	#define i_PulseColor		0
+	#define i_VertexAlpha		1
+#elif ( SELF_ILLUM_PULSE == 1 )
+	#define i_ClosestSurfaceDir 0
+	#define i_PulseColor		i.vPulseColor.rgb
+	#define i_VertexAlpha		i.vPulseColor.a
+#else
+	#define i_ClosestSurfaceDir	0
+	#define i_PulseColor		0
+	#define i_VertexAlpha		1
+#endif
+
+
+// INPUT STRUCT
+struct PS_INPUT
+{
+	float4 vWorldNormal			: TEXCOORD0;	// w is proj. z coord (for depth stuff)
+#if CONTACT_SHADOW == 0
+	float4 vPulseColor			: TEXCOORD1;
+#else
+	float4 vClosestSurfaceDir	: TEXCOORD1;
+#endif
+	float4 vWorldPos			: TEXCOORD2;	// w is proj. w coord
+	float4 vUV0					: TEXCOORD3;
+	float4 vUV1					: TEXCOORD4;
+	float4 vLightAtten			: TEXCOORD5;
+	float3 vLightCube			: TEXCOORD6;
+};
+
+
+//==============================================================================================================================================================
+float Luminance( const float3 colour )
+{
+	return dot( colour, float3( 0.3, 0.59, 0.11 ) );
+}
+
+//==============================================================================================================================================================
+float3 ComputeTextureBlendWeights( float3 vWorldNormal )
+{
+	float3 vBlendWeights = max( ( abs( vWorldNormal.xyz ) - 0.2 ) * 7.0, 0.0 );
+	vBlendWeights /= dot( vBlendWeights, float3(1, 1, 1) );	// normalize
+	return vBlendWeights;
+}
+
+//==============================================================================================================================================================
+float4 BlendedTexFetchMAX( sampler s, float2 vUV0, float2 vUV1, float2 vUV2, float3 vBlendWeights )
+{
+	// This 'max' blend is supposed to reduce the 'multiple layers sliding over one another'
+	// appearance of the blob skin.   NOTE: it doesn't preserve texture luminance.
+	float4 vFetch0 = tex2D( s, vUV0 );
+	float4 vFetch1 = tex2D( s, vUV1 );
+	float4 vFetch2 = tex2D( s, vUV2 );
+	//return vBlendWeights.x * vFetch0 + vBlendWeights.y * vFetch1 + vBlendWeights.z * vFetch2;
+	return max( vBlendWeights.x * vFetch0, max( vBlendWeights.y * vFetch1, vBlendWeights.z * vFetch2 ) );
+}
+
+//==============================================================================================================================================================
+float3 BumpedToWorldNormal( float3 vBumpedNormal,
+						    float3 vVertexNormal,	// should be normalized
+							float3 vTangentDir )
+{
+	float3x3 mTanToWorld;
+	mTanToWorld[2] = vVertexNormal;
+	mTanToWorld[0] = vTangentDir - dot( vTangentDir, vVertexNormal ) * vVertexNormal;
+	mTanToWorld[0] = normalize( mTanToWorld[0] );
+	mTanToWorld[1] = cross( mTanToWorld[0], mTanToWorld[2] );
+	return normalize( mul( vBumpedNormal, mTanToWorld ) );
+}
+
+//==============================================================================================================================================================
+void BlendedTexFetchNormal( sampler s, float2 vUV0, float2 vUV1, float2 vUV2, float3 vBlendWeights, float3 vWorldNormal,
+							// Function outputs:
+							out float2 vBumpedTSNormal, out float3 vBumpedWorldNormal, out float3 vFresnelWorldNormal )
+{
+	float3 vNormalTS1 = 2.0 * tex2D( g_tBump, vUV0 ) - 1.0;
+	float3 vNormalTS2 = 2.0 * tex2D( g_tBump, vUV1 ) - 1.0;
+	float3 vNormalTS3 = 2.0 * tex2D( g_tBump, vUV2 ) - 1.0;
+	vBumpedTSNormal   = vBlendWeights.x * vNormalTS1.xy  +  vBlendWeights.y * vNormalTS2.xy  +  vBlendWeights.z * vNormalTS3.xy;
+
+	float3 vBumpedNormal1 = BumpedToWorldNormal( vNormalTS1, vWorldNormal, float3( 0, 1, 0 ) );
+	float3 vBumpedNormal2 = BumpedToWorldNormal( vNormalTS2, vWorldNormal, float3( 1, 0, 0 ) );
+	float3 vBumpedNormal3 = BumpedToWorldNormal( vNormalTS3, vWorldNormal, float3( 1, 0, 0 ) );
+	vBumpedWorldNormal    = vBlendWeights.x * vBumpedNormal1 + vBlendWeights.y * vBumpedNormal2 + vBlendWeights.z * vBumpedNormal3;
+
+	// Apply bump strength in world space (this is cheaper because we have to do it twice, for normal and fresnel bumpstrength)
+	float3 vBumpStrengthDir	= vBumpedWorldNormal - dot( vBumpedWorldNormal, vWorldNormal ) * vWorldNormal;
+	vFresnelWorldNormal		= normalize( vBumpedWorldNormal + ( g_flFresnelBumpStrength - 1.0 ) * vBumpStrengthDir );
+	vBumpedWorldNormal		= normalize( vBumpedWorldNormal + ( g_flBumpStrength        - 1.0 ) * vBumpStrengthDir );
+}
+
+//==============================================================================================================================================================
+void ComputeOpacityAndFresnel(	float2 vUV0,  float2 vUV1,  float2 vUV2, float3 vBlendWeights,
+								float3 vEyeDir, float3 vWorldNormal, float flVertexAlpha,
+								// Function outputs:
+								out float flSkinOpacity, out float flBlobOpacity, out float flFresnel )
+{
+	flSkinOpacity = 1;
+	#if OPACITY_TEXTURE == 1
+		flSkinOpacity = BlendedTexFetchMAX( g_tOpacity, vUV0, vUV1, vUV2, vBlendWeights );
+	#endif
+
+	flFresnel = saturate( 1.0 - dot( vEyeDir.xyz, vWorldNormal.xyz ) );
+	#if FRESNEL_WARP == 1
+		float fTranslucentFresnel = tex1D( g_tFresnelWarp, flFresnel );
+	#else
+		float fTranslucentFresnel = lerp( g_vTranslucentFresnelParams.x, g_vTranslucentFresnelParams.y, pow( flFresnel, g_vTranslucentFresnelParams.z ) );
+	#endif
+
+	// TODO: should decouple fresnel from the opacity map, this kills base texture alpha
+	flSkinOpacity = max( flSkinOpacity, fTranslucentFresnel );
+
+	flBlobOpacity = flVertexAlpha;
+}
+
+//==============================================================================================================================================================
+float3 BlobAmbientLight( float3 vVertexAmbient, float3 vEyeDir, float3 vWorldNormal, float flFresnel )
+{
+	// Ambient lighting now comes from VS
+	float3 cAmbient = vVertexAmbient;
+
+	// TODO: Replace lambert diffuse with pixelshader-ambient term of full lighting env.
+	//float3 cAmbient = PixelShaderAmbientLight( vBumpedWorldNormal, cAmbientCube );
+
+	//float3 cAmbientSheen = PixelShaderAmbientLight( reflect( -vEyeDir, vBumpedWorldNormal ), cAmbientCube );
+	//cAmbient = lerp( cAmbient, cAmbientSheen, flFresnel );
+
+	return cAmbient;
+}
+
+//==============================================================================================================================================================
+void BlobDynamicLight(	float3 vWorldPos, float3 vEyeDir, float3 vBumpedWorldNormal, float4 vLightAtten, float flFresnel,
+						// Function outputs:
+						out float3 cDiffuse, out float3 cSpec, out float3 cSpec2, out float3 cRim )
+{
+	cDiffuse = cSpec = cSpec2 = cRim = 0;
+
+	for ( int l = 0; l < NUM_LIGHTS; l++ )
+	{
+		cDiffuse.rgb += vLightAtten[l] * PixelShaderGetLightColor( g_sLightInfo, l ) * 
+						DiffuseTerm( true, vBumpedWorldNormal, PixelShaderGetLightVector( vWorldPos, g_sLightInfo, l ),
+									bLightWarp, g_tLightWarp );
+
+		// spec 1
+		float3 cCurrSpec, cCurrRim;
+		bool bYesRimLight = true;
+		SpecularAndRimTerms( vBumpedWorldNormal, PixelShaderGetLightVector( vWorldPos, g_sLightInfo, l ), g_flSpecExp, vEyeDir,
+							 false, g_tBump, 1.0,	// dummy spec warp sampler & fresnel
+							 PixelShaderGetLightColor( g_sLightInfo, l ),
+							 bYesRimLight, g_flRimLightExp,
+							 cCurrSpec, cCurrRim );
+		cSpec += vLightAtten[l] * cCurrSpec;
+		cRim  += vLightAtten[l] * cCurrRim;
+
+		// spec 2
+		float3 cCurrSpec2, cDummy;
+		bool bNoRimLight = false;
+		SpecularAndRimTerms( vBumpedWorldNormal, PixelShaderGetLightVector( vWorldPos, g_sLightInfo, l ), g_flSpecExp2, vEyeDir,
+							 false, g_tBump, 1.0,	// dummy spec warp sampler & fresnel
+							 PixelShaderGetLightColor( g_sLightInfo, l ),
+							 bNoRimLight, 0,
+							 cCurrSpec2, cDummy );
+		cSpec2 += vLightAtten[l] * cCurrSpec2;
+		// FIXME: no rim2 term?
+	}
+
+	cRim *= flFresnel * flFresnel * flFresnel * flFresnel;
+}
+
+//==============================================================================================================================================================
+void BlobFlashlight( float3 vWorldPos, float3 vEyeDir, float3 vWorldNormal, float2 vScreenPos, float flSpecularExponent,
+					 // Function outputs:
+					 out float3 cOutFlashlightDiffuse, out float3 cOutFlashlightSpec, out float3 cOutFlashlightColor )
+{
+	float3 delta		= g_vFlashlightPos - vWorldPos;
+	float3 vLightVec	= normalize( delta );
+	float  distSquared	= dot( delta, delta );
+	float  dist			= sqrt( distSquared );
+
+	// Attenuation for light and to fade out shadow over distance
+	float fAtten			= saturate( dot( g_vFlashlightAttenuationFactors, float3( 1.0f, 1.0f/dist, 1.0f/distSquared ) ) );
+	float endFalloffFactor	= RemapValClamped( dist, g_flFlashlightFarZ, 0.6f * g_flFlashlightFarZ, 0.0f, 1.0f );
+
+	// Project into flashlight texture
+	float4 flashlightSpacePosition	= mul( float4( vWorldPos, 1.0f ), g_mFlashlightWorldToTexture );	// TODO: this can be moved to VS
+	float3 vProjCoords				= flashlightSpacePosition.xyz / flashlightSpacePosition.w;
+
+	// Flashlight colour
+	cOutFlashlightColor  = tex2D( g_tFlashlightCookie, vProjCoords );
+#if defined(SHADER_MODEL_PS_2_0) || defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0)
+		cOutFlashlightColor *= cFlashlightColor.xyz;
+#endif
+	cOutFlashlightColor *= endFalloffFactor * fAtten;
+
+	// Flashlight shadow
+#if (defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0))
+	if ( FLASHLIGHTSHADOWS )
+	{
+		float flShadow = DoFlashlightShadow( g_tShadowDepth, g_tNormalizeRandRot, vProjCoords, vScreenPos,
+											 FLASHLIGHTDEPTHFILTERMODE, g_vShadowTweaks );
+		float flAttenuated = lerp( flShadow, 1.0f, g_vShadowTweaks.y );	// Blend between fully attenuated and not attenuated
+		flShadow = saturate( lerp( flAttenuated, flShadow, fAtten ) );	// Blend between shadow and above, according to light attenuation
+		cOutFlashlightColor *= flShadow;								// Shadow term
+	}
+#endif
+
+	// Flashlight diffuse term
+	cOutFlashlightDiffuse = cOutFlashlightColor * DiffuseTerm( true, vWorldNormal, vLightVec, bLightWarp, g_tLightWarp );
+
+	// Flashlight specular term
+	float3 cDummy;
+	SpecularAndRimTerms( vWorldNormal, vLightVec, flSpecularExponent, -vEyeDir,
+						 false, g_tBump, 1.0,	// dummy spec warp sampler & fresnel
+						 cOutFlashlightColor,
+						 false, g_flRimLightExp,
+						 cOutFlashlightSpec, cDummy );
+}
+
+//==============================================================================================================================================================
+float4 SampleBackgroundBlurred( float2 vBumpedTSNormal, float3 vWorldNormal, float2 vScreenPos, float flCamDist, float flBlobOpacity )
+{
+	static const float2 vPoissonOffset[8] = {	float2(  0.3475f,  0.0042f ), float2(  0.8806f,  0.3430f ),
+												float2( -0.0041f, -0.6197f ), float2(  0.0472f,  0.4964f ),
+												float2( -0.3730f,  0.0874f ), float2( -0.9217f, -0.3177f ),
+												float2( -0.6289f,  0.7388f ), float2(  0.5744f, -0.7741f ) };
+	// TODO: get framebuffer res from constants
+	float2 vScreenRes = float2( 1600, 1200 );
+	float2 g_vInvScreenRes = 1.0 / vScreenRes;
+
+	// Project world-space blur radius into screen space.
+	float flBlurRadius = flBlobOpacity * g_flRefractBlur * ( vScreenRes.x / ( flCamDist * g_flHalfWindowWidth ) );
+
+	// Bumped refract
+	float  flRefractStrength = flBlobOpacity * 80.0 * g_flRefractStrength / ( flCamDist * g_flHalfWindowWidth );
+	float2 vBackgroundUV	 = flRefractStrength * vBumpedTSNormal + vScreenPos;
+	/*	// This gives the blob a more crystal-bally refractive look, which looks cool up-close, but looks weird when
+		// it pulls foreground pixels in. It could work well if the innards were rendered into their own texture.
+		float3 vOffset = mul( g_mView, normalize( -vWorldNormal ) );
+		float2 vBackgroundUV = 0.07 * vOffset.xy + 0.03 * vBumpedTSNormal + vScreenPos;  */
+
+	float4 cOut = 0;
+	for( int i = 0; i < 8; i++ )
+	{
+		cOut += 1.0/8.0 * tex2D( g_tScreen, vBackgroundUV + flBlurRadius * g_vInvScreenRes.xy * vPoissonOffset[i] );
+	}
+	return cOut;
+}
+
+float3 CubeAverage( void )
+{
+	// TODO: Pass this average light color in as a const
+	float3 cAvgLight = 0.0;
+	for( int j = 0; j < 6; j++ )
+	{
+		cAvgLight += cAmbientCube[j] / 6.0;
+	}
+	return cAvgLight;
+}
+
+float3 BlobInterior( float3 vWorldNormal, float2 vBumpedTSNormal, float3 vEyeDir,
+					 float2 vScreenPos, float flPixelDepth, float flCamDist, float flBlobOpacity, float3 cFlashlightColor )
+{
+	float3 cInterior = 0;
+
+	// Sample the background (and inner blob brain/tentacles)
+	float4 cBackground = SampleBackgroundBlurred( vBumpedTSNormal, vWorldNormal, vScreenPos, flCamDist, flBlobOpacity );
+	// Boost bright background pixels
+	float flLuminance = Luminance( cBackground.rgb );
+	cBackground.rgb *= 1.0 + g_flInteriorBoost * flLuminance * flLuminance;
+
+	// Fake refract-like vector without any total internal reflection crappiness
+	float3 vRefract = normalize( -( vEyeDir + vWorldNormal ) );
+
+	// Interior lighting through ambient cube
+	float3 cBackLight = PixelShaderAmbientLight( vRefract, cAmbientCube );
+	float3 cAvgLight  = CubeAverage() + ( 0.6 * cFlashlightColor );
+	cBackLight = max( g_flInteriorLightScale * cAvgLight, g_flInteriorBackLightScale * cBackLight );
+	cBackLight *= g_cInteriorColor;
+
+	// Get eye ray travel distance through blob
+	float flBackgroundDepth = cBackground.a * g_flDepthScale;
+	float flDistThroughBlob = flBackgroundDepth - flPixelDepth;
+	flDistThroughBlob = max( 0.0, flDistThroughBlob );
+	// Compute the opacity ('fog') of the blob interior volume, based on its thickness
+	float flFogAtten = pow( 2.0, -flDistThroughBlob * g_flInnerFogStrength );	// exponential falloff
+	//float flFogAtten = saturate( 0.5 - 0.011 * flDistThroughBlob );			// linear falloff
+	#if HIGH_PRECISION_DEPTH == 0
+		// fade to constant interior fogginess as we run against the low-precision destalpha depth limit
+		flFogAtten = lerp( flFogAtten, g_flLimitFogAtten, saturate( cBackground.a*cBackground.a*cBackground.a ) );
+	#endif
+	flFogAtten = lerp( 1.0, flFogAtten, flBlobOpacity );
+
+	// Composite the fog interior lighting/fog over the background
+	cInterior  = lerp( cBackLight, cBackground.rgb, flFogAtten );
+
+	//float flInScattering = flDistThroughBlob * 0.002;
+	//cInterior.rgb += flInScattering * i.vLightCube.rgb;
+
+	return cInterior;
+}
+
+//==============================================================================================================================================================
+void BlobSelfIllumFresnel(	float3 vFresnelWorldNormal, float3 vEyeDir,
+							// Function-modified inputs:
+							inout float3 cDiffuse )
+{
+	float flSelfIllumFresnel	= pow( saturate( dot( vEyeDir.xyz, vFresnelWorldNormal.xyz ) ), g_flSelfIllumExp );
+	flSelfIllumFresnel			= ( flSelfIllumFresnel * g_flSelfIllumScale ) + g_flSelfIllumBias;
+	float3 cSelfIllumComponent	= g_cSelfIllumTint * g_flSelfIllumBrightness;
+	cDiffuse.rgb = lerp( cDiffuse.rgb, cSelfIllumComponent.rgb, saturate( flSelfIllumFresnel ) );
+}
+
+//==============================================================================================================================================================
+float BlobContactShadow( float3 vWorldNormal, float4 vClosestSurfaceDir )
+{
+	// contact darkening for blob regions that touch a surface
+	float3 vSurfaceDir = normalize( vClosestSurfaceDir.xyz ) * vClosestSurfaceDir.w;
+	float  flContactShadow = saturate( 0.8 * ( 1.0 - dot( vSurfaceDir, vWorldNormal ) ) + 0.2 );
+	flContactShadow = lerp ( 0.3, 1.0, flContactShadow * flContactShadow * flContactShadow );
+	return flContactShadow;
+}
+
+//==============================================================================================================================================================
+float3 BlobSelfIllumPulse( float3 cPulseColor, float3 cBase, float flSkinOpacity )
+{
+	float  flBaseLuminance  = length( cBase.rgb );
+	float  flPulseLuminance = length( cPulseColor );
+	float3 cSelfIllumPulse  = sqrt( flSkinOpacity ) * g_flGlowScale * flBaseLuminance * flPulseLuminance * cPulseColor;
+	return cSelfIllumPulse;
+}
+
+//==============================================================================================================================================================
+float3 noise( float3 coord )
+{
+	coord.z *= 50.0;
+	float  zfrac = frac( coord.z );
+	float2 zhash = float2( coord.z, 1 + coord.z );
+	zhash -= frac( zhash );
+	zhash = ( zhash * zhash );
+	zhash -= 31.0 * floor( zhash / 31.0 );
+	zhash = ( zhash * zhash );
+	zhash -= 31.0 * floor( zhash / 31.0 );
+	zhash *= 1.0/31.0;
+	float3 c0 = tex2D( g_tBase, float4( coord.xy + float2( 0, zhash.x ), 0, 0 ) ).rgb;
+	float3 c1 = tex2D( g_tBase, float4( coord.xy + float2( 0, zhash.y ), 0, 0 ) ).rgb;
+
+	float3 rslt = lerp( c0, c1, zfrac );
+	return rslt;
+}
+
+void PerformVolumeTexturing( float3 vUVW, float3 vWorldNormal,
+							 // Function outputs:
+							 out float3 cOut )
+{
+	// volumetric texturing test code
+	float fNoiseScale = 0.002;
+	float fStrengthScale = 1.0;
+	cOut.rgb = 0;
+	for ( int k = 0; k < 6; k++ )
+	{
+		cOut.rgb += fStrengthScale * noise( fNoiseScale * vUVW ).rgb;
+		fNoiseScale *= 2.0; fStrengthScale /= 1.8;
+	}
+	cOut.rgb /= 2.0;
+	cOut.rgb *= PixelShaderAmbientLight( vWorldNormal, cAmbientCube );
+}
+
+//==============================================================================================================================================================
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 cOut = { 0, 0, 0, 1 };
+
+	// Set up misc camera variables
+	float  flPixelDepth = i.vWorldNormal.w;
+	float2 vScreenPos	= i.vUV1.wz / i.vWorldPos.w;
+	float3 vEyeDir		= g_vEyePos.xyz - i.vWorldPos.xyz;
+	float  flCamDist	= length( vEyeDir );
+	vEyeDir /= flCamDist;
+	// Set up contact shadowing or self-illum values (or neither), based on static combo
+	float4 vClosestSurfaceDir	= i_ClosestSurfaceDir;
+	float3 cPulseColor			= i_PulseColor;
+	float  flVertexAlpha		= i_VertexAlpha;
+
+
+	// For now, 'BACK_SURFACE' is a dead-simple path (just writes depth into dest alpha)
+	#if ( BACK_SURFACE == 1 )
+		cOut = tex2D( g_tScreen, vScreenPos );
+		return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR, g_fWriteDepthToAlpha, flPixelDepth );
+	#endif
+
+
+	// Blend weights for 3 blended planar projections
+	float3 vWorldNormal  = normalize( i.vWorldNormal.xyz );
+	float3 vBlendWeights = ComputeTextureBlendWeights( vWorldNormal );
+
+	// Base+spec maps
+	float4 cBase		 = BlendedTexFetchMAX( g_tBase,     i.vUV0.xy, i.vUV0.wz, i.vUV1.xy, vBlendWeights );
+	float  flSpecMask	 = BlendedTexFetchMAX( g_tSpecMask, i.vUV0.xy, i.vUV0.wz, i.vUV1.xy, vBlendWeights );
+	// Use base tex alpha channel as a tint mask
+	cBase.rgb			 = lerp( cBase.rgb, Luminance( cBase.rgb ) * g_cBaseTint.rgb, cBase.a );
+
+	// Normal mapping
+	float3 vBumpedWorldNormal, vFresnelWorldNormal;
+	float2 vBumpedTSNormal;
+	BlendedTexFetchNormal(	g_tBump, i.vUV0.xy, i.vUV0.zw, i.vUV1.xy, vBlendWeights, vWorldNormal,
+							vBumpedTSNormal, vBumpedWorldNormal, vFresnelWorldNormal );
+
+	// Opacity and fresnel
+	float flSkinOpacity, flBlobOpacity, flFresnel;
+	ComputeOpacityAndFresnel(	i.vUV0.xy, i.vUV0.wz, i.vUV1.xy, vBlendWeights, vEyeDir, vFresnelWorldNormal, flVertexAlpha,
+								flSkinOpacity, flBlobOpacity, flFresnel );
+
+	// Ambient light
+	float3 cAmbient = BlobAmbientLight( i.vLightCube, vEyeDir, vBumpedWorldNormal, flFresnel );
+
+	// Dynamic lights
+	float3 cDiffuse, cSpec, cSpec2, cRim;
+	BlobDynamicLight(	i.vWorldPos.xyz, vEyeDir, vBumpedWorldNormal, i.vLightAtten, flFresnel,
+						cDiffuse, cSpec, cSpec2, cRim );
+
+	// Flashlight
+	float3 cFlashlightColor = 0;
+	#if FLASHLIGHT == 1
+		float3 cFlashlightDiffuse, cFlashlightSpec;
+		BlobFlashlight(	i.vWorldPos.xyz, vEyeDir, vBumpedWorldNormal, vScreenPos, g_flSpecExp2,
+						cFlashlightDiffuse, cFlashlightSpec, cFlashlightColor );
+		cDiffuse.rgb += cFlashlightDiffuse;
+		cSpec2		 += cFlashlightSpec;
+	#endif
+
+	// Scale light terms
+	cDiffuse *= g_flDiffuseScale;
+	cSpec	 *= g_flSpecScale;
+	cSpec2	 *= g_flSpecScale2;
+	cRim	 *= g_flRimLightScale;
+
+	// Compute blob interior/background colour
+	float3 cInterior = 0;
+	#if INTERIOR_LAYER == 1
+		cInterior = BlobInterior(	vWorldNormal, vBumpedTSNormal, vEyeDir,
+									vScreenPos, flPixelDepth, flCamDist, flBlobOpacity, cFlashlightColor );
+	#endif
+
+	// Self-illum
+	#if SELF_ILLUM_FRESNEL == 1
+		BlobSelfIllumFresnel(	vFresnelWorldNormal, vEyeDir,
+								cDiffuse );
+	#endif
+
+	#if ( INTERIOR_LAYER == 0 )
+		// Outer layer only
+		cOut.rgb = cBase.rgb * ( cAmbient.rgb + cDiffuse.rgb ) + flSpecMask * ( cSpec + cSpec2 ) + cRim;
+	#else
+		// Outer layer blended over inner/background colour
+		cInterior.rgb += flBlobOpacity * flSpecMask * cSpec;
+		cOut.rgb = cBase.rgb * ( cAmbient.rgb + cDiffuse.rgb ) + flSpecMask * cSpec2 + cRim;
+		cOut.rgb = lerp( cInterior.rgb, cOut.rgb, flBlobOpacity * flSkinOpacity );
+	#endif
+
+	#if CONTACT_SHADOW == 1
+		cOut.rgb *= BlobContactShadow( vWorldNormal, vClosestSurfaceDir );
+	#elif SELF_ILLUM_PULSE == 1
+		cOut.rgb += BlobSelfIllumPulse( cPulseColor, cBase, flSkinOpacity );
+	#endif
+
+	#if VOLUME_TEXTURE == 1
+		PerformVolumeTexturing( i.vUV0.xyz, vWorldNormal, cOut.rgb );
+	#endif
+
+	// TODO: Support fog
+	cOut.a = 1;
+	return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR, g_fWriteDepthToAlpha, flPixelDepth );
+}

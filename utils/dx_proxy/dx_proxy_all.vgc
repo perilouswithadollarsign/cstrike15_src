@@ -1,0 +1,38 @@
+
+$Project "dx_proxy_dx9_v00_pc"
+{
+	"utils\dx_proxy\dx_proxy_dx9_v00_pc.vpc"	[$WINDOWS]
+}
+
+$Project "dx_proxy_dx9_v30_pc"
+{
+	"utils\dx_proxy\dx_proxy_dx9_v30_pc.vpc"	[$WINDOWS]
+}
+
+$Project "dx_proxy_dx9_v00_x360"
+{
+	"utils\dx_proxy\dx_proxy_dx9_v00_x360.vpc"	[$WINDOWS]
+}
+
+$Project "dx_proxy_dx10_v00_pc"
+{
+	"utils\dx_proxy\dx_proxy_dx10_v00_pc.vpc"	[$WINDOWS]
+}
+
+$Project "dx_proxy_ps3"
+{
+	"utils\dx_proxy\dx_proxy_ps3.vpc"           [$WINDOWS]
+}
+
+
+$Group "dx_proxy" "source" "everything"
+{
+	"dx_proxy_dx10_v00_pc"
+	
+	"dx_proxy_dx9_v00_pc"
+	"dx_proxy_dx9_v30_pc"
+	
+	//"dx_proxy_dx9_v00_x360"
+	
+	"dx_proxy_ps3"
+}

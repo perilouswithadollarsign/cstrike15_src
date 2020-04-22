@@ -1,0 +1,24 @@
+$MacroRequired	PROTOBUF_BUILDER_INCLUDED
+
+$Project
+{
+	$Folder "Protobuf Files"
+	{
+		$File "$SRCDIR\common\netmessages.proto"
+		$Folder "Generated Files"
+		{
+			$DynamicFile "$GENERATED_PROTO_DIR\netmessages.pb.h"
+			$DynamicFile "$GENERATED_PROTO_DIR\netmessages.pb.cc"
+			{
+				$Configuration
+				{
+					$Compiler [$WINDOWS]
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+					}
+				}
+			}
+		}
+	}
+
+}

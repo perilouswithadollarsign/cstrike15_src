@@ -1,0 +1,46 @@
+//-----------------------------------------------------------------------------
+//	MESHUTILS.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;..\public\meshutils"
+	}
+}
+
+$Project "meshutils"
+{
+	$Folder	"Source Files"
+	{
+		$File	"atlas.cpp"
+		$File	"clipmesh.cpp"
+		$File	"convexhull.cpp"
+		$File	"mesh.cpp"
+		$File	"simplify.cpp"
+		$File	"vertexops.cpp"
+		$File	"uvparam.cpp"
+	}
+
+	$Folder "External Source Files"
+	{
+		$File	"$SRCDIR\public\interpolatortypes.cpp"
+	}
+	
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\meshutils\simplify.h"
+		$File	"$SRCDIR\public\meshutils\mesh.h"
+	}
+
+	$Folder	"Header Files"
+	{
+	}
+}

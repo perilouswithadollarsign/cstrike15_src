@@ -1,0 +1,72 @@
+//-----------------------------------------------------------------------------
+//	INPUTSYSTEM.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+
+$Configuration
+{
+	$Compiler 
+	{
+		$PreprocessorDefinitions		"$BASE;NO_STRING_T;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE" 
+		$PreprocessorDefinitions		"$BASE;INCLUDE_SCALEFORM" [$WIN32]
+	}
+	$Linker [!$PS3]
+	{
+		$AdditionalDependencies			"$BASE Winmm.lib" [$WINDOWS]
+		$AdditionalDependencies			"$BASE imm32.lib" [$WINDOWS]
+		$SystemLibraries                "iconv" [$OSXALL]
+		$SystemFrameworks 				"Carbon;ForceFeedback;IOKit"
+		$SystemLibraries                "SDL2" [$LINUXALL]
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE $SCE_PPU_LIBROOT\libio_stub.a $SCE_PPU_LIBROOT\libcamera_stub.a $SCE_PPU_LIBROOT\libgem_stub.a $SCE_PPU_LIBROOT\libspurs_stub.a $SCE_PPU_LIBROOT\libgcm_cmd.a $SCE_PPU_LIBROOT\libgcm_sys_stub.a"
+	}
+}
+
+$Project "inputsystem"
+{
+	$Folder	"Source Files"
+	{
+		$File	"inputstacksystem.cpp"
+		$File	"inputsystem.cpp"
+		$File	"inputsystem.h"
+		$File	"joystick.cpp"			[!$POSIX]
+		$File	"joystick_osx.cpp"		[$OSXALL]
+		$File	"joystick_linux.cpp"	[$LINUXALL]
+		$File	"steamcontroller.cpp"
+		$File	"key_translation.cpp"
+		$File	"key_translation.h"
+		$File	"movecontroller_ps3.cpp" [$PS3]
+		$File	"movecontroller_ps3.h" [$PS3]
+		$File	"xcontroller.cpp"		[!$POSIX]
+		$File	"$SRCDIR\common\platforminputdevice.cpp"
+	}
+
+	$Folder	"Public Headers"
+	{
+		$File	"$SRCDIR\public\inputsystem\AnalogCode.h"
+		$File	"$SRCDIR\public\inputsystem\ButtonCode.h"
+		$File	"$SRCDIR\public\inputsystem\iinputsystem.h"
+		$File	"$SRCDIR\public\inputsystem\iinputstacksystem.h"
+		$File	"$SRCDIR\public\inputsystem\InputEnums.h"
+		$File	"$SRCDIR\dx9sdk\include\XInput.h"
+		$File	"$SRCDIR\common\platforminputdevice.h"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$Lib	"tier2"
+		$Lib	"mathlib"
+		$ImplibExternal	steam_api							[ ( $WIN32 || $POSIX || $PS3 ) && !$NO_STEAM ]
+		$ImplibExternal	steam_api64							[ $WIN64 && !$NO_STEAM ]
+	}
+}

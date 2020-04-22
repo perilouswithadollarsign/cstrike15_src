@@ -1,0 +1,95 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects	
+//-----------------------------------------------------------------------------
+
+$Include "$SRCDIR\vpc_scripts\version.vpc"
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"	"$PROJECTNAME"
+$MacroRequired				"OUTBINDIR"
+
+$Macro PLATSUBDIR	"\."
+$Macro LIBPUBLIC	"$SRCDIR\lib\public"
+$Macro LIBCOMMON	"$SRCDIR\lib\common"
+
+// - PPU specific library directories - 
+
+// C/C++ langauge support libraries live here:
+$Macro SCE_PPU_GCC_LIBROOT	"$(SCE_PS3_ROOT)\host-win32\ppu\lib\gcc\ppu-lv2\4.1.1\fno-exceptions"
+// Standard libraries and PS3-specific libraries live here
+$Macro SCE_PPU_LIBROOT		"$(SCE_PS3_ROOT)\target\ppu\lib"
+
+$Include "$SRCDIR\vpc_scripts\source_ppu_prx_ps3_debug.vpc"
+$Include "$SRCDIR\vpc_scripts\source_ppu_prx_ps3_release.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+
+// Common Configuration
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;_MEMTEST"		[$MEMTEST]
+		$PreprocessorDefinitions	"$BASE;_LOWVIOLENCE"	[$LV]
+		$PreprocessorDefinitions	"$BASE;_CERT"           [$CERT]
+		$PreprocessorDefinitions	"$BASE;NO_STEAM"        [$NO_STEAM]
+		$PreprocessorDefinitions	"$BASE;MEMOVERRIDE_MODULE=$PROJECTNAME;_DLL_EXT=$_DLL_EXT"
+		$PreprocessorDefinitions	"$BASE;DLLNAME=$OUTBINNAME"		
+	}
+
+	$PreBuildEvent
+	{
+		$CommandLine			"$CRCCHECK" "\n"
+	}
+	
+	$PostBuildEvent
+	{
+		$CommandLine			"$BASE"  "\n" \
+								"copy $(TargetDir)$(TargetName).sprx $OUTBINDIR\$(TargetName).sprx" "\n" \
+								"copy $(TargetPath) $OUTBINDIR\$(TargetFileName)"								
+	}
+
+}
+
+// Skeleton Project
+$Project
+{
+	$Folder	"Source Files"
+	{
+		$File "$SRCDIR\common\ps3\prx.cpp"
+		$File "$SRCDIR\public\tier0\memoverride.cpp"
+		{
+			$Configuration
+			{
+				$Compiler
+				{
+					$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+				}
+			}
+		}
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$ImpLib	"$LIBPUBLIC\tier0"
+		$Lib	"$LIBPUBLIC\interfaces"
+		$Lib	"$LIBPUBLIC\tier1"
+		$ImpLib	"$LIBPUBLIC\vstdlib"
+
+		// PS3 PPU assembly functions
+		// $File	"$SRCDIR\utils\ps3\ps3asmppu\ps3asmppu\gettlsglobals.obj"
+	}
+
+	$File "vsi.nul"
+	{
+		$Configuration
+		{
+			$CustomBuildStep
+			{
+				$CommandLine	"echo &gt;nul&#x0D;&#x0A;"
+				$Outputs		"$(IntDir)\vsi.out"
+			}
+		}
+	}
+}
+

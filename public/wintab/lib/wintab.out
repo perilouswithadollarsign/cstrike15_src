@@ -1,0 +1,148 @@
+WTClose...........WTClose           WTConfig..........WTConfig
+WTDataGet.........WTDataGet         WTDataPeek........WTDataPeek
+WTEnable..........WTEnable          WTExtGet..........WTExtGet
+WTExtSet..........WTExtSet          WTGet.............WTGet
+WTInfo............WTInfo            WTMgrClose........WTMgrClose
+WTMgrConfigReplace..WTMgrConfigReplace  WTMgrConfigReplaceEx..WTMgrConfigReplaceEx
+WTMgrContextEnum..WTMgrContextEnum  WTMgrContextOwner..WTMgrContextOwner
+WTMgrCsrButtonMap..WTMgrCsrButtonMap  WTMgrCsrEnable..WTMgrCsrEnable
+WTMgrCsrExt.......WTMgrCsrExt       WTMgrCsrPressureBtnMarks..WTMgrCsrPressureBtnMarks
+WTMgrCsrPressureBtnMarksEx..WTMgrCsrPressureBtnMarksEx  WTMgrCsrPressureResponse..WTMgrCsrPressureResponse
+WTMgrDefContext...WTMgrDefContext   WTMgrDefContextEx..WTMgrDefContextEx
+WTMgrDeviceConfig..WTMgrDeviceConfig  WTMgrExt........WTMgrExt
+WTMgrOpen.........WTMgrOpen         WTMgrPacketHook...WTMgrPacketHook
+WTMgrPacketHookDefProc..WTMgrPacketHookDefProc  WTMgrPacketHookEx..WTMgrPacketHookEx
+WTMgrPacketHookNext..WTMgrPacketHookNext  WTMgrPacketUnhook..WTMgrPacketUnhook
+WTOpen............WTOpen            WTOverlap.........WTOverlap
+WTPacket..........WTPacket          WTPacketsGet......WTPacketsGet
+WTPacketsPeek.....WTPacketsPeek     WTQueuePackets....WTQueuePackets
+WTQueuePacketsEx..WTQueuePacketsEx  WTQueueSizeGet....WTQueueSizeGet
+WTQueueSizeSet....WTQueueSizeSet    WTRestore.........WTRestore
+WTSave............WTSave            WTSet.............WTSet
+
+
+WTInfo            Offset: 00000010H  Code and data size: 0H
+  WTInfo          
+
+WTOpen            Offset: 00000040H  Code and data size: 0H
+  WTOpen          
+
+WTClose           Offset: 00000070H  Code and data size: 0H
+  WTClose         
+
+WTPacketsGet      Offset: 000000a0H  Code and data size: 0H
+  WTPacketsGet    
+
+WTPacket          Offset: 000000e0H  Code and data size: 0H
+  WTPacket        
+
+WTEnable          Offset: 00000110H  Code and data size: 0H
+  WTEnable        
+
+WTOverlap         Offset: 00000140H  Code and data size: 0H
+  WTOverlap       
+
+WTConfig          Offset: 00000170H  Code and data size: 0H
+  WTConfig        
+
+WTGet             Offset: 000001a0H  Code and data size: 0H
+  WTGet           
+
+WTSet             Offset: 000001d0H  Code and data size: 0H
+  WTSet           
+
+WTExtGet          Offset: 00000200H  Code and data size: 0H
+  WTExtGet        
+
+WTExtSet          Offset: 00000230H  Code and data size: 0H
+  WTExtSet        
+
+WTSave            Offset: 00000260H  Code and data size: 0H
+  WTSave          
+
+WTRestore         Offset: 00000290H  Code and data size: 0H
+  WTRestore       
+
+WTPacketsPeek     Offset: 000002c0H  Code and data size: 0H
+  WTPacketsPeek   
+
+WTDataGet         Offset: 00000300H  Code and data size: 0H
+  WTDataGet       
+
+WTDataPeek        Offset: 00000330H  Code and data size: 0H
+  WTDataPeek      
+
+WTQueuePackets    Offset: 00000360H  Code and data size: 0H
+  WTQueuePackets  
+
+WTQueuePacketsEx  Offset: 000003a0H  Code and data size: 0H
+  WTQueuePacketsEx
+
+WTQueueSizeGet    Offset: 000003e0H  Code and data size: 0H
+  WTQueueSizeGet  
+
+WTQueueSizeSet    Offset: 00000420H  Code and data size: 0H
+  WTQueueSizeSet  
+
+WTMgrOpen         Offset: 00000460H  Code and data size: 0H
+  WTMgrOpen       
+
+WTMgrClose        Offset: 00000490H  Code and data size: 0H
+  WTMgrClose      
+
+WTMgrContextEnum  Offset: 000004c0H  Code and data size: 0H
+  WTMgrContextEnum
+
+WTMgrContextOwner  Offset: 00000500H  Code and data size: 0H
+  WTMgrContextOwner                 
+
+WTMgrDefContext   Offset: 00000540H  Code and data size: 0H
+  WTMgrDefContext 
+
+WTMgrDefContextEx  Offset: 00000580H  Code and data size: 0H
+  WTMgrDefContextEx                 
+
+WTMgrDeviceConfig  Offset: 000005c0H  Code and data size: 0H
+  WTMgrDeviceConfig                 
+
+WTMgrConfigReplace  Offset: 00000600H  Code and data size: 0H
+  WTMgrConfigReplace                
+
+WTMgrConfigReplaceEx  Offset: 00000640H  Code and data size: 0H
+  WTMgrConfigReplaceEx              
+
+WTMgrPacketHook   Offset: 00000690H  Code and data size: 0H
+  WTMgrPacketHook 
+
+WTMgrPacketHookEx  Offset: 000006d0H  Code and data size: 0H
+  WTMgrPacketHookEx                 
+
+WTMgrPacketUnhook  Offset: 00000710H  Code and data size: 0H
+  WTMgrPacketUnhook                 
+
+WTMgrPacketHookDefProc  Offset: 00000750H  Code and data size: 0H
+  WTMgrPacketHookDefProc            
+
+WTMgrPacketHookNext  Offset: 000007a0H  Code and data size: 0H
+  WTMgrPacketHookNext               
+
+WTMgrExt          Offset: 000007f0H  Code and data size: 0H
+  WTMgrExt        
+
+WTMgrCsrEnable    Offset: 00000820H  Code and data size: 0H
+  WTMgrCsrEnable  
+
+WTMgrCsrButtonMap  Offset: 00000860H  Code and data size: 0H
+  WTMgrCsrButtonMap                 
+
+WTMgrCsrPressureBtnMarks  Offset: 000008a0H  Code and data size: 0H
+  WTMgrCsrPressureBtnMarks          
+
+WTMgrCsrPressureBtnMarksEx  Offset: 000008f0H  Code and data size: 0H
+  WTMgrCsrPressureBtnMarksEx        
+
+WTMgrCsrPressureResponse  Offset: 00000940H  Code and data size: 0H
+  WTMgrCsrPressureResponse          
+
+WTMgrCsrExt       Offset: 00000990H  Code and data size: 0H
+  WTMgrCsrExt     

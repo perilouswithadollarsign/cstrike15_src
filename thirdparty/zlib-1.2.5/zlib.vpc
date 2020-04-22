@@ -1,0 +1,57 @@
+//-----------------------------------------------------------------------------
+//	LIBTIFF.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTLIBDIR	"$SRCDIR\lib\public"		[!$WIN64]
+$Macro OUTLIBDIR	"$SRCDIR\lib\public\x64"	[$WIN64]
+$Macro OUTLIBNAME	"libz"	
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;include"
+		$PreprocessorDefinitions		"$BASE;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE"
+		$CompileAs						"Compile as C Code (/TC)"
+
+		// Silence zlib C library warnings
+		$DisableSpecificWarnings		"$BASE;4131;4244;4127" 
+	}
+}
+
+$Project "zlib"
+{
+	$Folder	"Header Files"
+	{
+		$File	"gzguts.h"
+		$File	"deflate.h"
+		$File	"inffast.h"
+		$File	"inftrees.h"
+		$File	"zutil.h"
+	}
+
+	$Folder	"Source Files"
+	{
+		$File "adler32.c"
+		$File "compress.c"
+		$File "crc32.c"
+		$File "deflate.c"
+		$File "gzclose.c"
+		$File "gzlib.c"
+		$File "gzread.c"
+		$File "gzwrite.c"
+		$File "infback.c"
+		$File "inffast.c"
+		$File "inflate.c"
+		$File "inftrees.c"
+		$File "trees.c"
+		$File "uncompr.c"
+		$File "zutil.c"
+	}
+}
+

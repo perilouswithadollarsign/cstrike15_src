@@ -1,0 +1,24 @@
+$MacroRequired	PROTOBUF_BUILDER_INCLUDED
+
+$Project
+{
+	$Folder "Protobuf Files"
+	{
+		$File "$SRCDIR\game\shared\cstrike15\cstrike15_gcmessages.proto" \
+				"$SRCDIR\common\engine_gcmessages.proto"
+		$DynamicFile "$GENERATED_PROTO_DIR\cstrike15_gcmessages.pb.h" \
+					"$GENERATED_PROTO_DIR\engine_gcmessages.pb.h"
+		$DynamicFile "$GENERATED_PROTO_DIR\cstrike15_gcmessages.pb.cc" \
+					"$GENERATED_PROTO_DIR\engine_gcmessages.pb.cc"
+		{
+			$Configuration
+			{
+				$Compiler [$WINDOWS]
+				{
+					$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+				}
+			}
+		}
+	}
+
+}

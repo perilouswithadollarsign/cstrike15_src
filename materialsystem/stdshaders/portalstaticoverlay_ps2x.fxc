@@ -1,0 +1,97 @@
+//===================== Copyright (c) Valve Corporation. All Rights Reserved. ======================
+
+// STATIC: "HASALPHAMASK"		"0..1"
+// STATIC: "HASSTATICTEXTURE"	"0..1"
+// STATIC: "PORTALGHOSTOVERLAY"	"0..1"
+
+#include "common_fog_ps_fxc.h"
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+#if defined( _X360 )
+	#undef SHADER_SRGB_READ
+	#define SHADER_SRGB_READ 1
+#endif
+
+const float3 g_StaticAmount	: register( c0 ); //x is static, y is 1.0 - static
+
+const float4 g_FogParams				: register( PSREG_FOG_PARAMS );
+const float4 g_EyePos_SpecExponent		: register( PSREG_EYEPOS_SPEC_EXPONENT );
+
+#if ( HASSTATICTEXTURE )
+	sampler StaticTextureSampler	: register( s0 );
+	#if ( HASALPHAMASK )
+		sampler AlphaMaskSampler	: register( s1 );
+	#endif
+#else
+	#if ( HASALPHAMASK )
+		sampler AlphaMaskSampler	: register( s0 );
+	#endif
+#endif
+
+struct PS_INPUT
+{
+	float4 vProjPos					: POSITION;
+	float4 vVertexColor				: COLOR;
+
+	//vStaticTexCoord and vAlphaMaskTexCoord are the same numbers, but we need to map TEXCOORD0 to sampler 0, and TEXCOORD1 to sampler1. ps11 compatibility issue
+	#if ( HASSTATICTEXTURE )
+		float2 vStaticTexCoord			: TEXCOORD0;
+		#if ( HASALPHAMASK )
+			float2 vAlphaMaskTexCoord	: TEXCOORD1;
+		#endif
+	#else
+		#if ( HASALPHAMASK )
+			float2 vAlphaMaskTexCoord	: TEXCOORD0;
+		#else
+			float2 vUnusedTexCoord1		: TEXCOORD0;
+		#endif
+		float2 vUnusedTexCoord2			: TEXCOORD1;
+	#endif
+
+	float4 worldPos_projPosZ		: TEXCOORD7; // Necessary for pixel fog
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 result;
+
+	#if ( HASSTATICTEXTURE )
+	{
+		result.rgba = tex2Dsrgb( StaticTextureSampler, i.vStaticTexCoord );
+	}
+	#else
+	{
+		result.rgba = 0.25; // Without a static texture, just be gray
+	}
+	#endif
+
+	#if ( PORTALGHOSTOVERLAY )
+	{
+		result.rgb *= i.vVertexColor.rgb;
+		result.rgb *= i.vVertexColor.a * g_StaticAmount.x; // Doing a one/invSrcAlpha blend so dim color here
+
+		result.a *= i.vVertexColor.a;
+
+		// Limit tonemap scalar to 0.0-1.0 so the colors don't oversaturate, but let it drop down to 0 to allow fading
+		float flTonemapScalar = saturate( LINEAR_LIGHT_SCALE );
+		return FinalOutput( result, 0.0f, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE ) * flTonemapScalar;
+	}
+	#else
+	{
+		#if ( HASALPHAMASK )
+		{
+			result.a = min( g_StaticAmount.x, tex2D( AlphaMaskSampler, i.vAlphaMaskTexCoord ).a ); // When static reaches 0, fades away completely, also never exceeds the mask's alpha
+		}
+		#else
+		{
+			result.a = g_StaticAmount.x; // When static reaches 0, fades away completely
+		}
+		#endif
+
+		float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos_SpecExponent.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+		return FinalOutput( result, fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+	}
+	#endif
+}

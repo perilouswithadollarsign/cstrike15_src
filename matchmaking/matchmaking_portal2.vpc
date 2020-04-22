@@ -1,0 +1,55 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_portal2.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro OUTBINNAME "matchmaking"
+
+$Include "matchmaking_portal2_inc.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;MATCHMAKING_DLL" 
+	}
+}
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$OutputDirectory			".\Debug_$GAMENAME"			[$WIN32||$POSIX]
+		$IntermediateDirectory		".\Debug_$GAMENAME"			[$WIN32||$POSIX]
+
+		$OutputDirectory			".\Debug_$GAMENAME_360"		[$X360]
+		$IntermediateDirectory		".\Debug_$GAMENAME_360"		[$X360]
+
+		$OutputDirectory			".\Debug_$GAMENAME_PS3"		[$PS3]
+		$IntermediateDirectory		".\Debug_$GAMENAME_PS3"		[$PS3]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$OutputDirectory			".\Release_$GAMENAME"		[$WIN32||$POSIX]
+		$IntermediateDirectory		".\Release_$GAMENAME"		[$WIN32||$POSIX]
+
+		$OutputDirectory			".\Release_$GAMENAME_360"	[$X360]
+		$IntermediateDirectory		".\Release_$GAMENAME_360"	[$X360]
+
+		$OutputDirectory			".\Release_$GAMENAME_PS3"	[$PS3]
+		$IntermediateDirectory		".\Release_$GAMENAME_PS3"	[$PS3]
+	}
+}
+
+$Project "Matchmaking (portal2)"
+{
+	$Folder	"Link Libraries"
+	{
+		$Lib	matchmakingbase
+	}
+}

@@ -1,0 +1,74 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..3" [ps20b] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..2" [ps30] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..0" [XBOX]
+
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"
+// DYNAMIC: "UBERLIGHT"					"0..1"	[ps30] [PC]
+
+#include "common_flashlight_fxc.h"
+#include "shader_constant_register_map.h"
+
+const float4 g_PackedParams					: register( c0 );
+const float4 g_NoiseScroll					: register( c1 );
+const float4 g_ShadowTweaks					: register( PSREG_ENVMAP_TINT__SHADOW_TWEAKS ); // c2
+const float4 g_FlashlightAttenuationFactors	: register( PSREG_FLASHLIGHT_ATTENUATION );
+const float4 g_FlashlightPos				: register( PSREG_FLASHLIGHT_POSITION_RIM_BOOST );
+
+#define g_NoiseStrength	 g_PackedParams.x
+#define g_PerPlaneFactor g_PackedParams.y
+
+
+#if UBERLIGHT
+const float3 g_vSmoothEdge0					: register( PSREG_UBERLIGHT_SMOOTH_EDGE_0 );
+const float3 g_vSmoothEdge1					: register( PSREG_UBERLIGHT_SMOOTH_EDGE_1 );
+const float3 g_vSmoothOneOverWidth			: register( PSREG_UBERLIGHT_SMOOTH_EDGE_OOW );
+const float4 g_vShearRound					: register( PSREG_UBERLIGHT_SHEAR_ROUND );
+const float4 g_aAbB							: register( PSREG_UBERLIGHT_AABB );
+const float4x4 g_FlashlightWorldToLight		: register( PSREG_UBERLIGHT_WORLD_TO_LIGHT );
+#endif
+
+sampler FlashlightCookieSampler	: register( s0 );
+sampler ShadowDepthSampler		: register( s1 );
+sampler RandRotSampler			: register( s2 );
+sampler NoiseSampler			: register( s3 );
+
+#if defined(_PS3)
+// Needed for optimal shadow filter code generation on PS3.
+#pragma texformat ShadowDepthSampler DEPTH_COMPONENT24
+#endif
+
+struct PS_INPUT
+{
+	float3 vWorldPos	: TEXCOORD0;
+	float4 vProjPos		: TEXCOORD1;
+	float4 spotTexCoord	: TEXCOORD2;
+	float4 uberLightPos	: TEXCOORD3;	// not currently actually used
+};
+
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float3 flashlightColor = DoFlashlight( g_FlashlightPos, i.vWorldPos, i.spotTexCoord,
+		float3(1,0,0), g_FlashlightAttenuationFactors.xyz, g_FlashlightAttenuationFactors.w,
+		FlashlightCookieSampler, ShadowDepthSampler, RandRotSampler,
+		FLASHLIGHTDEPTHFILTERMODE, FLASHLIGHTSHADOWS, i.vProjPos.xy / i.vProjPos.w, false, g_ShadowTweaks, false );
+
+#if UBERLIGHT
+		float4 uberLightPosition = mul( float4( i.vWorldPos, 1.0f ), g_FlashlightWorldToLight ).yzxw;
+		flashlightColor *= uberlight( uberLightPosition, g_vSmoothEdge0, g_vSmoothEdge1,
+									  g_vSmoothOneOverWidth, g_vShearRound.xy, g_aAbB, g_vShearRound.zw );
+#endif
+
+	// Scrolling noise with adjustable strength
+	float fNoise = tex2D( NoiseSampler, (i.spotTexCoord.xy / i.spotTexCoord.w) + g_NoiseScroll.xy ).x;
+	fNoise *= tex2D( NoiseSampler, (i.spotTexCoord.xy / i.spotTexCoord.w) + g_NoiseScroll.zw  ).y;
+	fNoise = lerp( 1.0, fNoise, g_NoiseStrength );
+
+	// Pre-tonemapped result
+	float4 vResult = float4( flashlightColor * 0.005f * g_PerPlaneFactor * fNoise, 1 );
+
+	// Tone map on the way out (no fog and no depthwrite)
+	return FinalOutput( vResult, 0.0f, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR, false, 0 );
+}

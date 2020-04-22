@@ -1,0 +1,19 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler TexSampler	: register( s0 );
+
+float g_flBloomAmount	: register( c0 );
+
+struct PS_INPUT
+{
+	float2 baseTexCoord				: TEXCOORD0;		// Base texture coordinate
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4_color_return_type result = g_flBloomAmount * tex2D( TexSampler, i.baseTexCoord );
+	result.a = 1.0f;
+	return result; //FinalOutput( result, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

@@ -1,0 +1,71 @@
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE,$SRCDIR\gcsdk\steamextra,..\common,$SRCDIR\thirdparty\protobuf-2.5.0\src"
+		$AdditionalIncludeDirectories	"$BASE,..\common\xlast_$GAMENAME"				[!$DEMO]
+		$AdditionalIncludeDirectories	"$BASE,..\common\xlast_$GAMENAME_demo"			[$DEMO]
+		$PreprocessorDefinitions		"$BASE;NO_STRING_T;VECTOR;VERSION_SAFE_STEAM_API_INTERFACES;PROTECTED_THINGS_ENABLE;NO_STEAM_GAMECOORDINATOR"
+		$PreprocessorDefinitions		"$BASE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead" [!$PS3]
+	}
+	
+	$Linker
+	{
+		$AdditionalLibraryDirectories	"$BASE;$(XEDK)\lib\win32\vs2010"		[$XDKINSTALLED]
+		$SystemLibraries				"iconv"									[$OSXALL]
+	}		
+}
+
+$Configuration
+{
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies		"$BASE wsock32.lib ws2_32.lib wininet.lib"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies		"$BASE libnet_stub.a libnetctl_stub.a"
+	}
+}
+
+$Configuration	"Debug"
+{
+	$Linker [$X360]
+	{
+		$AdditionalDependencies		"$BASE xaudiod2.lib Xhvd2.lib xmpd.lib"
+	}
+
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies		"$BASE wsock32.lib ws2_32.lib wininet.lib"
+	}
+}
+
+$Configuration	"Release"
+{
+	$Linker [$X360]
+	{
+		$AdditionalDependencies		"$BASE xaudio2.lib Xhv2.lib xmp.lib"
+	}
+
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies		"$BASE wsock32.lib ws2_32.lib wininet.lib"
+	}
+}
+
+$Project
+{
+	$Folder	"Link Libraries"
+	{
+		$Lib	mathlib
+		$Lib	tier2
+		$Lib	tier3
+		$ImplibExternal	steam_api							[ ( $WIN32 || $POSIX || $PS3 ) && !$NO_STEAM ]
+		$ImplibExternal	steam_api64							[ $WIN64 && !$NO_STEAM ]
+		$Lib	gcsdk  [!$X360 && !$PS3]
+	}
+}
+

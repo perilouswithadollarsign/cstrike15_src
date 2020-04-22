@@ -1,0 +1,34 @@
+//
+// dx_proxy_dx9_v30_pc.vpc
+//
+// Base script for generating dx_proxy.dll for specific
+// version of Microsoft DirectX SDK:
+// DirectX9 ver 33 from April 2007 SDK
+//
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\ps3sdk\utilities"
+$Macro DX_SDK_VER	"DX_PS3"
+
+$Include "dx_proxy_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories  "$BASE;$SRCDIR\ps3sdk\cell\host-win32\cg\include;$SRCDIR\ps3sdk\cell\host-common\include"
+	}
+	$Linker
+	{
+		$AdditionalDependencies		"$BASE $SRCDIR\ps3sdk\cell\host-win32\cg\lib\libcgc.lib $SRCDIR\dx10sdk\Lib\x86\dxguid.lib $SRCDIR\ps3sdk\cell\host-win32\cg\lib\SCEShaderPerf.lib"
+	}
+}
+
+$Project "DX_Proxy ($DX_SDK_VER)"
+{
+	$Folder	"Source Files"
+	{
+		-$File	"dx_proxy.cpp"
+		$File	"dx_proxy_ps3.cpp"
+	}
+}

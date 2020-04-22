@@ -1,0 +1,55 @@
+//-----------------------------------------------------------------------------
+//	SOUNDSYSTEM_LOWLEVEL.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+$Include "$SRCDIR\vpc_scripts\dxsdk_macros.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\thirdparty\dxsdk\include;$DXSDKINCLUDE"					[$WINDOWS]
+	}
+}
+
+$Project "soundsystem_lowlevel"
+{
+	$Folder	"Source Files"
+	{
+		$File	"device_dsound.cpp" [$WINDOWS]
+		$File	"device_xaudio2.cpp" [$WINDOWS]
+		$File	"device_sdl.cpp" [$POSIX]
+		$File	"device_null.cpp"
+		$File	"mix.cpp"
+		$File	"simple_filter.cpp"
+		$File	"windows_audio.cpp" [$WINDOWS]
+		{
+			$Configuration
+			{
+				$Compiler
+				{
+					$AdditionalIncludeDirectories	"$SRCDIR\dxs9dk\include"					[$WINDOWS]
+				}
+			}
+		}
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR/public/soundsystem/lowlevel.h"
+		$File	"$SRCDIR/public/soundsystem/audio_mix.h"
+		$File	"mix.h"
+		$File	"simple_filter.h"
+	}
+
+	$Folder "Link Libraries" [$WINDOWS]
+	{
+		$Lib	"$LIBDXSDK\dsound"	   [$WINDOWS]
+		$Lib	"$LIBDXSDK\dxguid"	   [$WINDOWS]
+	}
+}

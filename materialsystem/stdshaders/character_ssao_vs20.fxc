@@ -1,0 +1,26 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_vs_fxc.h"
+
+struct VS_INPUT
+{
+	float3 vPos						: POSITION;
+	float2 vBaseTexCoord			: TEXCOORD0;
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPos					: POSITION;	
+	float2 vBaseUV					: TEXCOORD0;
+};
+
+// Main
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	o.vProjPos = float4( i.vPos, 1.0f );
+	o.vBaseUV.xy = i.vBaseTexCoord.xy;
+
+	return o;
+}

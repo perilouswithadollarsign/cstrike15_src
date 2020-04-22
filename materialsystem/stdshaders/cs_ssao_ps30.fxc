@@ -1,0 +1,117 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler DepthSampler : register( s0 );
+sampler Tex1Sampler : register( s1 );
+
+const float4 g_Const0 : register( c0 );
+const float4 g_Const1 : register( c1 );
+
+const float4x4 g_viewProjMatrix : register( c11 );
+const float4x4 g_invViewMatrix : register( c15 );
+
+#define g_radius g_Const0.x
+#define g_offsetX g_Const0.y
+#define g_offsetY g_Const0.z
+
+struct PS_INPUT
+{
+	float2 vBaseUV : TEXCOORD0;
+};
+
+float3 screenDepthToWorld( float2 vUV, float depth )
+{	
+	float x = vUV.x * 2 - 1;
+	float y = (1 - vUV.y) * 2 - 1;
+	float4 vProjectedPos = float4(x, y, depth, 1);
+	float4 vPositionVS = mul(vProjectedPos, g_invViewMatrix);
+	return (vPositionVS.xyz / vPositionVS.w);
+}
+
+float3 sampleDepthToWorld( float2 vUV )
+{
+	float flDepth = tex2D( DepthSampler, vUV ).r;	
+	return screenDepthToWorld( vUV, flDepth );
+}
+
+float2 worldToScreen( float3 pos )
+{
+	float4 uvPos = mul( float4(pos,1), g_viewProjMatrix );
+	uvPos.xy /= uvPos.w;
+	uvPos.x =     ( uvPos.x + 1) * 0.5;	
+	uvPos.y = 1 - ( uvPos.y + 1) * 0.5;	
+	return uvPos.xy;
+}
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	
+	float3 offset = float3( g_offsetX, g_offsetY, 0 );
+	
+	float flDepthCenter = tex2D( DepthSampler, i.vBaseUV ).r;
+	clip( 0.9999f - flDepthCenter );
+	
+	float3 pos0 = screenDepthToWorld( i.vBaseUV, flDepthCenter );	
+	
+	float3 random = normalize( tex2D(Tex1Sampler, i.vBaseUV * 32.0).rgb ) * 2 - 1;	
+	
+	//float3 pos1 = sampleDepthToWorld( i.vBaseUV + offset.xz );
+	//float3 pos2 = sampleDepthToWorld( i.vBaseUV + offset.zy );
+	//float3 tangent = normalize( pos1 - pos0 + random );
+	//float3 binormal = normalize( pos2 - pos0 );
+	//float3 normal = cross(tangent, binormal);
+	//float3x3 tbn = float3x3( tangent, binormal, abs(normal) );
+	//return float4( pow(float3( normal.xy * 0.5 + 0.5, 1 ), 2.2), 1 );
+	
+	//// to screenspace
+	//float3 camU = float3( g_invViewMatrix[1][0], g_invViewMatrix[1][1], g_invViewMatrix[1][2] );
+	//float3 camV = float3( g_invViewMatrix[0][0], g_invViewMatrix[0][1], g_invViewMatrix[0][2] );	
+	//float dtV = dot( camU, normal );
+	//float dtU = dot( camV, normal );
+	//float3 screenNormal = float3( dtU, dtV, 1 );
+	
+	const float3 sample_sphere[16] =
+	{ // KERNEL IS TEMP - POPULATE WITH BETTER SAMPLES
+		float3(0.2196607,0.9032637,0.2254677),
+		float3(0.05916681,0.2201506,-0.1430302),
+		float3(-0.4152246,0.1320857,0.7036734),
+		float3(-0.3790807,0.1454145,0.100605),
+		float3(0.3149606,-0.1294581,0.7044517),
+		float3(-0.1108412,0.2162839,0.1336278),
+		float3(0.658012,-0.4395972,-0.2919373),
+		float3(0.5377914,0.3112189,0.426864),
+		float3(-0.2752537,0.07625949,-0.1273409),
+		float3(-0.1915639,-0.4973421,-0.3129629),
+		float3(-0.2634767,0.5277923,-0.1107446),
+		float3(0.8242752,0.02434147,0.06049098),
+		float3(0.06262707,-0.2128643,-0.03671562),
+		float3(-0.1795662,-0.3543862,0.07924347),
+		float3(0.06039629,0.24629,0.4501176),
+		float3(-0.7786345,-0.3814852,-0.2391262),
+	};
+	
+	float occlusion = 0;
+	for ( int j=0; j<16; j++ )
+	{
+		float3 worldSampleDir = sample_sphere[j];//mul( sample_sphere[j], tbn );
+		
+		worldSampleDir = reflect( worldSampleDir, random );
+		
+	    
+		float3 worldSamplePos = pos0 + (worldSampleDir.xyz * g_radius);		
+		float2 screenSamplePos = worldToScreen( worldSamplePos );
+		
+		float sampleDepth = tex2D( DepthSampler, screenSamplePos ).r;
+		float difference = ( flDepthCenter - sampleDepth );
+		
+		
+		occlusion += (step( difference, 0 ) - 0.5 ) 
+			* step( 0.0001, abs(difference) );
+			//* step( abs(difference), 0.002  );
+	}
+	
+	occlusion = smoothstep( -8, 8, occlusion );
+	
+	return float4( pow(occlusion, 2.2).xxx, 1 );
+}

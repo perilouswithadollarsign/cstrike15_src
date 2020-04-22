@@ -1,0 +1,56 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_vs_fxc.h"
+
+float4 uvTransform : register ( SHADER_SPECIFIC_CONST_0 );
+float4 uvTransform_UpperLeftLowerRight : register ( SHADER_SPECIFIC_CONST_1 );
+
+struct VS_INPUT
+{
+	float3 vPos				: POSITION;
+	float2 vBaseTexCoord	: TEXCOORD0;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos			: POSITION;	
+	float4 bloombaseCoords	: TEXCOORD0;
+	float4 fxaaCoords		: TEXCOORD1;
+};
+
+float2 PerformUVTransform( float2 uv )
+{
+	return uv * uvTransform.zw + uvTransform.xy;
+}
+
+float4 PerformUVTransform_UpperLeftLowerRight( float2 uv )
+{
+	
+	return uv.xyxy + uvTransform_UpperLeftLowerRight.xyzw; 
+}
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	o.projPos = float4( v.vPos, 1.0f );
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+//	o.baseCoords.xy = v.vBaseTexCoord.xy;
+//	o.bloomCoords.xy = PerformUVTransform( v.vBaseTexCoord.xy ); // Compute bloom tex coords
+
+	o.bloombaseCoords.zw = v.vBaseTexCoord.xy;
+	o.bloombaseCoords.xy = PerformUVTransform( v.vBaseTexCoord.xy ); // Compute bloom tex coords
+
+	// extra fxaa coords
+    // {xy__} = upper left of pixel
+    // {__zw} = lower right of pixel
+	o.fxaaCoords.xyzw = PerformUVTransform_UpperLeftLowerRight( o.bloombaseCoords.xy ); // Compute upper left, lower right tex coords
+
+	return o;
+}

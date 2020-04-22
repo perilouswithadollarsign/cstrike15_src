@@ -1,0 +1,64 @@
+//-----------------------------------------------------------------------------
+//	PET.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin\tools"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_win32_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE,.\,$SRCDIR\game\shared"
+		$PreprocessorDefinitions			"$BASE;PET_EXPORTS"
+	}
+
+	$Linker
+	{
+		$AdditionalDependencies				"$BASE Psapi.lib"
+	}
+}
+
+$Project "Pet"
+{
+	$Folder	"Source Files"
+	{
+		$File	"$SRCDIR\public\interpolatortypes.cpp"
+		$File	"particlesystemdefinitionbrowser.cpp"
+		$File	"particlesystempropertiescontainer.cpp"
+		$File	"petdoc.cpp"
+		$File	"pettool.cpp"
+		$File	"$SRCDIR\public\registry.cpp"
+		$File	"$SRCDIR\public\vgui_controls\vgui_controls.cpp"
+	}
+	
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\mathlib\mathlib.h"
+		$File	"particlesystemdefinitionbrowser.h"
+		$File	"particlesystempropertiescontainer.h"
+		$File	"petdoc.h"
+		$File	"pettool.h"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$File	"$SRCDIR\lib\public\bonesetup.lib"
+		$File	"$SRCDIR\lib\public\datamodel.lib"
+		$File	"$SRCDIR\lib\public\dme_controls.lib"
+		$File	"$SRCDIR\lib\public\dmserializers.lib"
+		$File	"$SRCDIR\lib\public\dmxloader.lib"
+		$File	"$SRCDIR\lib\public\mathlib.lib"
+		$File	"$SRCDIR\lib\public\matsys_controls.lib"
+		$File	"$SRCDIR\lib\public\movieobjects.lib"
+		$File	"$SRCDIR\lib\public\particles.lib"
+		$File	"$SRCDIR\lib\public\tier2.lib"
+		$File	"$SRCDIR\lib\public\tier3.lib"
+		$File	"$SRCDIR\lib\public\toolutils.lib"
+		$File	"$SRCDIR\lib\public\vgui_controls.lib"
+	}
+}

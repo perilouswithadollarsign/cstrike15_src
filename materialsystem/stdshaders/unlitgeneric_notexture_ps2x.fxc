@@ -1,0 +1,13 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+struct PS_INPUT
+{
+	float4 vColor0		: COLOR0;
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	return FinalOutput( i.vColor0, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

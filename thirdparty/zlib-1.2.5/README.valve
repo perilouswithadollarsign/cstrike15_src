@@ -1,0 +1,7 @@
+for linux:
+p4 edit ...
+chmod +x configure
+CC="/valve/bin/gcc-4.5.1 -fPIC" ./configure
+make
+
+

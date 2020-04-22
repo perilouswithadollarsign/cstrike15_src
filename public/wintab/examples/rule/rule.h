@@ -1,0 +1,11 @@
+#define IDD_RULE                    100
+#define ID_CLICK                    106
+#define ID_PRESS                    107
+#define ID_RELASE                   108
+#define ID_HI                       109
+#define ID_VI                       110
+#define ID_DI                       111
+#define ID_HC                       112
+#define ID_VC                       113
+#define ID_DC                       114
+#define ID_RELEASE                  115

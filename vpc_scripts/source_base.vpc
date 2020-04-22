@@ -1,0 +1,46 @@
+//-----------------------------------------------------------------------------
+//	source_base.vpc
+//
+//  This is the base VPC file that is included by all others, on all platforms.
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+// Set which branch we are building out of.
+// This is one file we expect to be different between branches and so it must be merged carefully
+
+// Rel branch:
+$Conditional CSTRIKE_TRUNK_BUILD	"0"
+$Conditional CSTRIKE_STAGING_BUILD	"0"
+$Conditional CSTRIKE_REL_BUILD		"1"
+
+// Telemetry is disabled in rel, unless you use /DRAD_TELEMETRY_ENABLED on the vpc command line.
+$Conditional RAD_TELEMETRY_DISABLED	"1"			[ $CSTRIKE_REL_BUILD && !$RAD_TELEMETRY_ENABLED ]
+
+$Configuration "Debug"
+{
+	$Compiler
+	{
+		// Pass on appropriate branch define to preprocessor
+		$PreprocessorDefinitions		"VPC"
+		$PreprocessorDefinitions		"$BASE;CSTRIKE_TRUNK_BUILD=1"			[ $CSTRIKE_TRUNK_BUILD ]
+		$PreprocessorDefinitions		"$BASE;CSTRIKE_STAGING_BUILD=1"			[ $CSTRIKE_STAGING_BUILD ]
+		$PreprocessorDefinitions		"$BASE;CSTRIKE_REL_BUILD=1"				[ $CSTRIKE_REL_BUILD ]
+		$PreprocessorDefinitions		"$BASE;RAD_TELEMETRY_DISABLED"			[ $RAD_TELEMETRY_DISABLED ]
+	}
+}
+
+$Configuration "Release"
+{
+	$Compiler
+	{
+		// Pass on appropriate branch define to preprocessor
+		$PreprocessorDefinitions		"VPC"
+		$PreprocessorDefinitions		"$BASE;CSTRIKE_TRUNK_BUILD=1"			[ $CSTRIKE_TRUNK_BUILD ]
+		$PreprocessorDefinitions		"$BASE;CSTRIKE_STAGING_BUILD=1"			[ $CSTRIKE_STAGING_BUILD ]
+		$PreprocessorDefinitions		"$BASE;CSTRIKE_REL_BUILD=1"				[ $CSTRIKE_REL_BUILD ]
+		$PreprocessorDefinitions		"$BASE;RAD_TELEMETRY_DISABLED"			[ $RAD_TELEMETRY_DISABLED ] 
+	}
+}
+
+

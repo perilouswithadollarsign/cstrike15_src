@@ -1,0 +1,293 @@
+//===================== Copyright (c) Valve Corporation. All Rights Reserved. ======================
+
+//	STATIC: "ENVMAP_MASK"				"0..1"
+//	STATIC: "TANGENTSPACE"				"0..1"
+//  STATIC: "BUMPMAP"					"0..1"
+//	STATIC: "DETAILTEXTURE"				"0..2"
+//  STATIC: "VERTEXCOLOR"				"0..1"
+//  STATIC: "VERTEXALPHATEXBLENDFACTOR"	"0..1"
+//  STATIC: "SEAMLESS"                  "0..1"
+
+// disable seamless & bumpmask (does not appear to be used)
+//  STATIC: "BUMPMASK"                  "0..0"
+// diffuse bump map is always true when bumpmapping is enabled, so just set it to 1
+#define DIFFUSEBUMPMAP 1
+
+//	STATIC: "FLASHLIGHT"				"0..1"	[CONSOLE]
+//	STATIC: "FANCY_BLENDING"			"0..1"
+//	STATIC: "SELFILLUM"					"0..1"
+//  STATIC: "LIGHTING_PREVIEW"			"0..1"	[PC]
+//  STATIC: "LIGHTING_PREVIEW"			"0..0"	[CONSOLE]
+//  STATIC: "PAINT"						"0..1"
+//  STATIC: "ADDBUMPMAPS"				"0..1"
+
+//  DYNAMIC: "FASTPATH"					"0..1"
+
+//  SKIP: $BUMPMASK && $ADDBUMPMAPS
+//  SKIP: !$BUMPMAP && $ADDBUMPMAPS
+
+// This should not be a combo since I'm a moron with the tangent space and the flashlight.
+//  SKIP: $BUMPMASK && $SEAMLESS
+
+//  SKIP: $LIGHTING_PREVIEW && $FLASHLIGHT
+
+#include "common_fog_vs_supportsvertexfog_fxc.h"
+#include "common_vs_fxc.h"
+#include "common_lightmappedgeneric_fxc.h"
+
+
+static const int g_FogType						= DOWATERFOG;
+static const bool g_UseSeparateEnvmapMask		= ENVMAP_MASK;
+static const bool g_bTangentSpace				= TANGENTSPACE;
+static const bool g_bBumpmap					= BUMPMAP;
+static const bool g_bBumpmapDiffuseLighting		= DIFFUSEBUMPMAP;
+static const bool g_bVertexColor				= VERTEXCOLOR;
+static const bool g_bVertexAlphaTexBlendFactor	= VERTEXALPHATEXBLENDFACTOR;
+static const bool g_BumpMask					= BUMPMASK;
+
+#if SEAMLESS
+const float4 SeamlessScale : register( SHADER_SPECIFIC_CONST_0 );
+#define SEAMLESS_SCALE (SeamlessScale.x)
+#else
+const float4 cBaseTexCoordTransform[2]			:  register( SHADER_SPECIFIC_CONST_0 );
+const float4 cDetailTexCoordTransform[2]		:  register( SHADER_SPECIFIC_CONST_2 );
+#endif
+
+#if FLASHLIGHT
+const float4x4 g_FlashlightWorldToTexture		:  register( SHADER_SPECIFIC_CONST_6 );
+#endif
+
+const float4 cBumpTexCoordTransform[2]			:  register( SHADER_SPECIFIC_CONST_10 );	
+
+#if ( ( LIGHTING_PREVIEW == 3 ) || PAINT )
+const float4 g_vEyeVector						:  register( SHADER_SPECIFIC_CONST_12 );
+#endif
+
+#if ( DETAILTEXTURE == 2 )
+#define SHADER_SPECIFIC_CONST_13 c217 // TODO: add this to common_vs_fxc.h and fix up case (pain) of vcs filenames when all the other shaders are forced to compile as a result
+const float4 cDetailTexCoordTransform2[2]		:  register( SHADER_SPECIFIC_CONST_13 );	// not contiguous with the rest!
+#endif
+
+#if ( SHADER_MODEL_VS_3_0 )
+#define SHADER_SPECIFIC_CONST_14 c219 // TODO: add this to common_vs_fxc.h and fix up case (pain) of vcs filenames when all the other shaders are forced to compile as a result
+#define SHADER_SPECIFIC_CONST_15 c221
+#define SHADER_SPECIFIC_CONST_16 c223
+
+const float4 cBaseTexCoordTransform2[2]			:  register( SHADER_SPECIFIC_CONST_14 );	
+const float4 cBumpTexCoordTransform2[2]			:  register( SHADER_SPECIFIC_CONST_15 );	
+const float4 cBlendModulateTexCoordTransform[2] :  register( SHADER_SPECIFIC_CONST_16 );	
+#endif
+
+struct VS_INPUT
+{
+	float3 vPos							: POSITION;
+	float4 vNormal						: NORMAL;
+	float2 vBaseTexCoord				: TEXCOORD0;
+	float2 vLightmapTexCoord			: TEXCOORD1;
+	float2 vLightmapTexCoordOffset		: TEXCOORD2;
+	float3 vTangentS					: TANGENT;
+	float3 vTangentT					: BINORMAL;
+	float4 vColor						: COLOR0;
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	float3 vObjNormal;
+	DecompressVertex_Normal( v.vNormal, vObjNormal );
+
+	float4 projPos;
+	float3 worldPos;
+
+	worldPos = mul4x3( float4( v.vPos, 1 ), cModel[0] );
+	projPos = mul( float4( worldPos, 1 ), cViewProj );
+	o.projPos = projPos;
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	o.worldPos_projPosZ.w = projPos.z;
+	o.worldPos_projPosZ.xyz = worldPos;
+
+#if ( LIGHTING_PREVIEW == 3 )
+	o.worldPos_projPosZ.w = dot( g_vEyeVector, worldPos.xyz - cEyePos.xyz );	// Linear depth
+#endif
+	
+	float3 worldNormal = mul3x3( vObjNormal, ( float3x3 )cModel[0] );
+
+#if TANGENTSPACE || PAINT || LIGHTING_PREVIEW || defined( _X360 ) || defined( _PS3 )
+	float3 worldTangentS = mul3x3( v.vTangentS, ( const float3x3 )cModel[0] );
+	float3 worldTangentT = mul3x3( v.vTangentT, ( const float3x3 )cModel[0] );
+
+	#if SEAMLESS && BUMPMAP && ( defined( _X360 ) || defined( _PS3 ) )
+		float3 n = normalize( worldNormal );
+		float3 n2 = n * n;           // sums to 1.
+
+		o.tangentSpaceTranspose0_vertexBlendX.xyz	= normalize( float3( n2.y + n2.z, 0.0f, n2.x ) );
+		o.tangentSpaceTranspose1_bumpTexCoord2u.xyz	= normalize( float3( 0.0f, n2.x + n2.z, n2.y ) );
+		o.tangentSpaceTranspose2_bumpTexCoord2v.xyz	= worldNormal;
+	#else
+		o.tangentSpaceTranspose0_vertexBlendX.xyz	= worldTangentS;
+		o.tangentSpaceTranspose1_bumpTexCoord2u.xyz	= worldTangentT;
+		o.tangentSpaceTranspose2_bumpTexCoord2v.xyz	= worldNormal;
+	#endif
+	#if 0 //PAINT //should try to do this in the vs but the lack of tesselation on world geo makes the interpolation yucky
+		float3x3 matCameraFaceUVs;
+		float3 fvViewDirection = normalize( g_vEyeVector.xyz - worldPos.xyz );
+		float3 fvTangentViewDirection;
+		fvTangentViewDirection.x = dot( fvViewDirection, worldTangentS );
+		fvTangentViewDirection.y = dot( fvViewDirection, worldTangentT );
+		fvTangentViewDirection.z = dot( fvViewDirection, worldNormal );
+
+		matCameraFaceUVs[2] = fvTangentViewDirection; // new normal
+		matCameraFaceUVs[1] = float3( 0.0f, 1.0f, 0.0f ); // tangent
+		matCameraFaceUVs[0] = normalize( cross( matCameraFaceUVs[1].xyz, matCameraFaceUVs[2].xyz ) ); //binormal
+		matCameraFaceUVs[1] = normalize( cross( matCameraFaceUVs[2].xyz, matCameraFaceUVs[0].xyz ) ); //re-square tangent
+		o.detailOrBumpAndEnvmapMaskTexCoord = float4( matCameraFaceUVs[0].xy, matCameraFaceUVs[1].xy );
+	#endif
+#else
+	// Surface normal (required for Phong in absence of tangentspace)
+	o.tangentSpaceTranspose2_bumpTexCoord2v.xyz = worldNormal;
+#endif
+
+	float3 worldVertToEyeVector = VSHADER_VECT_SCALE * (cEyePos - worldPos);
+
+	#if ( SEAMLESS )
+	{
+		// we need to fill in the texture coordinate projections
+		o.SeamlessTexCoord.xyz = SEAMLESS_SCALE * worldPos;
+	}
+	#else
+	{
+		if ( FASTPATH )
+		{
+			o.BASETEXCOORD = v.vBaseTexCoord;
+#if defined( SHADER_MODEL_VS_3_0 )
+			o.BASETEXCOORD2 = v.vBaseTexCoord;
+#endif
+		}
+		else
+		{
+			o.BASETEXCOORD = float2( dot( v.vBaseTexCoord.xy, cBaseTexCoordTransform[0].xy ) + cBaseTexCoordTransform[0].w,
+									 dot( v.vBaseTexCoord.xy, cBaseTexCoordTransform[1].xy ) + cBaseTexCoordTransform[1].w );
+#if defined( SHADER_MODEL_VS_3_0 )
+			o.BASETEXCOORD2 = float2( dot( v.vBaseTexCoord.xy, cBaseTexCoordTransform2[0].xy ) + cBaseTexCoordTransform2[0].w,
+									  dot( v.vBaseTexCoord.xy, cBaseTexCoordTransform2[1].xy ) + cBaseTexCoordTransform2[1].w );
+#endif
+		}
+	}
+	#endif
+
+	if ( FASTPATH )
+	{
+#if BUMPMAP && !SELFILLUM && !PAINT
+		o.BUMPCOORD		= v.vBaseTexCoord;
+		o.BUMPCOORD2U	= v.vBaseTexCoord.x;
+		o.BUMPCOORD2V	= v.vBaseTexCoord.y;
+#endif
+
+#if ( DETAILTEXTURE )
+		o.DETAILCOORD   = v.vBaseTexCoord;
+	#if ( DETAILTEXTURE == 2 ) && defined( SHADER_MODEL_VS_3_0 )	
+			o.DETAILCOORD2  = v.vBaseTexCoord;
+	#endif
+#endif
+
+#if FANCY_BLENDING && !PAINT && !SEAMLESS
+		o.BLENDMODULATECOORD = v.vBaseTexCoord;
+#endif
+	}
+	else
+	{
+#if BUMPMAP && !SELFILLUM && !PAINT
+		o.BUMPCOORD = float2( dot( v.vBaseTexCoord.xy, cBumpTexCoordTransform[0].xy ) + cBumpTexCoordTransform[0].w,
+							  dot( v.vBaseTexCoord.xy, cBumpTexCoordTransform[1].xy ) + cBumpTexCoordTransform[1].w );
+
+		#if defined( SHADER_MODEL_VS_3_0 )
+			o.BUMPCOORD2U = dot( v.vBaseTexCoord.xy, cBumpTexCoordTransform2[0].xy ) + cBumpTexCoordTransform2[0].w;
+			o.BUMPCOORD2V = dot( v.vBaseTexCoord.xy, cBumpTexCoordTransform2[1].xy ) + cBumpTexCoordTransform2[1].w;
+		#endif
+#endif
+
+#if FANCY_BLENDING && !PAINT && defined( SHADER_MODEL_VS_3_0 ) && ( SEAMLESS == 0 )
+		o.BLENDMODULATECOORD = float2( dot( v.vBaseTexCoord.xy, cBlendModulateTexCoordTransform[0].xy ) + cBlendModulateTexCoordTransform[0].w,
+									   dot( v.vBaseTexCoord.xy, cBlendModulateTexCoordTransform[1].xy ) + cBlendModulateTexCoordTransform[1].w );
+#endif
+
+#if ( DETAILTEXTURE ) && ( SEAMLESS == 0 )
+	o.DETAILCOORD = float2( dot( v.vBaseTexCoord.xy, cDetailTexCoordTransform[0].xy ) + cDetailTexCoordTransform[0].w,
+						    dot( v.vBaseTexCoord.xy, cDetailTexCoordTransform[1].xy ) + cDetailTexCoordTransform[1].w );
+	#if ( DETAILTEXTURE == 2 ) && defined( SHADER_MODEL_VS_3_0 )
+		o.DETAILCOORD2 = float2( dot( v.vBaseTexCoord.xy, cDetailTexCoordTransform2[0].xy ) + cDetailTexCoordTransform2[0].w,
+								 dot( v.vBaseTexCoord.xy, cDetailTexCoordTransform2[1].xy ) + cDetailTexCoordTransform2[1].w );
+	#endif
+#endif
+	}
+	
+	//  compute lightmap coordinates
+	if( g_bBumpmap && g_bBumpmapDiffuseLighting )
+	{
+		o.lightmapTexCoord1And2.xy = v.vLightmapTexCoord + v.vLightmapTexCoordOffset;
+
+		float2 lightmapTexCoord2 = o.lightmapTexCoord1And2.xy + v.vLightmapTexCoordOffset;
+		float2 lightmapTexCoord3 = lightmapTexCoord2 + v.vLightmapTexCoordOffset;
+
+		// reversed component order
+		o.lightmapTexCoord1And2.w = lightmapTexCoord2.x;
+		o.lightmapTexCoord1And2.z = lightmapTexCoord2.y;
+
+		o.lightmapTexCoord3_bumpTexCoord.xy = lightmapTexCoord3;
+	}
+	else
+	{
+		o.lightmapTexCoord1And2.xy = v.vLightmapTexCoord;
+	}
+
+#if !ADDBUMPMAPS
+	if( g_UseSeparateEnvmapMask || g_BumpMask )
+#endif
+	{
+		// transform(s) performed in PS, pass in untransformed base coords
+		o.ENVMAPMASKCOORD = v.vBaseTexCoord.xy;
+	}
+	
+	if ( !g_bVertexColor )
+	{
+		o.vertexColor = float4( 1.0f, 1.0f, 1.0f, cModulationColor.a );
+	}
+	else
+	{
+		if ( g_bVertexAlphaTexBlendFactor )
+		{
+			o.vertexColor.rgb = v.vColor.rgb;
+			o.vertexColor.a = cModulationColor.a;
+		}
+		else
+		{
+			o.vertexColor = v.vColor;
+			o.vertexColor.a *= cModulationColor.a;
+		}
+	}
+#if SEAMLESS
+	// compute belnd weights in rgb
+	float3 vNormal=normalize( worldNormal );
+	o.vertexColor.xyz = vNormal * vNormal;           // sums to 1.
+#endif
+
+	// On 360/PS3, we have extra iterators and can fold the flashlight into this shader
+#if ( defined( _X360 ) || defined( _PS3 ) ) && FLASHLIGHT
+	o.flashlightSpacePos = TransformFlashlightWorldToTexture( worldPos, g_FlashlightWorldToTexture );
+	o.vProjPos = projPos;
+#endif
+
+	if ( g_bVertexAlphaTexBlendFactor )
+	{
+		o.tangentSpaceTranspose0_vertexBlendX.w = v.vColor.a;
+	}
+	
+	return o;
+}

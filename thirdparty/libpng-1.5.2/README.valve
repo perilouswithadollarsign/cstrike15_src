@@ -1,0 +1,10 @@
+windows build:
+open projects\2k5\libpng.sln in VS 2k5 and build the "Lib Release" target.
+
+osx build: (also build.sh)
+CC="clang -arch i386 -arch x86_64 -g -isysroot /Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.5" \
+AR_RC="libtool -static -o" \
+make -f scripts/makefile.gcc
+
+linux build
+CC="/valve/bin/gcc-4.5 -fPIC -fvisibility=hidden -I../zlib-1.2.5 -L ../../lib/linux32/release" make -f scripts/makefile.gcc

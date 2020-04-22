@@ -1,0 +1,14 @@
+; Module name: Rule.DEF
+
+NAME        Rule
+DESCRIPTION 'Rule: WinTab Measuring Application'
+STUB        'WinStub.exe'
+EXETYPE     WINDOWS
+CODE        MOVEABLE DISCARDABLE PRELOAD
+DATA        MOVEABLE MULTIPLE PRELOAD
+HEAPSIZE    1024
+STACKSIZE   4096
+EXPORTS
+   RuleAppWndProc
+
+

@@ -1,0 +1,67 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler Tex1Sampler : register( s0 );
+sampler Tex2Sampler : register( s1 );
+
+const float4 g_Const0 : register( c0 );
+
+#define g_offsetX g_Const0.x
+#define g_offsetY g_Const0.y
+#define g_time g_Const0.z
+#define g_fadein g_Const0.w
+
+struct PS_INPUT
+{
+	float2 vBaseUV : TEXCOORD0;
+};
+
+float4 main( PS_INPUT i ) : COLOR
+{	
+	float2 vUV = i.vBaseUV;
+	
+	float flDistortX = (vUV.x - 0.5) * 2.8;
+	float flDistortY = (vUV.y - 0.5) * 2.5;			
+	float flToCenter = length( float2( flDistortX, flDistortY ) );
+	float flAbbrScale = pow( flToCenter, 2 );
+
+	// gather noise
+	float2 vUVnoise0 = vUV * 1.5;
+	vUVnoise0.x += g_time * 8;
+	vUVnoise0.y += sin( g_time ) * 0.1;	
+	float flNoise0 = tex2D( Tex2Sampler, vUVnoise0 ).g;
+	
+	float2 vUVnoise1 = vUV * 1.2;
+	vUVnoise1.x += g_time * 5;
+	vUVnoise1.y += sin( g_time ) * 0.2;
+	float flNoise1 = tex2D( Tex2Sampler, vUVnoise1 ).g;
+	
+	float flNoise = max( flNoise0, flNoise1 );
+	
+	// distort
+	vUV.x += flNoise * 0.002 * flAbbrScale;
+	
+	// chromatic abberation
+	float flR = tex2D( Tex1Sampler, vUV + flAbbrScale * float2(g_offsetX,	0) 			).r;
+	float flG = tex2D( Tex1Sampler, vUV + flAbbrScale * float2(g_offsetX,	g_offsetY)	).g;
+	float flB = tex2D( Tex1Sampler, vUV + flAbbrScale * float2(0,			g_offsetY)	).b;
+	float3 cOut = float3( flR, flG, flB );
+	
+	// desaturate edge
+	const float3 coef = float3( 0.3, 0.59, 0.11 );
+	cOut.rgb = lerp(cOut.rgb, dot(coef.rgb, cOut.rgb), saturate(flNoise * 4) );
+	
+	// lateral vignette
+	float flBezel = saturate( abs( vUV.x - 0.5 ) - 0.48 ) * 50;
+	cOut.rgb -= flBezel * flBezel * 0.1;
+	
+	// blue tint
+	cOut.rg *= 0.9;
+	
+	// fade to black
+	cOut.rgb = (cOut-g_fadein) * (1-g_fadein);
+	
+	return float4( cOut, 1 );
+}
+

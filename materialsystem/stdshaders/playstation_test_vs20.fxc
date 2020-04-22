@@ -1,0 +1,30 @@
+//====== Copyright © 1996-2007, Valve Corporation, All rights reserved. ===========================
+
+#include "common_vs_fxc.h"
+
+struct VS_INPUT
+{
+	float3 vPos				: POSITION;
+	float2 vBaseTexCoord	: TEXCOORD0;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos	: POSITION;	
+	float2 vUv0		: TEXCOORD0;
+};
+
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	o.projPos.xyzw = float4( i.vPos.xyz, 1.0f );
+	
+	// PS3-specific fixup to y/z coordinates
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+	
+	o.vUv0.xy = i.vBaseTexCoord.xy;
+
+	return o;
+}

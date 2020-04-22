@@ -1,0 +1,48 @@
+//-----------------------------------------------------------------------------
+//	VTF.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\dx9sdk\include"			[$WINDOWS]
+		$PreprocessorDefinitions		"$BASE;fopen=dont_use_fopen"			[$WINDOWS]
+	}
+}
+
+$Project "vtf"
+{
+	$Folder	"Source Files"
+	{
+		$File	"convert_x360.cpp"
+		$File	"s3tc_decode.cpp" 	[$WINDOWS]
+		$File	"vtf.cpp"
+		$File	"vtf_x360.cpp"		[$X360]
+		$File	"vtf_ps3.cpp"		[$PS3]
+	}
+
+	$Folder	"Public Header Files"
+	{	
+		$File	"s3tc_decode.h"				[$WINDOWS]
+		$File	"$SRCDIR\public\vtf\vtf.h"
+	}
+
+	$Folder	"Header Files"
+	{	
+		$File	"cvtf.h"
+	}
+
+	$Folder "Link Libraries" [$X360]
+	{
+		$File	"$SRCDIR\lib\public\bitmap_360.lib"
+		$File	"$SRCDIR\lib\public\mathlib_360.lib"
+		$File	"$SRCDIR\lib\public\tier2_360.lib"
+	}
+}

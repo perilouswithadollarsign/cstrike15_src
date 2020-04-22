@@ -1,0 +1,43 @@
+//-----------------------------------------------------------------------------
+//	localize.dll project script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$Configuration
+{
+	$Linker [$POSIX]
+	{
+		$SystemLibraries                                                        "iconv" [$OSXALL]
+	}
+}
+
+$Project "localize"
+{
+	$Folder	"Public Header Files"
+	{
+		$File "$SRCDIR\public\localize\ilocalize.h"
+	}
+
+	$Folder "Source Files"
+	{
+		$File "localize.cpp"
+		$File "$SRCDIR\public\registry.cpp"
+		$File "$SRCDIR\public\UnicodeFileHelpers.cpp"
+	}
+	
+	$Folder	"Header Files"
+	{
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$Lib	"$LIBPUBLIC\tier2"
+		$ImplibExternal	steam_api							[ ( $WIN32 || $POSIX || $PS3 ) && !$NO_STEAM ]
+		$ImplibExternal	steam_api64							[ $WIN64 && !$NO_STEAM ]
+	}
+}
+

@@ -1,0 +1,95 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:	"SELF_ILLUM_FRESNEL"		"0..1"
+// STATIC:  "PRE_PASS"					"0..1"
+// STATIC:	"NORMALMAP"					"0..1"
+// STATIC:	"MOVING_PULSES"				"0..1"
+
+#include "common_ps_fxc.h"
+#include "common_vertexlitgeneric_dx9.h"
+#include "shader_constant_register_map.h"
+
+// SAMPLERS
+sampler g_tBase			: register( s0 );
+sampler g_tNormal		: register( s1 );
+
+// SHADER CONSTANTS
+const float4 g_cArmColor	: register( c19 );
+const float3 g_vLightCube[6] : register( PSREG_AMBIENT_CUBE );
+
+const float4 g_vSelfIllumFresnelParams		: register( c26 );
+#define g_flSelfIllumScale		g_vSelfIllumFresnelParams.x
+#define g_flSelfIllumBias		g_vSelfIllumFresnelParams.y
+#define g_flSelfIllumExp		g_vSelfIllumFresnelParams.z
+#define g_flSelfIllumBrightness	g_vSelfIllumFresnelParams.w
+
+const float4 g_cSelfIllumTint				: register( c27 );
+const float3 g_vEyePos						: register( PSREG_EYEPOS_SPEC_EXPONENT );
+
+// INPUT STRUCT
+struct PS_INPUT
+{
+	float4 vWorldNormal			: TEXCOORD0;	// w is proj. z coord (for depth stuff)
+	float3 vWorldTangent		: TEXCOORD1;
+	float3 vWorldBinormal		: TEXCOORD2;
+	float3 vWorldPos			: TEXCOORD3;
+	float2 vUV					: TEXCOORD4;
+	float4 vColor				: TEXCOORD5;
+};
+
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 cBase = tex2D( g_tBase, i.vUV );
+	float4 cOut;
+
+	#if PRE_PASS == 1
+		return cBase;		// First pass: output texture to alpha so that we can fill depth using alpha-to-coverage or alpha test
+	#endif
+
+	// The 2nd pass does full shading and can output depth using the destalpha channel. 
+
+	#if NORMALMAP == 1
+		float3 vNormalTS = tex2D( g_tNormal, i.vUV );
+		//return vNormalTS.rgbb;
+	#else
+		// make up some tubey looking normal
+		float3 vNormalTS = float3( 0, (2*i.vUV.y-1) * 3.0, 1.0 );
+	#endif
+
+	float3x3 mTan;
+	mTan[0] = i.vWorldTangent;
+	mTan[1] = i.vWorldBinormal;
+	mTan[2] = i.vWorldNormal;
+	float3 vNormal = normalize( mul( vNormalTS, mTan ) );
+	float3 vView = normalize( g_vEyePos.xyz - i.vWorldPos.xyz );
+
+	// diffuse lighting using baked light cube
+	float3 cDiffuse = PixelShaderAmbientLight( vNormal, g_vLightCube );
+
+	// selfillum
+	#if SELF_ILLUM_FRESNEL == 1
+		float flSelfIllumFresnel = ( pow( saturate( dot( vView.xyz, vNormal.xyz ) ), g_flSelfIllumExp ) * g_flSelfIllumScale ) + g_flSelfIllumBias;
+		float3 cSelfIllumComponent = g_cSelfIllumTint * g_flSelfIllumBrightness;
+		cDiffuse.rgb = lerp( cDiffuse.rgb, cSelfIllumComponent.rgb, saturate( flSelfIllumFresnel ) );
+	#endif
+
+	// the u coord -- which is 0 at the root and 1 at the tip -- works well as an occlusion factor
+	cOut = float4( i.vUV.x * cDiffuse * g_cArmColor.rgb * cBase.rgb, 1 );
+
+	// pulse
+	float flPulseWidth = 0.4;
+	#if MOVING_PULSES == 1
+		float flPulse = smoothstep( i.vColor.a, i.vColor.a - flPulseWidth, i.vUV.x );// * ( 1 - smoothstep( i.vColor.a + flPulseWidth, i.vColor.a, i.vUV.x ) );
+		flPulse *= 1 - smoothstep( i.vColor.a, i.vColor.a - flPulseWidth, i.vUV.x );// * ( 1 - smoothstep( i.vColor.a + flPulseWidth, i.vColor.a, i.vUV.x ) );
+	#else
+		float flPulse = max( 0.0, i.vColor.a );
+	#endif
+	cOut.rgb = lerp( 1.0 * cOut.rgb, 3 * i.vColor.rgb, flPulse );
+
+	//cOut.rgb *= float3( 1.0, 0.1, 0.1 );
+	//cOut = float4( fmod( i.vUV, 1.0 ), 0, 0 );
+	//float4 cOut = 0.5 * i.vWorldTangent.xyzz + 0.5;//float4( i.vUV, 0, 0 );
+
+	return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR, true, i.vWorldNormal.w );
+}

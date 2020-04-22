@@ -1,0 +1,27 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+struct PS_INPUT
+{
+	float2 coordTap0		: TEXCOORD0;
+  	float4 vertexColor      : TEXCOORD1;
+};
+
+float4 Constant_color : register( c0 );
+
+sampler TexSampler	: register( s0 );
+
+float4 main( PS_INPUT i ) : COLOR
+{
+  float flDepth = tex2D( TexSampler, i.coordTap0 ).r;
+  flDepth = flDepth * Constant_color.x + Constant_color.y;
+  
+  float4 vOutputColor = float4( flDepth, flDepth, flDepth, 1.0f);
+
+  // Slamming output alpha to 1.0f because screenspace_general always enables alpha testing (argh)
+  vOutputColor.a = 1.0f;
+    
+  return FinalOutput( vOutputColor, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE ); //Constant_color;
+}
+

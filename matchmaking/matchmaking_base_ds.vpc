@@ -1,0 +1,98 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_base_ds.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro OUTLIBNAME	"matchmakingbase_ds"
+
+$include "matchmaking_base_inc.vpc"
+
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;MATCHMAKING_DS_DLL;SWDS"
+	}
+}
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$IntermediateDirectory		".\Debug_matchmakingbase_ds$PLATSUBDIR"			[$WINDOWS||$POSIX]
+		$IntermediateDirectory		".\Debug_matchmakingbase_ds_360"				[$X360]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$IntermediateDirectory		".\Release_matchmakingbase_ds$PLATSUBDIR"		[$WINDOWS||$POSIX]
+		$IntermediateDirectory		".\Release_matchmakingbase_ds_360"				[$X360]
+	}
+}
+
+$Project "matchmakingbase_ds"
+{
+	$Folder "Matchmaking"
+	{
+		-$File	"mm_session.cpp"
+	}
+
+	$Folder "Sessions"
+	{
+		-$File	"ds_searcher.h"
+		-$File	"ds_searcher.cpp"
+		-$File	"match_searcher.h"
+		-$File	"match_searcher.cpp"
+		-$File	"mm_session_offline_custom.h"
+		-$File	"mm_session_offline_custom.cpp"
+		-$File	"mm_session_online_client.h"
+		-$File	"mm_session_online_client.cpp"
+		-$File	"mm_session_online_host.h"
+		-$File	"mm_session_online_host.cpp"
+		-$File	"mm_session_online_search.h"
+		-$File	"mm_session_online_search.cpp"
+		-$File	"mm_session_online_teamsearch.h"
+		-$File	"mm_session_online_teamsearch.cpp"
+		-$File	"sys_session.h"
+		-$File	"sys_session.cpp"
+	}
+
+	$Folder "Platform - Steam"
+	{
+	}
+
+	$Folder "Platform - Xbox 360"
+	{
+	}
+
+	$Folder "Systems"
+	{
+		$Folder "Headers"
+		{
+			-$File	"leaderboards.h"
+			-$File	"player.h"
+			-$File	"searchmanager.h"
+		}
+		-$File	"leaderboards.cpp"
+		-$File	"player.cpp"
+		-$File	"searchmanager.cpp"
+	}
+
+	$Folder "Utils"
+	{
+	}
+
+	$Folder	"Public Headers"
+	{
+	}
+
+	$Folder "Source Files"
+	{
+	}
+}
+

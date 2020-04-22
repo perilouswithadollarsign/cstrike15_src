@@ -1,0 +1,23 @@
+//===== Copyright (c) 1996-2008, Valve Corporation, All rights reserved. ======//
+
+float4x4 matWVP : register(c0);  
+
+struct VS_IN  
+{ 
+	float4 ObjPos : POSITION;
+	float2 TexCoord : TEXCOORD;
+}; 
+
+struct VS_OUT 
+{ 
+	float4 ProjPos : POSITION; 
+	float2 TexCoord : TEXCOORD;
+};  
+
+VS_OUT main( VS_IN In )  
+{  
+	VS_OUT Out;   
+	Out.ProjPos = mul( In.ObjPos, matWVP );
+	Out.TexCoord = In.TexCoord;
+	return Out;  
+}

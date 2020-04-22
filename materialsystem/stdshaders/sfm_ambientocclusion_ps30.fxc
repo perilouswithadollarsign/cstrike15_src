@@ -1,0 +1,130 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+// DYNAMIC: "AO_MODE"				"0..2"
+
+sampler FrontNDBuffer				: register( s0 );
+sampler RandomReflectionSampler		: register( s1 );
+
+#define NUM_SSAO_SAMPLES 9
+
+struct PS_INPUT
+{
+	float2 vScreenPos	: VPOS;
+	float2 tc			: TEXCOORD0;
+	float3 vEyeRay		: TEXCOORD1;
+};
+
+const float4 cNoiseOffset							: register( c1 );
+const float2 g_vInvScreenExtents					: register( c2 );
+const float3 g_vEyePt								: register( c3 );	// vEyePos in world space
+const float3 g_vEyeDir								: register( c4 );	// vForward / zFar
+
+const matrix g_mViewProj							: register( c5 );	// 5, 6, 7, 8
+const float4 g_vRandSampleScale						: register( c9 );	// xy is rand sample scale, zw is half-texel offset shift + 0.5
+const float4 g_vSampleRadiusNBias					: register( c10 );	// x is world rad, y is depth to world space scale, z is far plane, w is bias
+
+const float4 g_vSphereSamples[NUM_SSAO_SAMPLES]		: register( c11 );
+
+
+float ToonEdges( float2 tcCenter )
+{
+	float4 vND[9];
+
+	// 3x3 neighborhood offsets
+	float2 v3x3Offsets[9] = { float2( -0.00078125f, -0.001388f ), float2( 0, -0.001388f ), float2( 0.00078125f, -0.001388f ),
+							  float2( -0.00078125f,          0 ), float2( 0,          0 ), float2( 0.00078125f,          0 ),
+							  float2( -0.00078125f,  0.001388f ), float2( 0,  0.001388f ), float2( 0.00078125f,  0.001388f ) };
+
+	// Look up 3x3 neighborhood
+	[unroll]
+	for( int i=0; i<9; i++ )
+	{
+		vND[i] = tex2D( FrontNDBuffer, tcCenter + v3x3Offsets[i].xy );
+		vND[i].xyz = normalize( vND[i].xyz );
+		vND[i].w = vND[i].w;
+	}
+
+	// Take some local dot products
+	float4 vNormalDots;
+	vNormalDots.x = dot( vND[4].xyz, vND[1].xyz );
+	vNormalDots.y = dot( vND[4].xyz, vND[3].xyz );
+	vNormalDots.z = dot( vND[4].xyz, vND[5].xyz );
+	vNormalDots.w = dot( vND[4].xyz, vND[7].xyz );
+
+	// Threshold the four dots and combine
+	float normalEdges = smoothstep( 0.7, 0.9, dot( vNormalDots > 0.8f, float4( 0.25, 0.25, 0.25, 0.25 ) ) );
+
+	float flSobelX = 1.0f - ( abs( -vND[0].w - vND[3].w * 2.0f - vND[6].w + vND[2].w + vND[5].w * 2.0f + vND[8].w ) > 0.004 );
+	float flSobelY = 1.0f - ( abs( -vND[0].w - vND[1].w * 2.0f - vND[2].w + vND[6].w + vND[7].w * 2.0f + vND[8].w ) > 0.004 );
+
+	return normalEdges * flSobelX * flSobelY;
+}
+
+float3 RecoverWorldPos( float flDepth, float3 vEyeRay )
+{
+	return g_vEyePt + vEyeRay * flDepth;
+}
+
+float4 main( PS_INPUT Input ) : COLOR0
+{
+	float2 vShiftedScreenPos = Input.vScreenPos.xy + float2( 0.5, 0.5 );
+
+	float2 vScreenCoord = ( vShiftedScreenPos ) * ( g_vInvScreenExtents.xy );
+	float2 vRandSampleCoord = ( Input.vScreenPos.xy ) * ( g_vRandSampleScale.xy );
+
+	// Sample from ND buffer
+	float4 vFrontND = tex2D( FrontNDBuffer, vScreenCoord );
+	float3 vNormal = vFrontND.xyz;
+	float flDepth = vFrontND.a;
+
+	float3 vReflectPlane = tex2D( RandomReflectionSampler, vRandSampleCoord + cNoiseOffset.xy) * 2 - 1;
+	float3 vEyePos = RecoverWorldPos( flDepth, Input.vEyeRay );
+	vEyePos += vNormal * flDepth * g_vSampleRadiusNBias.w;
+
+	// Loop over samples
+	float flTotalOcc = 0.0f;
+	[unroll]
+	for ( int s=0; s<NUM_SSAO_SAMPLES; ++s )
+	{
+		float3 vPosDelta = reflect( g_vSphereSamples[s], vReflectPlane );
+		
+		if ( dot( vPosDelta, vNormal ) < 0 )
+			vPosDelta = reflect( vPosDelta, vNormal );
+
+		float3 vSamplePos = vEyePos + g_vSampleRadiusNBias.x * vPosDelta * 0.25;
+
+		// World space
+		float flTestDepth = dot( vSamplePos - g_vEyePt, g_vEyeDir );
+		float4 vProjSamplePos = mul( g_mViewProj, float4( vSamplePos, 1 ) );
+		float2 vSampleCoord = vProjSamplePos.xy / vProjSamplePos.w;
+	
+		vSampleCoord = vSampleCoord * float2( 0.5, -0.5 ) + g_vRandSampleScale.zw;
+		float flSampleDepth = tex2D( FrontNDBuffer, vSampleCoord ).a;
+		
+		float flDepthDelta = ( flTestDepth - flSampleDepth ) * g_vSampleRadiusNBias.y;
+
+		float flOccMask = saturate( flDepthDelta * 10000000 );
+		
+		float flOcc = saturate( ( 1.0f / ( flDepthDelta + 0.618f ) ) - 0.618f );
+		flTotalOcc += flOcc * flOccMask;
+	}
+	
+	float flVis = 1 - flTotalOcc / NUM_SSAO_SAMPLES;
+	flVis = flVis * flVis;
+
+
+	#if ( AO_MODE == 1 )	// Toon edges only
+	{
+		return ToonEdges( Input.vScreenPos.xy * g_vInvScreenExtents.xy );
+	}
+	#elif ( AO_MODE == 2 )	// Toon edges and ambientocclusion
+	{
+		return float4( flVis.xxx, 1 ) * ToonEdges( Input.vScreenPos.xy * g_vInvScreenExtents.xy );
+	}
+	#else //  ( AO_MODE == 0 )	Ambient occlusion only
+	{
+		return float4( flVis.xxx, 1 );
+	}
+	#endif
+}

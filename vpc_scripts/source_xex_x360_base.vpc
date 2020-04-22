@@ -1,0 +1,94 @@
+//-----------------------------------------------------------------------------
+//	SOURCE_XEX_X360_BASE.VPC
+//
+//	Base Settings for Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$Include "$SRCDIR\vpc_scripts\version.vpc"
+
+// 360 must have a xex load address
+$Include "$SRCDIR\vpc_scripts\loadaddress.vpc"
+$MacroRequired				"LOADADDRESS_DEVELOPMENT"
+$MacroRequired				"LOADADDRESS_RETAIL"
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"	"$PROJECTNAME"
+$MacroRequired				"OUTBINDIR"
+$MacroRequired				"DEVKITBINDIR"	"."
+
+$Macro PLATSUBDIR	"\."
+$Macro LIBPUBLIC	"$SRCDIR\lib\public"
+$Macro LIBCOMMON	"$SRCDIR\lib\common"
+
+$Include "$SRCDIR\vpc_scripts\source_xex_x360_debug.vpc"
+$Include "$SRCDIR\vpc_scripts\source_xex_x360_release.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+
+// Common Configuration
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;_MEMTEST"		[$MEMTEST]
+		$PreprocessorDefinitions	"$BASE;_LOWVIOLENCE"	[$LV]
+		$PreprocessorDefinitions	"$BASE;_X360DEMO"		[$X360DEMO]
+		$PreprocessorDefinitions	"$BASE;COMPILER_MSVC;COMPILER_MSVCX360;MEMOVERRIDE_MODULE=$PROJECTNAME;_DLL_EXT=$_DLL_EXT"
+	}
+
+	$PreBuildEvent
+	{
+		$CommandLine		"if EXIST $OUTBINDIR\$(TargetName).xex for /f $QUOTEdelims=$QUOTE %%A in ('attrib $QUOTE$OUTBINDIR\$(TargetName).xex$QUOTE') do set valveTmpIsReadOnly=$QUOTE%%A$QUOTE" "\n" \
+							"set valveTmpIsReadOnlyLetter=%valveTmpIsReadOnly:~6,1%" "\n" \
+							"if $QUOTE%valveTmpIsReadOnlyLetter%$QUOTE==$QUOTER$QUOTE del /q $(TargetDir)$(TargetName).xex" "\n" \
+							"$CRCCHECK" "\n"
+	}
+
+	$Xbox360ImageConversion
+	{
+		// General
+		$TitleID				"0x5841125A"
+		//$ProjectDefaults		"$SRCDIR\common\portal.xml"
+	}
+
+	$PostBuildEvent
+	{
+		$CommandLine			"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetName).xex $SRCDIR" "\n" \
+								"copy $(TargetDir)$(TargetName).xex $OUTBINDIR\$(TargetName).xex" "\n" \
+								"if exist $(TargetDir)$(TargetName).map copy $(TargetDir)$(TargetName).map $OUTBINDIR\$(TargetName).map" "\n" \
+								"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetName).pdb $SRCDIR" "\n" \
+								"copy $(TargetDir)$(TargetName).pdb $OUTBINDIR\$(TargetName).pdb" "\n" \
+								"copy $(TargetDir)$(TargetName).xdb $OUTBINDIR\$(TargetName).xdb" "\n" \
+								"call $SRCDIR\vpc_scripts\valve_xbcp_wrapper.cmd $(TargetDir)$(TargetName).xex $(RemoteRoot)\$DEVKITBINDIR\$(TargetName).xex" "\n" \
+								"call $SRCDIR\..\game\bin\CSSVersionNumber.exe $SRCDIR\..\game\platform\resource\css_code_version_local.txt quiet" "\n"
+		$Description			"Publishing to $OUTBINDIR"
+		$ExcludedFromBuild		"No"
+	}
+}
+
+// Skeleton Project
+$Project
+{
+	$Folder	"Source Files"
+	{
+		$File "$SRCDIR\public\tier0\memoverride.cpp"
+		{
+			$Configuration
+			{
+				$Compiler
+				{
+					$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+				}
+			}
+		}
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$File	"$LIBPUBLIC\tier0_360.lib"
+		$File	"$LIBPUBLIC\tier1_360.lib"
+		$File	"$LIBPUBLIC\interfaces_360.lib"
+		$File	"$LIBPUBLIC\vstdlib_360.lib"
+	}
+}
+

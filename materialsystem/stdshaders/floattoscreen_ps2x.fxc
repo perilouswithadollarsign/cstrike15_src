@@ -1,0 +1,20 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler FBSampler	: register( s0 );
+
+struct PS_INPUT
+{
+	float2 texCoord				: TEXCOORD0;
+};
+
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 fbSample = tex2D( FBSampler, i.texCoord );
+	// Temporary hack to work around color tint problem in float HDR mode. 
+	// fbSample *= float4(cLightScale.xyz, 1);
+
+	return FinalOutput( fbSample, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

@@ -1,0 +1,224 @@
+//---------------------------------------------------------------------------------//
+// Parallax occlusion mapping algorithm implementation. Pixel shader.              
+//---------------------------------------------------------------------------------//
+
+//..........................................................................................
+// Uniform shader parameters declaration
+//..........................................................................................
+
+const float4 g_ParallaxParms : register( c0 );
+
+float fShadowSoftening = 0.59f; // fixme: should be a vmt param
+float fHeightMapRange = 0.02f; // fixme: should be a vmt param
+
+// unused stuff
+float fSpecularExponent = 100.0f; // fixme: should be a vmt param
+float fDiffuseBrightness = 1.0f;
+float4 cAmbientColor = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+float4 cDiffuseColor = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+float4 cSpecularColor = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+
+// texture samplers
+sampler tBaseMap;
+sampler tNormalMap;
+
+//..........................................................................................
+// Note: centroid is specified if multisampling is enabled through RenderMonkey's DirectX
+// window preferences settings
+//..........................................................................................
+struct PS_INPUT
+{
+	float2 texCoord          : TEXCOORD0;
+//	float3 vLightTS          : TEXCOORD1_centroid;   // light vector in tangent space, denormalized
+	float3 vViewTS           : TEXCOORD2_centroid;   // view vector in tangent space, denormalized
+	float2 vParallaxOffsetTS : TEXCOORD3_centroid;   // Parallax offset vector in tangent space
+	float3 vNormalWS         : TEXCOORD4_centroid;   // Normal vector in world space
+	float3 vViewWS           : TEXCOORD5_centroid;   // View vector in world space
+	float4 vDebug		     : TEXCOORD6;
+};
+
+//..........................................................................................
+// Function:    ComputeIllumination
+// 
+// Description: Computes phong illumination for the given pixel using its attribute textures
+//              and a light vector.
+//..........................................................................................
+float4 ComputeIllumination( float2 texCoord, float3 vLightTS, float3 vViewTS, float fOcclusionShadow )
+{
+	// Sample the normal from the normal map for the given texture sample:
+	float3 vNormalTS = normalize( tex2D( tNormalMap, texCoord ) * 2 - 1 );
+
+	// Sample base map:
+	float4 cBaseColor = tex2D( tBaseMap, texCoord );
+
+	// Compute diffuse color component:
+	float4 cDiffuse = saturate( dot( vNormalTS, vLightTS )) * cDiffuseColor;
+
+	// Compute specular component:
+	float3 vReflectionTS = normalize( 2 * dot( vViewTS, vNormalTS ) * vNormalTS - vViewTS );
+
+	float fRdotL = dot( vReflectionTS, vLightTS );
+
+	float4 cSpecular = saturate( pow( fRdotL, fSpecularExponent )) * cSpecularColor;
+
+	float4 cFinalColor = (( cAmbientColor + cDiffuse ) * cBaseColor + cSpecular ) * fOcclusionShadow; 
+
+	return cFinalColor;
+} 
+
+//...........................................................................................
+// Function:    ps_main
+//
+// Description: Computes pixel illumination result due to applying parallax occlusion mapping 
+//              to simulation of view-dependent surface displacement for a given height map 
+//...........................................................................................
+float4 main( PS_INPUT i ) : COLOR0
+{   
+	int nMinSamples = g_ParallaxParms.x;
+	int nMaxSamples = g_ParallaxParms.y;
+
+	//  Normalize the interpolated vectors:
+	float3 vViewTS   = normalize( i.vViewTS  );
+	float3 vViewWS   = normalize( i.vViewWS  );
+//	float3 vLightTS  = normalize( i.vLightTS );
+	float3 vNormalWS = normalize( i.vNormalWS );
+
+	float4 cResultColor = float4( 0, 0, 0, 1 );
+
+	// Compute all the derivatives:
+	float2 dx = ddx( i.texCoord );
+	float2 dy = ddy( i.texCoord );
+
+	//===============================================//
+	// Parallax occlusion mapping offset computation //
+	//===============================================//
+
+	// Utilize dynamic flow control to change the number of samples per ray 
+	// depending on the viewing angle for the surface. Oblique angles require 
+	// smaller step sizes to achieve more accurate precision for computing displacement.
+	// We express the sampling rate as a linear function of the angle between 
+	// the geometric normal and the view direction ray:
+	int nNumSteps = (int) lerp( nMaxSamples, nMinSamples, dot( vViewWS, vNormalWS ) );
+
+	// Intersect the view ray with the height field profile along the direction of
+	// the parallax offset ray (computed in the vertex shader. Note that the code is
+	// designed specifically to take advantage of the dynamic flow control constructs
+	// in HLSL and is very sensitive to specific syntax. When converting to other examples,
+	// if still want to use dynamic flow control in the resulting assembly shader,
+	// care must be applied.
+	// 
+	// In the below steps we approximate the height field profile as piecewise linear
+	// curve. We find the pair of endpoints between which the intersection between the 
+	// height field profile and the view ray is found and then compute line segment
+	// intersection for the view ray and the line segment formed by the two endpoints.
+	// This intersection is the displacement offset from the original texture coordinate.
+	// See the above paper for more details about the process and derivation.
+	//
+	float fCurrHeight = 0.0;
+	float fStepSize   = 1.0 / (float) nNumSteps;
+	float fPrevHeight = 1.0;
+	float fNextHeight = 0.0;
+
+	int    nStepIndex = 0;
+	bool   bCondition = true;
+
+	float2 vTexOffsetPerStep = fStepSize * i.vParallaxOffsetTS;
+	float2 vTexCurrentOffset = i.texCoord;
+	float  fCurrentBound     = 1.0;
+	float  fParallaxAmount   = 0.0;
+
+	float2 pt1 = 0;
+	float2 pt2 = 0;
+
+	float2 texOffset2 = 0;
+
+	while ( nStepIndex < nNumSteps ) 
+	{
+		vTexCurrentOffset -= vTexOffsetPerStep;
+
+		// Sample height map which in this case is stored in the alpha channel of the normal map:
+		fCurrHeight = tex2Dgrad( tNormalMap, vTexCurrentOffset, dx, dy ).a;
+
+		fCurrentBound -= fStepSize;
+
+		if ( fCurrHeight > fCurrentBound ) 
+		{     
+			pt1 = float2( fCurrentBound, fCurrHeight );
+			pt2 = float2( fCurrentBound + fStepSize, fPrevHeight );
+
+			texOffset2 = vTexCurrentOffset - vTexOffsetPerStep;
+
+			nStepIndex = nNumSteps + 1;
+		}
+		else
+		{
+			nStepIndex++;
+			fPrevHeight = fCurrHeight;
+		}
+	}   // End of while ( nStepIndex < nNumSteps )
+
+	float fDelta2 = pt2.x - pt2.y;
+	float fDelta1 = pt1.x - pt1.y;
+	fParallaxAmount = (pt1.x * fDelta2 - pt2.x * fDelta1 ) / ( fDelta2 - fDelta1 );
+
+	float2 vParallaxOffset = i.vParallaxOffsetTS * (1 - fParallaxAmount );
+
+	// The computed texture offset for the displaced point on the pseudo-extruded surface:
+	float2 texSample = i.texCoord - vParallaxOffset;
+
+//	float2 vLightRayTS = vLightTS.xy * fHeightMapRange;
+
+	// Compute the soft blurry shadows taking into account self-occlusion for features of the height
+	// field:
+
+//	float sh0 =  tex2Dgrad( tNormalMap, texSample, dx, dy ).a;
+//	float shA = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.88, dx, dy ).a - sh0 - 0.88 ) *  1 * fShadowSoftening;
+//	float sh9 = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.77, dx, dy ).a - sh0 - 0.77 ) *  2 * fShadowSoftening;
+//	float sh8 = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.66, dx, dy ).a - sh0 - 0.66 ) *  4 * fShadowSoftening;
+//	float sh7 = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.55, dx, dy ).a - sh0 - 0.55 ) *  6 * fShadowSoftening;
+//	float sh6 = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.44, dx, dy ).a - sh0 - 0.44 ) *  8 * fShadowSoftening;
+//	float sh5 = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.33, dx, dy ).a - sh0 - 0.33 ) * 10 * fShadowSoftening;
+//	float sh4 = (tex2Dgrad( tNormalMap, texSample + vLightRayTS * 0.22, dx, dy ).a - sh0 - 0.22 ) * 12 * fShadowSoftening;
+
+	// Compute the actual shadow strength:
+//	float fOcclusionShadow = 1 - max( max( max( max( max( max( shA, sh9 ), sh8 ), sh7 ), sh6 ), sh5 ), sh4 );
+
+	// The previous computation overbrightens the image, let's adjust for that:
+//	fOcclusionShadow = fOcclusionShadow * 0.6 + 0.4; 
+
+	// Compute resulting color for the pixel:
+//	cResultColor = ComputeIllumination( texSample, vLightTS, vViewTS, fOcclusionShadow );
+
+	//   cResultColor.xyz = ( float )nNumSteps / nMaxSamples;
+	//cResultColor.xyz = float3( vTexOffsetPerStep, 0.0f );
+	cResultColor.xyz = tex2Dgrad( tNormalMap, texSample, dx, dy ).rgb;
+	cResultColor.a = 1.0f;
+
+//	cResultColor.xyz = float3( vParallaxOffset * 10.0, 0.0f );
+//	cResultColor.xyz = ( float3 )fParallaxAmount * .1f;
+	//	cResultColor.xyz = float3( i.texCoord - ( int2 )i.texCoord, 0.0f );
+//	cResultColor.xyz = i.vViewTS;
+//	cResultColor.xyz = i.vNormalWS.xyz;
+//	cResultColor.xyz = float3( i.vParallaxOffsetTS * 10.0f, 0.0f );
+//	cResultColor = i.vDebug;
+//	cResultColor.xyz = ( float3 )tex2Dgrad( tNormalMap, texSample, dx, dy ).a;
+//	cResultColor.xyz = float3( vTexOffsetPerStep * 10.0f, 0.0f );
+
+
+//	cResultColor = float4( 1.0f, 0.0f, 0.0f, 1.0f );
+
+	return cResultColor;
+
+}   // End of float4 ps_main(..) 
+
+#if 0
+struct PS_INPUT
+{
+	float2 texCoord          : TEXCOORD0;
+//	float3 vLightTS          : TEXCOORD1_centroid;   // light vector in tangent space, denormalized
+	float3 vViewTS           : TEXCOORD2_centroid;   // view vector in tangent space, denormalized
+	float2 vParallaxOffsetTS : TEXCOORD3_centroid;   // Parallax offset vector in tangent space
+	float3 vNormalWS         : TEXCOORD4_centroid;   // Normal vector in world space
+	float3 vViewWS           : TEXCOORD5_centroid;   // View vector in world space
+};
+#endif

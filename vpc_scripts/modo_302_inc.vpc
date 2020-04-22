@@ -1,0 +1,72 @@
+//-----------------------------------------------------------------------------
+//	modo_302_inc.vpc
+//
+//	Include files for Modo 302
+//-----------------------------------------------------------------------------
+
+$Project
+{
+	$Folder	"Modo 302 Headers"
+	{
+$File "$SRCDIR/common/modo/302/lxaction.h"
+$File "$SRCDIR/common/modo/302/lxcom.h"
+$File "$SRCDIR/common/modo/302/lxcommand.h"
+$File "$SRCDIR/common/modo/302/lxenvelope.h"
+$File "$SRCDIR/common/modo/302/lxidef.h"
+$File "$SRCDIR/common/modo/302/lximage.h"
+$File "$SRCDIR/common/modo/302/lxio.h"
+$File "$SRCDIR/common/modo/302/lxitem.h"
+$File "$SRCDIR/common/modo/302/lxitem1.h"
+$File "$SRCDIR/common/modo/302/lxlayer.h"
+$File "$SRCDIR/common/modo/302/lxlog.h"
+$File "$SRCDIR/common/modo/302/lxmesh.h"
+$File "$SRCDIR/common/modo/302/lxmeshOLD.h"
+$File "$SRCDIR/common/modo/302/lxmessage.h"
+$File "$SRCDIR/common/modo/302/lxresult.h"
+$File "$SRCDIR/common/modo/302/lxsel.h"
+$File "$SRCDIR/common/modo/302/lxserver.h"
+$File "$SRCDIR/common/modo/302/lxshade.h"
+$File "$SRCDIR/common/modo/302/lxu_format.hpp"
+$File "$SRCDIR/common/modo/302/lxu_parser.hpp"
+$File "$SRCDIR/common/modo/302/lxu_scene.hpp"
+$File "$SRCDIR/common/modo/302/lxu_uservalue.hpp"
+$File "$SRCDIR/common/modo/302/lxvalue.h"
+$File "$SRCDIR/common/modo/302/lxvector.h"
+$File "$SRCDIR/common/modo/302/lxvmath.h"
+$File "$SRCDIR/common/modo/302/lxw_action.hpp"
+$File "$SRCDIR/common/modo/302/lxw_command.hpp"
+$File "$SRCDIR/common/modo/302/lxw_envelope.hpp"
+$File "$SRCDIR/common/modo/302/lxw_image.hpp"
+$File "$SRCDIR/common/modo/302/lxw_io.hpp"
+$File "$SRCDIR/common/modo/302/lxw_item.hpp"
+$File "$SRCDIR/common/modo/302/lxw_layer.hpp"
+$File "$SRCDIR/common/modo/302/lxw_log.hpp"
+$File "$SRCDIR/common/modo/302/lxw_mesh.hpp"
+$File "$SRCDIR/common/modo/302/lxw_message.hpp"
+$File "$SRCDIR/common/modo/302/lxw_server.hpp"
+$File "$SRCDIR/common/modo/302/lxw_value.hpp"
+$File "$SRCDIR/common/modo/302/lx_action.hpp"
+$File "$SRCDIR/common/modo/302/lx_command.hpp"
+$File "$SRCDIR/common/modo/302/lx_envelope.hpp"
+$File "$SRCDIR/common/modo/302/lx_image.hpp"
+$File "$SRCDIR/common/modo/302/lx_io.hpp"
+$File "$SRCDIR/common/modo/302/lx_item.hpp"
+$File "$SRCDIR/common/modo/302/lx_log.hpp"
+$File "$SRCDIR/common/modo/302/lx_mesh.hpp"
+$File "$SRCDIR/common/modo/302/lx_message.hpp"
+$File "$SRCDIR/common/modo/302/lx_server.hpp"
+$File "$SRCDIR/common/modo/302/lx_util.hpp"
+$File "$SRCDIR/common/modo/302/lx_value.hpp"
+$File "$SRCDIR/common/modo/302/lx_visitor.hpp"
+$File "$SRCDIR/common/modo/302/lx_wrap.hpp"
+	}
+
+	$Folder "Modo 302 Common Files"
+	{
+		$File	"$SRCDIR\common\modo\302\common\cwrap.cpp"
+		$File	"$SRCDIR\common\modo\302\common\lxu_format.cpp"
+		$File	"$SRCDIR\common\modo\302\common\lxu_parser.cpp"
+		$File	"$SRCDIR\common\modo\302\common\lxu_scene.cpp"
+		$File	"$SRCDIR\common\modo\302\common\lxu_uservalue.cpp"
+	}
+}

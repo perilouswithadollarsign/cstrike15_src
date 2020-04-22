@@ -1,0 +1,25 @@
+//===== Copyright © 1996-2008, Valve Corporation, All rights reserved. ======//
+#ifndef SHADERAPI_ISHADERSHADOW_DECLARATIONS_H
+#define SHADERAPI_ISHADERSHADOW_DECLARATIONS_H
+
+enum ShaderFogMode_t
+{
+	SHADER_FOGMODE_DISABLED = 0,
+	SHADER_FOGMODE_OO_OVERBRIGHT,
+	SHADER_FOGMODE_BLACK,
+	SHADER_FOGMODE_GREY,
+	SHADER_FOGMODE_FOGCOLOR,
+	SHADER_FOGMODE_WHITE,
+	SHADER_FOGMODE_NUMFOGMODES
+};
+
+// m_ZBias has only two bits in ShadowState_t, so be careful extending this enum
+enum PolygonOffsetMode_t
+{
+	SHADER_POLYOFFSET_DISABLE		= 0x0,
+	SHADER_POLYOFFSET_DECAL			= 0x1,
+	SHADER_POLYOFFSET_SHADOW_BIAS	= 0x2,
+	SHADER_POLYOFFSET_RESERVED		= 0x3	// Reserved for future use
+};
+
+#endif

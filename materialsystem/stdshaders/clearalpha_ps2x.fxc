@@ -1,0 +1,8 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+const float4 g_vClearVal : register( c0 );
+
+float4 main() : COLOR
+{
+	return g_vClearVal;
+}

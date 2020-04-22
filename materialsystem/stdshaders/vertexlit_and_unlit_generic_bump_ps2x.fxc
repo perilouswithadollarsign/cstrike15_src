@@ -1,0 +1,623 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "SFM"						"0..0" [ps20] [ps20b] [PC]
+// STATIC: "SFM"						"0..1" [ps30] [PC]
+// STATIC: "SFM"						"0..0" [CONSOLE]
+
+// STATIC: "CUBEMAP"					"0..1"
+// STATIC: "DIFFUSELIGHTING"			"0..1"
+// STATIC: "LIGHTWARPTEXTURE"			"0..1"
+// STATIC: "SELFILLUM"					"0..1"
+// STATIC: "SELFILLUMFRESNEL"			"0..1"
+// STATIC: "NORMALMAPALPHAENVMAPMASK"	"0..1"
+// STATIC: "HALFLAMBERT"				"0..0"
+// STATIC: "FLASHLIGHT"					"0..1"						
+// STATIC: "DETAILTEXTURE"				"0..1"
+// STATIC: "DETAIL_BLEND_MODE"      	"0..7"
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..3"						[ps20b] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..2"						[ps30] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..1"						[ps20b] [CONSOLE]
+// STATIC: "SHADER_SRGB_READ"			"0..1"						[XBOX]
+// STATIC: "SHADER_SRGB_READ"			"0..0"						[PC]
+// STATIC: "SHADER_SRGB_READ"			"0..0"						[SONYPS3]
+// STATIC: "WORLD_NORMAL"				"0..0"						[ps20] [PC]
+// STATIC: "WORLD_NORMAL"				"0..0"						[ps20b] [PC]
+// STATIC: "WORLD_NORMAL"				"0..1"						[ps30] [PC]
+// STATIC: "WORLD_NORMAL"				"0..0"						[CONSOLE]
+
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[CONSOLE]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..0"	[ps20] [PC]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[ps20b] [ps30] [PC]
+// STATIC: "CSM_MODE"					"0..0"	[CONSOLE]
+// STATIC: "CSM_MODE"					"0..0"	[ps20] [ps20b] [PC]
+// STATIC: "CSM_MODE"					"0..3"	[ps30] [PC]
+
+// STATIC: "DECAL_BLEND_MODE"           "0..2"
+
+// STATIC: "TINTMASKTEXTURE"			"0..1"	[ps30]
+// STATIC: "TINTMASKTEXTURE"			"0..0"	[ps20] [ps20b]
+// STATIC: "TINTMASKTEXTURE"			"0..0"	[CONSOLE]
+
+// DYNAMIC: "WRITEWATERFOGTODESTALPHA"	"0..1"
+// DYNAMIC: "NUM_LIGHTS"				"0..2"						[ps20]
+// DYNAMIC: "NUM_LIGHTS"				"0..4"						[ps20b] [CONSOLE]
+// DYNAMIC: "NUM_LIGHTS"				"0..2"						[ps20b] [PC]
+// DYNAMIC: "NUM_LIGHTS"				"0..4"						[ps30]
+// DYNAMIC: "AMBIENT_LIGHT"				"0..1"
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"						[ps20b]
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"						[ps30] [PC]
+
+// DYNAMIC: "UBERLIGHT"					"0..1"	[ps30] [PC]
+
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[CONSOLE]
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[ps20b] [PC]
+// DYNAMIC: "CASCADE_SIZE"				"0..0"	[ps20] [ps30] [PC]
+
+// DYNAMIC: "STATICLIGHT3"				"0..0"						[CONSOLE]
+// DYNAMIC: "STATICLIGHT3"				"0..0"						[ps20] [PC]
+// DYNAMIC: "STATICLIGHT3"				"0..1"						[ps20b] [ps30] [PC]
+
+
+// SKIP: ( $SFM == 0 ) && ( $UBERLIGHT == 1 )
+
+// We don't use light combos when doing the flashlight
+// SKIP: ( $FLASHLIGHT != 0 ) && ( $NUM_LIGHTS > 0 )				[PC]
+
+// We don't care about flashlight depth unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )		[ps20b]
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )		[ps30]
+
+// We don't care about uberlight unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $UBERLIGHT == 1 )	[ps30]
+
+// SKIP: (! $DETAILTEXTURE) && ( $DETAIL_BLEND_MODE != 0 )
+
+// Don't do diffuse warp on flashlight
+
+// Only warp diffuse if we have it at all
+// SKIP: ( $DIFFUSELIGHTING == 0 ) && ( $LIGHTWARPTEXTURE == 1 )
+
+// Skip this since it blows ps20 instruction limits
+// SKIP: ( $SELFILLUMFRESNEL == 1 ) && ( $LIGHTWARPTEXTURE == 1 )
+
+// Only need self illum fresnel when self illum enabled
+// SKIP: ( $SELFILLUM == 0 ) && ( $SELFILLUMFRESNEL == 1 )
+// SKIP: ( $FLASHLIGHT == 1 ) && ( $SELFILLUMFRESNEL == 1 )			[PC]
+// SKIP: ( $SELFILLUMFRESNEL == 1 ) && ( $DETAILTEXTURE == 1 )
+// SKIP: ( $SELFILLUMFRESNEL == 1 ) && ( $NORMALMAPALPHAENVMAPMASK == 1 )
+
+// Only do world normals in constrained case
+// SKIP: ( $WORLD_NORMAL == 1 ) && ( $FLASHLIGHTSHADOWS != 0 ) && ( $AMBIENT_LIGHT != 0 ) && ( $NUM_LIGHTS != 0 ) [ps30]
+
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CASCADE_SIZE != 0 ) 
+// SKIP: ( $CASCADED_SHADOW_MAPPING != 0 ) && ( $SFM != 0 ) 
+// SKIP: ( $CASCADED_SHADOW_MAPPING != 0 ) && ( $FLASHLIGHT != 0 ) 
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CSM_MODE != 0 ) 
+
+#include "common_fog_ps_supportsvertexfog_fxc.h"
+#include "shader_constant_register_map.h"
+#include "common_flashlight_fxc.h"
+#include "common_vertexlitgeneric_dx9.h"
+#include "common_decaltexture_fxc.h"
+
+
+const float4 g_EnvmapTint					: register( c0 );
+const float4 g_DiffuseModulation			: register( c1 );
+const float4 g_ShadowTweaks					: register( c2 );
+const float4 g_EnvmapParams					: register( c19 );
+#define g_EnvmapContrast g_EnvmapParams.x
+//#define g_DiffuseCubemapScale g_EnvmapParams.y
+//#define g_fvDiffuseCubemapMin g_EnvmapParams.z
+//#define g_fvDiffuseCubemapMax g_EnvmapParams.w
+#if defined( SHADER_MODEL_PS_2_B )
+#define g_vCSMLightColor g_EnvmapParams.yzw	// squeezing CSM light color here for blending, only remaining free slots for OSX/ps2b
+#endif
+const float4 g_EnvmapSaturation_DecalTextureScale	: register( c3 );
+#define g_EnvmapSaturation (g_EnvmapSaturation_DecalTextureScale.rgb)
+#define g_flDecalTextureScale (g_EnvmapSaturation_DecalTextureScale.a)
+const float4 g_SelfIllumTint_and_BlendFactor: register( c4 );
+#define g_SelfIllumTint ( g_SelfIllumTint_and_BlendFactor.rgb)
+#define g_DetailBlendFactor (g_SelfIllumTint_and_BlendFactor.w)
+
+
+const float3 cAmbientCube[6]				: register( c5 );
+
+// 11, 12 not used?
+#if ( SELFILLUMFRESNEL == 1 )
+ const float4 g_SelfIllumScaleBiasExpBrightness	: register( c11 );
+#endif
+
+const float4 g_ShaderControls				: register( c12 );
+#define g_fInverseBlendTintByBaseAlpha		g_ShaderControls.x
+#define g_fWriteDepthToAlpha				g_ShaderControls.y
+//#define g_fWriteWaterFogToDestAlpha		g_ShaderControls.z
+#define g_fEnvMapMaskInTintMaskTexture		g_ShaderControls.w
+
+
+// 2 registers each - 4 registers total when using csm's and ps_2_b, 6 registers total otherwise, (4th light spread across w's)
+#if defined( SHADER_MODEL_PS_2_B ) && ( CASCADED_SHADOW_MAPPING )
+PixelShaderLightInfo cLightInfo[2]			: register( c13 );  // through c16
+#else
+PixelShaderLightInfo cLightInfo[3]			: register( c13 );  // through c18
+#endif
+
+const float4 g_EyePos_BaseTextureTranslucency : register( c20 );
+const float4 g_FogParams					: register( c21 );
+
+#define g_EyePos g_EyePos_BaseTextureTranslucency.xyz
+
+const float4 g_FlashlightAttenuationFactors	: register( c22 );
+const float3 g_FlashlightPos				: register( c23 );
+const float4x4 g_FlashlightWorldToTexture	: register( c24 ); // through c27
+
+#if ( UBERLIGHT )
+const float3 g_vSmoothEdge0					: register( PSREG_UBERLIGHT_SMOOTH_EDGE_0 );		// ps_3_0 and up (over 32 registers)
+const float3 g_vSmoothEdge1					: register( PSREG_UBERLIGHT_SMOOTH_EDGE_1 );
+const float3 g_vSmoothOneOverWidth			: register( PSREG_UBERLIGHT_SMOOTH_EDGE_OOW );
+const float4 g_vShearRound					: register( PSREG_UBERLIGHT_SHEAR_ROUND );
+const float4 g_aAbB							: register( PSREG_UBERLIGHT_AABB );
+const float4x4 g_FlashlightWorldToLight		: register( PSREG_UBERLIGHT_WORLD_TO_LIGHT );
+#endif
+
+sampler BaseTextureSampler					: register( s0 );
+samplerCUBE EnvmapSampler					: register( s1 );
+sampler DetailSampler						: register( s2 );
+sampler BumpmapSampler						: register( s3 );
+sampler EnvmapMaskSampler					: register( s4 );
+samplerCUBE NormalizeSampler				: register( s5 );
+sampler RandRotSampler						: register( s6 );	// RandomRotation sampler
+sampler FlashlightSampler					: register( s7 );
+sampler ShadowDepthSampler					: register( s8 );	// Flashlight shadow depth map sampler
+sampler DiffuseWarpSampler					: register( s9 );	// Lighting warp sampler (1D texture for diffuse lighting modification)
+
+#if ( DECAL_BLEND_MODE != 2 )
+	sampler DecalSampler					: register( s12 );
+#endif
+
+#if ( TINTMASKTEXTURE )
+	sampler TintMaskSampler		: register( s13 );
+#endif
+
+#if defined(_PS3)
+// Needed for optimal shadow filter code generation on PS3.
+#pragma texformat ShadowDepthSampler DEPTH_COMPONENT24
+#endif
+
+#if defined( _PS3 )
+// Causes the Cg compiler to automatically produce _bx2 modifier on the texture load instead of producing a MAD to range expand the vector, saving one instruction.
+#pragma texsign BumpmapSampler
+#pragma texformat BumpmapSampler RGBA8
+#endif
+
+struct PS_INPUT
+{
+	float4 baseTexCoord_baseTexCoord2					: TEXCOORD0;	// Base texture coordinates in .xy, 2nd (decal) uv set in .zw
+	float4 bumpTexCoord_detailTexCoord					: TEXCOORD1;	
+
+	float4 vWorldNormal_fogFactorW						: TEXCOORD2;	// world space normal in .xyz, fog factor in .w
+	float4 vWorldTangent								: TEXCOORD3;	// world tangent in .xyz, tangent sign in .w 
+
+	float4 vWorldPos_linearDepth						: TEXCOORD4;	// world pos in .xyz, view space linear depth in w
+	float4 vProjPos										: TEXCOORD5;	// proj pos .xyzw
+
+#if defined( SHADER_MODEL_PS_3_0 )
+	float4 staticLight0									: TEXCOORD6;	// STATICLIGHT3 output basis 0 in .xyz, sun percent in .w
+	float4 staticLight1									: TEXCOORD7;	// STATICLIGHT3 output basis 1 in .xyz
+	float4 staticLight2									: TEXCOORD8;	// STATICLIGHT3 output basis 2 in .xyz
+	float4 lightAtten									: TEXCOORD9;	// light attenuation for 4 lights
+#else
+	float4 csmXform0or1_csmXform2						: TEXCOORD6;	// csm lightToWorldxformcascade0 or 1.xy in .xy lightToWorldxformcascade2.xy in .zw
+	float4 staticLight_csmXform0z						: TEXCOORD7;	// STATICLIGHT3 average rgb in .xyz, csm lightToWorldxformcascade0.z in .w
+	float4 lightAtten									: COLOR0;		// light attenuation for lights 0 and 1 in .xy (lower precision for sm2_b/OSX), sun percent in .w
+#endif
+
+#if defined( _GAMECONSOLE ) && FLASHLIGHT
+	float4 flashlightSpacePos							: TEXCOORD8;
+#endif
+
+#if defined( _X360 )
+	float2 vScreenPos : VPOS;
+#endif
+};
+
+#if defined( _X360 ) || defined( _PS3 )
+	#define SINGLE_PASS_FLASHLIGHT 1
+#else
+	#define SINGLE_PASS_FLASHLIGHT 0
+#endif
+
+#define FLASHLIGHT_ONLY ( FLASHLIGHT && !SINGLE_PASS_FLASHLIGHT )
+
+#if ( CASCADED_SHADOW_MAPPING ) && !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+	const bool g_bCSMEnabled : register(b0);
+	#undef CASCADE_SIZE
+	#define CASCADE_SIZE 1
+#endif
+
+#if ( ( !SFM ) && ( !FLASHLIGHT_ONLY ) && ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) )
+	#define CSM_ENABLED 1
+#else
+	#define CSM_ENABLED 0	
+#endif
+
+#if ( CSM_ENABLED )
+
+	sampler CSMDepthAtlasSampler : register( s15 );
+	
+	#if defined(_PS3)
+		// Needed for optimal shadow filter code generation on PS3.
+		#pragma texformat CSMDepthAtlasSampler DEPTH_COMPONENT24
+	#endif
+	
+	#if defined( SHADER_MODEL_PS_2_B )
+		#define CSM_VERTEXLIT_AND_UNLIT_GENERIC_BUMP
+	#endif
+
+	#include "csm_common_fxc.h"
+#endif
+
+
+//
+// Accumulate all dynamic lights other than the 0th/CSM light which has already been added to the static lighting term (since it was computed in bump basis space).
+//
+float3 PixelShaderDoLighting_STATIC3( const float3 worldPos, const float3 worldNormal, const float4 lightAtten,
+											in samplerCUBE NormalizeSampler, const int nNumLights, PixelShaderLightInfo llightInfo[3], const bool bHalfLambert,
+											const bool bDoLightingWarp, in sampler lightWarpSampler )
+{
+	float3 linearColor = 0.0f;
+
+	if ( nNumLights > 1 )
+	{
+		linearColor += PixelShaderDoGeneralDiffuseLight( lightAtten.y, worldPos, worldNormal, NormalizeSampler,
+															llightInfo[1].pos.xyz, llightInfo[1].color.rgb, bHalfLambert,
+															bDoLightingWarp, lightWarpSampler );
+		if ( nNumLights > 2 )
+		{
+			linearColor += PixelShaderDoGeneralDiffuseLight( lightAtten.z, worldPos, worldNormal, NormalizeSampler,
+																llightInfo[2].pos.xyz, llightInfo[2].color.rgb, bHalfLambert,
+																bDoLightingWarp, lightWarpSampler );
+			if ( nNumLights > 3 )
+			{
+				// Unpack the 4th light's data from tight constant packing
+				float3 vLight3Color = float3( llightInfo[0].color.w, llightInfo[0].pos.w, llightInfo[1].color.w );
+				float3 vLight3Pos = float3( llightInfo[1].pos.w, llightInfo[2].color.w, llightInfo[2].pos.w );
+				linearColor += PixelShaderDoGeneralDiffuseLight( lightAtten.w, worldPos, worldNormal, NormalizeSampler,
+																	vLight3Pos, vLight3Color, bHalfLambert,
+																	bDoLightingWarp, lightWarpSampler );
+			}
+		}
+	}
+
+	return linearColor;
+}
+
+
+float Luminance( float3 cColor )
+{
+	// Formula for calculating luminance based on NTSC standard
+	return dot( cColor.rgb, float3( 0.2125, 0.7154, 0.0721 ) );
+}
+
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	bool bCubemap = CUBEMAP ? true : false;
+	bool bDiffuseLighting = DIFFUSELIGHTING ? true : false;
+	bool bDoDiffuseWarp = LIGHTWARPTEXTURE ? true : false;
+	bool bSelfIllum = SELFILLUM ? true : false;
+	bool bNormalMapAlphaEnvmapMask = NORMALMAPALPHAENVMAPMASK ? true : false;
+	bool bHalfLambert = HALFLAMBERT ? true : false;
+	bool bAmbientLight = AMBIENT_LIGHT ? true : false;
+	bool bDetailTexture = DETAILTEXTURE ? true : false;
+	int nNumLights = NUM_LIGHTS;
+	
+	float3 vWorldNormal = i.vWorldNormal_fogFactorW.xyz;
+	float3 vWorldBinormal = cross( vWorldNormal, i.vWorldTangent.xyz ) * i.vWorldTangent.w;
+
+	float4 baseColor = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+	baseColor = tex2Dsrgb( BaseTextureSampler, i.baseTexCoord_baseTexCoord2.xy );
+
+	#if DETAILTEXTURE
+		float4 detailColor = tex2D( DetailSampler, i.bumpTexCoord_detailTexCoord.zw );
+		baseColor = TextureCombine( baseColor, detailColor, DETAIL_BLEND_MODE, g_DetailBlendFactor );
+	#endif
+
+	float specularFactor = 1.0f;
+	float4 normalTexel = tex2D( BumpmapSampler, i.bumpTexCoord_detailTexCoord.xy );
+	float3 tangentSpaceNormal = normalTexel.xyz * 2.0f - 1.0f;
+
+	if ( bNormalMapAlphaEnvmapMask )
+		specularFactor = normalTexel.a;
+
+	float flDirectionalShadow = 1.0f;		
+	#if ( CSM_ENABLED )
+	{
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+		if ( g_bCSMEnabled )
+		{
+#endif	
+
+#if !defined( _X360 ) && !defined( _PS3 ) && defined( SHADER_MODEL_PS_2_B )
+			flDirectionalShadow = CSMComputeShadowing( i.vWorldPos_linearDepth.xyz, i.csmXform0or1_csmXform2.xy, i.csmXform0or1_csmXform2.zw, i.staticLight_csmXform0z.w );
+#elif defined( SHADER_MODEL_PS_3_0 )
+			flDirectionalShadow = CSMComputeShadowing( i.vWorldPos_linearDepth.xyz );
+#endif
+
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+		}
+#endif				
+	}
+	#endif
+		
+	float3 diffuseLighting = float3( 1.0f, 1.0f, 1.0f );
+	float3 worldSpaceNormal = float3( 0.0f, 0.0f, 1.0f );
+	if ( bDiffuseLighting )
+	{
+		worldSpaceNormal = Vec3TangentToWorld( tangentSpaceNormal.xyz, vWorldNormal, i.vWorldTangent.xyz, vWorldBinormal );
+
+		#if ( defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0) )
+			worldSpaceNormal = normalize( worldSpaceNormal );
+		#else
+			worldSpaceNormal = NormalizeWithCubemap( NormalizeSampler, worldSpaceNormal );
+		#endif
+
+		float4 staticLighting = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+
+		// static lighting
+		#if STATICLIGHT3
+
+			#if defined( SHADER_MODEL_PS_3_0 )
+
+				float3 dp;
+
+				dp.x = saturate( dot( tangentSpaceNormal, bumpBasis[0] ) );
+				dp.y = saturate( dot( tangentSpaceNormal, bumpBasis[1] ) );
+				dp.z = saturate( dot( tangentSpaceNormal, bumpBasis[2] ) );
+				dp *= dp;
+
+				staticLighting.rgb = dp.x * i.staticLight0.rgb + 
+									 dp.y * i.staticLight1.rgb + 
+									 dp.z * i.staticLight2.rgb;
+				float sum = dot( dp, float3(1.0f, 1.0f, 1.0f) );
+
+				#if ( CSM_ENABLED )
+				{
+					if ( g_bCSMEnabled )
+					{
+						float flSunAmount = i.staticLight0.a + i.staticLight1.a + i.staticLight2.a;
+
+						if ( flSunAmount > 0.0f )
+						{
+							// explicitly add direct term from the CSM light
+							staticLighting.rgb += g_vCSMLightColor.rgb * ( dp.x * i.staticLight0.a + dp.y * i.staticLight1.a + dp.z * i.staticLight2.a ) * flDirectionalShadow;
+						}
+					}
+				}
+				#endif
+
+				staticLighting.rgb /= sum;
+
+			#else
+
+				staticLighting.rgb = i.staticLight_csmXform0z.rgb;
+
+				#if ( CSM_ENABLED )
+				{
+					float flSunAmount = i.lightAtten.w;
+
+					float3 direct = flSunAmount * g_vCSMLightColor.rgb;
+
+					// add direct term
+					staticLighting.rgb += direct * flDirectionalShadow;
+				}
+				#endif
+
+			#endif
+
+			if ( bDoDiffuseWarp )
+			{
+				float fDiffuseScale = 0.5 * length( staticLighting.rgb );
+				staticLighting.rgb *= 2.0 * tex2D( DiffuseWarpSampler, float2( fDiffuseScale, 0 ) );
+			}
+
+			// dynamic lighting
+			#if defined( SHADER_MODEL_PS_3_0 )
+				diffuseLighting = PixelShaderDoLighting_STATIC3( i.vWorldPos_linearDepth.xyz, worldSpaceNormal, i.lightAtten, 
+					NormalizeSampler, nNumLights, cLightInfo, bHalfLambert,
+					bDoDiffuseWarp, DiffuseWarpSampler );
+			#elif defined( SHADER_MODEL_PS_2_B )
+				// work around overlapping registers c17. c18, since we're using those slots for csm data
+				// and would like to avoid adding a number of extra protos using PixelShaderLightInfo [2] instead of [3]
+				// copy to local
+				PixelShaderLightInfo lightInfo[3]; 
+
+				lightInfo[0]		= cLightInfo[0];
+				lightInfo[1]		= cLightInfo[1];
+				lightInfo[2].pos	= float4( 0.0, 0.0, 0.0, 0.0 );
+				lightInfo[2].color	= float4( 0.0, 0.0, 0.0, 0.0 );
+
+				diffuseLighting = PixelShaderDoLighting_STATIC3( i.vWorldPos_linearDepth.xyz, worldSpaceNormal, i.lightAtten, 
+					NormalizeSampler, nNumLights, lightInfo, bHalfLambert,
+					bDoDiffuseWarp, DiffuseWarpSampler );
+			#endif
+
+			// static lighting in linear space (see VS) so okay to add here
+			diffuseLighting.rgb += staticLighting.rgb;
+
+		#else
+		
+			// dynamic lighting only
+			// First local light will always be forced to a directional light in CS:GO (see CanonicalizeMaterialLightingState() in shaderapidx8.cpp) - it may be completely black.
+			#if defined( SHADER_MODEL_PS_3_0 )
+				diffuseLighting = PixelShaderDoLighting( i.vWorldPos_linearDepth.xyz, worldSpaceNormal,
+					float3( 0.0f, 0.0f, 0.0f ), false, bAmbientLight, i.lightAtten,
+					cAmbientCube, NormalizeSampler, nNumLights, cLightInfo, bHalfLambert,
+					bDoDiffuseWarp, DiffuseWarpSampler, flDirectionalShadow );
+			#elif defined( SHADER_MODEL_PS_2_B )
+				// work around overlapping registers c17. c18, since we're using those slots for csm data
+				// and would like to avoid adding a number of extra protos using PixelShaderLightInfo [2] instead of [3]
+				// copy to local
+				PixelShaderLightInfo lightInfo[3]; 
+
+				lightInfo[0]		= cLightInfo[0];
+				lightInfo[1]		= cLightInfo[1];
+				lightInfo[2].pos	= float4( 0.0, 0.0, 0.0, 0.0 );
+				lightInfo[2].color	= float4( 0.0, 0.0, 0.0, 0.0 );
+
+				diffuseLighting = PixelShaderDoLighting( i.vWorldPos_linearDepth.xyz, worldSpaceNormal,
+					float3( 0.0f, 0.0f, 0.0f ), false, bAmbientLight, i.lightAtten,
+					cAmbientCube, NormalizeSampler, nNumLights, lightInfo, bHalfLambert,
+					bDoDiffuseWarp, DiffuseWarpSampler, flDirectionalShadow );
+			#endif
+
+		#endif
+	}
+
+	float3 albedo = float3( 1.0f, 1.0f, 1.0f );
+	float alpha = 1.0f;
+	albedo *= baseColor.xyz;
+	if ( !bSelfIllum )
+	{
+		alpha *= lerp( 1.0f, baseColor.a, g_EyePos_BaseTextureTranslucency.w );
+	}
+
+	#if ( FLASHLIGHT )
+	{
+		int nShadowSampleLevel = 0;
+		bool bDoShadows = false;
+		float2 vProjPos = float2(0, 0);
+
+		// On ps_2_b, we can do shadow mapping
+		#if ( FLASHLIGHTSHADOWS && (defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0) ) )
+			nShadowSampleLevel = FLASHLIGHTDEPTHFILTERMODE;
+			bDoShadows = FLASHLIGHTSHADOWS;
+			vProjPos = i.vProjPos.xy / i.vProjPos.w;	// Screen-space position for shadow map noise (projPos.xy / projPos.w)
+		#endif
+
+		worldSpaceNormal = Vec3TangentToWorldNormalized( tangentSpaceNormal.xyz, vWorldNormal, i.vWorldTangent.xyz, vWorldBinormal );
+
+		#if defined ( _GAMECONSOLE )
+			float4 flashlightSpacePosition = i.flashlightSpacePos;
+		#else
+			float4 flashlightSpacePosition = TransformFlashlightWorldToTexture( i.vWorldPos_linearDepth.xyz, g_FlashlightWorldToTexture );
+		#endif
+
+		float3 flashlightColor = DoFlashlight( g_FlashlightPos, i.vWorldPos_linearDepth.xyz, flashlightSpacePosition,
+			worldSpaceNormal, g_FlashlightAttenuationFactors.xyz, 
+			g_FlashlightAttenuationFactors.w, FlashlightSampler, ShadowDepthSampler,
+			RandRotSampler, nShadowSampleLevel, bDoShadows, vProjPos, false, g_ShadowTweaks );
+
+		#if ( UBERLIGHT )
+			float4 uberLightPosition = mul( float4( i.vWorldPos_linearDepth.xyz, 1.0f ), g_FlashlightWorldToLight ).yzxw;
+			flashlightColor *= uberlight( uberLightPosition.xyz, g_vSmoothEdge0, g_vSmoothEdge1,
+					           g_vSmoothOneOverWidth, g_vShearRound.xy, g_aAbB, g_vShearRound.zw );
+		#endif
+
+		#if defined ( _GAMECONSOLE )
+			diffuseLighting += flashlightColor;
+		#else
+			diffuseLighting += flashlightColor;
+		#endif
+	}
+	#endif
+	
+	#if ( DECAL_BLEND_MODE != 2 )
+		float3 decalLighting = diffuseLighting;
+	#endif
+
+	#if ( TINTMASKTEXTURE )
+		// Optionally use inverseblendtint texture to blend in the diffuse modulation (saturated add of g_fInverseBlendTintByBaseAlpha turns this on/off)
+		float4 tintMask = h4tex2Dsrgb( TintMaskSampler, i.baseTexCoord_baseTexCoord2.xy ); // use g channel since common use will be mono or dxt1 (greater precision in g).
+		// g_fInverseBlendTintByBaseAlpha will be 0 in this combo so that tintMask.g has an effect, or -1 if notint is set in the material
+		diffuseLighting *= lerp( float3( 1.0h, 1.0h, 1.0h ), g_DiffuseModulation.rgb, saturate( tintMask.g + g_fInverseBlendTintByBaseAlpha ) );
+		specularFactor = g_fEnvMapMaskInTintMaskTexture ? tintMask.r : specularFactor + 0;
+	#else
+		// Optionally use basealpha to blend in the diffuse modulation (saturated add of g_fInverseBlendTintByBaseAlpha turns this on/off)
+		diffuseLighting *= lerp( float3( 1.0f, 1.0f, 1.0f ), g_DiffuseModulation.rgb, saturate( baseColor.a + g_fInverseBlendTintByBaseAlpha ) );
+	#endif
+
+	alpha *= g_DiffuseModulation.a;
+
+	float3 diffuseComponent = albedo * diffuseLighting;
+
+	#if !FLASHLIGHT || defined ( _GAMECONSOLE )
+	if ( bSelfIllum )
+	{
+		#if ( SELFILLUMFRESNEL == 1 ) // To free up the constant register...see top of file
+			// This will apply a fresnel term based on the vertex normal (not the per-pixel normal!) to help fake and internal glow look
+		    #if ((defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0)))
+				float3 vEyeDir = normalize( g_EyePos - i.vWorldPos_linearDepth.xyz );
+				float3 vVertexNormal = normalize( vWorldNormal.xyz );
+				float flSelfIllumFresnel = ( pow( saturate( dot( vVertexNormal.xyz, vEyeDir ) ), g_SelfIllumScaleBiasExpBrightness.z ) * g_SelfIllumScaleBiasExpBrightness.x ) + g_SelfIllumScaleBiasExpBrightness.y;
+				float3 selfIllumComponent = g_SelfIllumTint * albedo * g_SelfIllumScaleBiasExpBrightness.w;
+				diffuseComponent = lerp( diffuseComponent, selfIllumComponent, baseColor.a * saturate( flSelfIllumFresnel ) );
+			#else
+				float3 vEyeDir = g_EyePos - i.vWorldPos_linearDepth.xyz; // this should be normalized, but we're out of PS2.0 instructions, and we should never be running this path for CSGO anyway
+				float3 vVertexNormal = vWorldNormal.xyz;
+				float flSelfIllumFresnel = ( pow( saturate( dot( vVertexNormal.xyz, vEyeDir ) ), g_SelfIllumScaleBiasExpBrightness.z ) * g_SelfIllumScaleBiasExpBrightness.x ) + g_SelfIllumScaleBiasExpBrightness.y;
+				float3 selfIllumComponent = g_SelfIllumTint * albedo * g_SelfIllumScaleBiasExpBrightness.w;
+				diffuseComponent = lerp( diffuseComponent, selfIllumComponent, baseColor.a * saturate( flSelfIllumFresnel ) );
+			#endif
+		#else
+			float3 selfIllumComponent = g_SelfIllumTint * albedo;
+			diffuseComponent = lerp( diffuseComponent, selfIllumComponent, baseColor.a );
+		#endif
+	}
+	#endif
+
+	float3 specularLighting = float3( 0.0f, 0.0f, 0.0f );
+	#if !FLASHLIGHT || defined ( _GAMECONSOLE )
+	if( bCubemap )
+	{
+		float3 vEyeDir = g_EyePos - i.vWorldPos_linearDepth.xyz;
+
+		worldSpaceNormal = Vec3TangentToWorld( tangentSpaceNormal.xyz, vWorldNormal, i.vWorldTangent.xyz, vWorldBinormal );
+
+		float3 reflectVect = CalcReflectionVectorUnnormalized( worldSpaceNormal, vEyeDir );
+
+		specularLighting = ENV_MAP_SCALE * texCUBE( EnvmapSampler, reflectVect ).rgb;
+		
+		specularLighting *= specularFactor;
+		specularLighting *= g_EnvmapTint.xyz;
+		float3 specularLightingSquared = specularLighting * specularLighting;
+		specularLighting = lerp( specularLighting, specularLightingSquared, g_EnvmapContrast );
+		float3 greyScale = dot( specularLighting, float3( 0.299f, 0.587f, 0.114f ) );
+		specularLighting = lerp( greyScale, specularLighting, g_EnvmapSaturation );
+	}
+	#endif
+
+	#if ( DECAL_BLEND_MODE != 2 )
+		float4 decalColor = tex2D( DecalSampler,  i.baseTexCoord_baseTexCoord2.zw );
+		decalColor.rgb *= g_flDecalTextureScale;
+		diffuseComponent = TextureCombineDecal( diffuseComponent, decalColor, decalLighting );
+	#endif
+
+	float3 result = diffuseComponent + specularLighting;
+
+	float flVertexFogFactor = 0.0f;
+	#if ( !HARDWAREFOGBLEND && !DOPIXELFOG )
+	{
+		flVertexFogFactor = i.vWorldNormal_fogFactorW.w;
+	}
+	#endif
+	float fogFactor = CalcPixelFogFactorSupportsVertexFog( PIXELFOGTYPE, g_FogParams, g_EyePos_BaseTextureTranslucency.xyz, i.vWorldPos_linearDepth.xyz, i.vWorldPos_linearDepth.w, flVertexFogFactor );
+
+	#if WRITEWATERFOGTODESTALPHA && (PIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT)
+	alpha = fogFactor;
+	#endif
+		
+	#if ( ( defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0) ) && WORLD_NORMAL )
+		// Vertex normal
+		return float4( normalize( vWorldNormal ), i.vWorldPos_linearDepth.w );
+	#else
+		float4_color_return_type vOutput = FinalOutput( float4( result.rgb, alpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, g_fWriteDepthToAlpha, i.vWorldPos_linearDepth.w );
+			
+		#if ( defined( _X360 ) )
+		{
+			vOutput.xyz += ScreenSpaceOrderedDither( i.vScreenPos );
+		}
+		#endif
+		
+		return vOutput;
+	#endif
+}

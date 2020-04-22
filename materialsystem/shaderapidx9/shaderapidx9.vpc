@@ -1,0 +1,89 @@
+//-----------------------------------------------------------------------------
+//	SHADERDX8.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro SHADERAPIDX9DIR "."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+$Macro OUTBINNAME	"shaderapidx9"
+//$Macro SCE_PS3_ROOT "$env(SCE_PS3_ROOT)"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+// Common Configuration
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\dx9sdk\include;..\" [$WINDOWS && !$GL]
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\thirdparty\nvidia\nvapi" [$WINDOWS]
+		$AdditionalIncludeDirectories	"$BASE;$(XEDK)\include\xbox;..\" [$X360]
+		$AdditionalIncludeDirectories	"$BASE;..\" [$PS3||$POSIX||$GL]
+		$PreprocessorDefinitions		"$BASE;SHADERAPIDX9;SHADER_DLL_EXPORT;PROTECTED_THINGS_ENABLE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead"
+		$PreprocessorDefinitions		"$BASE;USE_ACTUAL_DX" [( $WINDOWS || $X360 ) && !$GL]
+		$PreprocessorDefinitions		"$BASE;GL_GLEXT_PROTOTYPES;DX_TO_GL_ABSTRACTION" [$GL]
+//		$AdditionalOptions				"/FC"
+	}
+    
+	$Linker
+	{
+		$SystemFrameworks				"Carbon;OpenGL;Quartz;Cocoa;IOKit" 
+		$SystemLibraries				"iconv" [$OSXALL]
+		$AdditionalDependencies			"$BASE ws2_32.lib" [$WINDOWS]
+		$AdditionalDependencies			"$BASE libgcm_sys_stub.a libsysutil_stub.a libresc_stub.a libspurs_stub.a" [$PS3]
+	}
+}
+
+$Configuration "Debug"
+{
+	$Linker [$X360]
+	{
+		$AdditionalDependencies			"$BASE d3dx9d.lib xuirund.lib xuirenderd.lib xaudiod2.lib xmcored.lib"
+	}
+	$Linker [$PS3]
+	{
+		// NOTE: We refer to our own build of libPSGL but to system version of libPSGLcgc, even though we build and maintain our own version of libPSGLcgc as well
+		$AdditionalDependencies			"$BASE libgcm_cmddbg.a"
+	}
+}
+
+$Configuration "Release"
+{
+	$Linker [$X360]
+	{
+		$AdditionalDependencies			"$BASE d3dx9.lib xuirun.lib xuirender.lib xaudio2.lib xmcore.lib"
+	}
+
+	// NOTE: We refer to our own build of libPSGL but to system version of libPSGLcgc, even though we build and maintain our own version of libPSGLcgc as well
+	// Also, there are 2 release build configurations, ultra-opt and opt, which are different by this one thing only: there's no error checking in "ultra", so it'll be ultra-hard to debug RSX crashes. So, it's linked against in CERT builds only
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE libgcm_cmd.a"
+	}
+}
+
+$include "shaderapidx9_inc.vpc"
+
+$Project "shaderapidx9"
+{
+	$Folder	"Link Libraries"
+	{
+		$Lib	bitmap
+		$Lib	mathlib
+		$Lib	tier2
+		$Lib	vtf
+		$Lib	videocfg [$WINDOWS||$POSIX]
+		$ImpLib togl [!$IS_LIB_PROJECT && $GL]
+
+
+		$Lib	"$LIBCOMMON\bzip2"
+
+		$File	"$SRCDIR\dx9sdk\lib$PLATSUBDIR\d3d9.lib" [$WINDOWS && !$GL]
+		$File	"$SRCDIR\dx9sdk\lib$PLATSUBDIR\d3dx9.lib" [$WINDOWS && !$GL]
+
+		$File	"$SRCDIR\thirdparty\nvidia\nvapi\lib$PLATSUBDIR\nvapi.lib" [$WINDOWS]
+	}	
+}

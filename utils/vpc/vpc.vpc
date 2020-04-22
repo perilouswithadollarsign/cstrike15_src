@@ -1,0 +1,121 @@
+ //-----------------------------------------------------------------------------
+//	VPC.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\devtools\bin"		[!$OSX32]
+$Macro OUTBINDIR	"$SRCDIR\devtools\bin\osx"	[$OSX32]
+
+$Include "$SRCDIR\vpc_scripts\source_dll_win32_base.vpc" [!$OSX32]
+$Include "$SRCDIR\vpc_scripts\source_dll_linux_base.vpc" [$OSX32]
+
+$Configuration
+{
+	$General
+	{
+		$AdditionalProjectDependencies		"$BASE;binlaunch;p4lib;filesystem_stdio"
+	}
+	
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;_USE_32BIT_TIME_T;_USRDLL"
+		$DisableSpecificWarnings		"4005"
+		$AdditionalOptions				"/MP1"
+	}
+	
+	$Linker
+	{
+		$AdditionalDependencies			"ws2_32.lib"
+	}
+
+	$PostBuildEvent [$WIN32]
+	{
+		// Copy binlaunch.exe to our exe.
+		$CommandLine		"$BASE" "\n" \
+							"\n" \
+							"echo ... Copying BINLAUNCH.EXE to VPC.EXE" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\vpc.exe $SRCDIR" "\n" \
+							"copy $SRCDIR\devtools\bin\binlaunch.exe $OUTBINDIR\vpc.exe" "\n" \
+							"if ERRORLEVEL 1 goto BinLaunchCopyFailed" "\n" \
+							"\n" \
+							"goto BinLaunchCopyOK" "\n" \
+							"\n" \
+							":BinLaunchCopyFailed" "\n" \
+							"echo *** ERROR! binlaunch copy step failed." "\n" \
+							"del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+							"exit 1" "\n" \
+							"\n" \
+							":BinLaunchCopyOK" "\n" \
+							"\n"
+	}
+}
+
+$Project "vpc"
+{
+	$Folder	"Source Files"
+	{
+		$File	"baseprojectdatacollector.cpp"
+		$File	"configuration.cpp"
+		$File	"../vpccrccheck/crccheck_shared.cpp"
+		$File	"dependencies.cpp"
+		$File	"GroupScript.cpp"
+		$File	"main.cpp"
+		$File	"p4sln.cpp"							[$WIN32]
+		$File	"projectgenerator_vcproj.cpp"
+		$File	"projectgenerator_makefile.cpp"
+		$File	"projectgenerator_xcode.cpp"
+		$File	"projectgenerator_win32.cpp"		[$WIN32]
+		$File	"projectgenerator_win32_2010.cpp"	[$WIN32]
+		$File	"projectgenerator_ps3.cpp"
+		$File	"projectgenerator_xbox360.cpp"
+		$File	"projectgenerator_xbox360_2010.cpp"
+		$File	"ProjectScript.cpp"
+		$File	"scriptsource.cpp"
+		$File	"solutiongenerator_makefile.cpp"
+		$File	"solutiongenerator_xcode.cpp"
+		$File	"solutiongenerator_win32.cpp"		[$WIN32]
+		$File	"sys_utils.cpp"
+		$File	"macros.cpp"
+		$File	"conditionals.cpp"
+		$File	"generatordefinition.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"baseprojectdatacollector.h"
+		$File	"dependencies.h"
+		$File	"ibaseprojectgenerator.h"
+		$File	"ibasesolutiongenerator.h"
+		$File	"p4sln.h"							[$WIN32]
+		$File	"projectgenerator_xcode.h"
+		$file	"projectgenerator_ps3.h"
+		$file	"projectgenerator_ps3.inc"
+		$file	"projectgenerator_win32_2010.h"
+		$File	"projectgenerator_win32_2010.inc"
+		$file	"projectgenerator_win32.h"
+		$File	"projectgenerator_win32.inc"
+		$File	"projectgenerator_vcproj.h"
+		$File	"projectgenerator_xbox360.h"
+		$File	"projectgenerator_xbox360.inc"
+		$File	"projectgenerator_xbox360_2010.h"
+		$File	"projectgenerator_xbox360_2010.inc"
+		$File	"scriptsource.h"		
+		$file	"sys_utils.h"
+		$File	"vpc.h"
+		$File	"generatordefinition.h"
+	}
+	
+	$Folder	"VPC Scripts"	
+	{
+		$Folder	"Definitions"
+		{
+			$File	"$SRCDIR\vpc_scripts\definitions\ps3.def"
+			$File	"$SRCDIR\vpc_scripts\definitions\xbox360.def"
+			$File	"$SRCDIR\vpc_scripts\definitions\xbox360_2010.def"
+			$File	"$SRCDIR\vpc_scripts\definitions\win32_2005.def"
+			$File	"$SRCDIR\vpc_scripts\definitions\win32_2010.def"
+		}
+	}
+}

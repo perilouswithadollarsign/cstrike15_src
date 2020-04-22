@@ -1,0 +1,97 @@
+#include "common_vs_fxc.h"
+
+//---------------------------------------------------------------------------------//
+// Parallax occlusion mapping algorithm implementation. Vertex shader.             
+//---------------------------------------------------------------------------------//
+
+
+#define matWorldViewProjection cModelViewProj
+//float4x4 matViewInverse;
+//float4x4 matView;
+
+//float    fBaseTextureRepeat;
+//float4   vLightPosition;
+
+struct VS_INPUT
+{
+	float4 positionWS  : POSITION;
+	float3 vNormalWS   : NORMAL;
+	float2 texCoord    : TEXCOORD0;
+	float3 vBinormalWS : BINORMAL;
+	float3 vTangentWS  : TANGENT;
+};
+
+struct VS_OUTPUT
+{
+	float4 position          : POSITION;	// proj-space position
+	float2 texCoord          : TEXCOORD0;
+//	float3 vLightTS          : TEXCOORD1;   // light vector in tangent space, denormalized
+	float3 vViewTS           : TEXCOORD2;   // view vector in tangent space, denormalized
+	float2 vParallaxOffsetTS : TEXCOORD3;   // Parallax offset vector in tangent space
+	float3 vNormalWS         : TEXCOORD4;   // Normal vector in world space
+	float3 vViewWS           : TEXCOORD5;   // View vector in world space
+	float4 vDebug		     : TEXCOORD6;
+};
+
+VS_OUTPUT main( VS_INPUT i )
+{
+	VS_OUTPUT Out = (VS_OUTPUT) 0;
+
+	// Transform and output input position 
+	Out.position = mul( float4( i.positionWS.xyz, 1 ), cModelViewProj );
+	//Out.position = mul( matWorldViewProjection, i.positionWS );
+
+	// Propagate texture coordinate through:
+	Out.texCoord = i.texCoord; 
+
+	// Uncomment this to repeat the texture 
+	// Out.texCoord *= fBaseTextureRepeat;
+
+	// Propagate the world vertex normal through:   
+	Out.vNormalWS = i.vNormalWS;
+
+	// Compute and output the world view vector:
+	float3 vViewWS = cEyePos - i.positionWS;
+	Out.vViewWS = vViewWS;
+
+	// Compute denormalized light vector in world space:
+//	float3 vLightWS = vLightPosition - i.positionWS;
+
+	// Normalize the light and view vectors and transform it to the tangent space:
+	float3x3 mWorldToTangent = float3x3( i.vTangentWS, i.vBinormalWS, i.vNormalWS );
+//	float3x3 mWorldToTangent = float3x3( i.vBinormalWS, i.vTangentWS, i.vNormalWS );
+
+	// Propagate the view and the light vectors (in tangent space):
+//	Out.vLightTS = mul( mWorldToTangent, vLightWS );
+	Out.vViewTS  = mul( mWorldToTangent, vViewWS  );
+
+	float fHeightMapRange = 0.02f; // FIXME: should be a vmt param
+
+	// Compute the ray direction for intersecting the height field profile with 
+	// current view ray. See the above paper for derivation of this computation.
+
+	// Compute initial parallax displacement direction:
+	float2 vParallaxDirection = normalize(  Out.vViewTS.xy );
+
+	// The length of this vector determines the furthest amount of displacement:
+	float fLength = length( Out.vViewTS );
+	float fParallaxLength = sqrt( fLength * fLength - Out.vViewTS.z * Out.vViewTS.z ) / Out.vViewTS.z; 
+
+	// Compute the actual reverse parallax displacement vector:
+	Out.vParallaxOffsetTS = vParallaxDirection * fParallaxLength;
+
+	// Need to scale the amount of displacement to account for different height ranges
+	// in height maps. This is controlled by an artist-editable parameter:
+	Out.vParallaxOffsetTS *= fHeightMapRange;
+
+	Out.vDebug = float4( 1.0f, 0.0f, 0.0f, 1.0f );
+	Out.vDebug.xy = vParallaxDirection;
+	//   Out.vDebug.xyz = ( float3 )fHeightMapRange;
+	Out.vDebug.xyz = fParallaxLength * .1;
+	Out.vDebug.xyz = fHeightMapRange * 200;
+
+	return Out;
+
+}   // End of VS_OUTPUT vs_main(..)
+
+ 

@@ -1,0 +1,18 @@
+#include "common_vs_fxc.h"
+
+struct VS_INPUT
+{
+	float3 vPos						: POSITION;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos					: POSITION;	
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+	o.projPos = float4( v.vPos, 1.0f );
+	return o;
+}

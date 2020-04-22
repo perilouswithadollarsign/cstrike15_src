@@ -1,0 +1,553 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "PAINTSTYLE"				"0..9"
+// STATIC:  "EXPONENTMODE"				"0..1"
+// STATIC:  "CHEAPMODE"					"0..1"
+// STATIC:	"PREVIEW"					"0..1" [ps30]
+// STATIC:  "PREVIEWPHONGALBEDOTINT"	"0..1" [ps30]
+// STATIC:  "PHONGALBEDOFACTORMODE"		"0..1"
+
+// DYNAMIC: "NUM_LIGHTS"				"0..4" [ps30]
+
+// SKIP: ( $PAINTSTYLE == 0 )
+// SKIP: ( ( $CHEAPMODE == 1 ) && !( ( $PAINTSTYLE == 3 ) || ( $PAINTSTYLE == 6 ) ) )
+// SKIP: ( ( $EXPONENTMODE == 1 ) && ( $CHEAPMODE == 1 ) )
+// SKIP: ( ( $NUM_LIGHTS != 0 ) && ( $PREVIEW == 0 ) )
+// SKIP: ( ( $PREVIEW == 0 ) && ( $PREVIEWPHONGALBEDOTINT == 1 ) )
+// SKIP: ( ( $PREVIEW == 1 ) && ( $EXPONENTMODE == 1 ) )
+
+#include "common_ps_fxc.h"
+#include "common_vertexlitgeneric_dx9.h"
+#include "shader_constant_register_map.h"
+
+// SAMPLERS
+sampler AOSampler			: register( s0 );
+sampler ScratchesSampler	: register( s1 );
+
+#if ( ( EXPONENTMODE == 1 ) || ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) || ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) || ( PREVIEW == 1 ) )
+	sampler ExponentSampler		: register( s2 );
+#endif
+
+#if ( EXPONENTMODE == 0 )
+	sampler BaseSampler			: register( s3 );
+	sampler GrungeSampler		: register( s5 );
+	#if ( ( PAINTSTYLE == 3 ) || ( PAINTSTYLE == 6 ) )
+		sampler NormalsSampler		: register( s6 );
+		sampler OSPosSampler		: register( s7 );
+	#endif
+#endif
+#if ( ( PAINTSTYLE == 2 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 7 ) || ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) || ( ( EXPONENTMODE == 0 ) && ( PAINTSTYLE == 3 ) || ( PAINTSTYLE == 6 ) ) )
+	sampler PatternSampler		: register( s8 );
+#endif
+
+sampler MasksSampler		: register( s4 );
+
+// SHADER CONSTANTS
+const float4 g_cCamo0_camo3r	: register( c0 );
+#define g_cCamo0				g_cCamo0_camo3r.rgb
+
+const float4 g_cCamo1_camo3g	: register( c1 );
+#define g_cCamo1				g_cCamo1_camo3g.rgb
+
+const float4 g_cCamo2_camo3b	: register( c2 );
+#define g_cCamo2				g_cCamo2_camo3b.rgb
+
+#define	g_cCamo3				float3( g_cCamo0_camo3r.a, g_cCamo1_camo3g.a, g_cCamo2_camo3b.a )
+
+const float4 g_fvPhongSettings_wear  : register( c3 );
+#define		 g_flPhongAlbedoFactor	 g_fvPhongSettings_wear.x
+#define		 g_flPaintExponent		 g_fvPhongSettings_wear.y
+#define		 g_flPaintPhongIntensity g_fvPhongSettings_wear.z
+#define		 g_flWearAmt			 g_fvPhongSettings_wear.w
+
+#if ( ( PAINTSTYLE == 3 ) || ( PAINTSTYLE == 6 ) )
+	const float4 g_patternTexCoordTransform[2] : register( c10 ); // 10 & 11
+#endif
+
+#if ( PREVIEW == 1 )
+	sampler NormalizeSampler	: register( s9 );
+
+	const float4 g_EyePos_unused	: register( c12 );
+	#define g_EyePos				g_EyePos_unused.xyz
+	//#define UNUSED				g_EyePos_unused.w
+	
+	const float4 g_PreviewPhongFresnelRanges_unused : register( c13 );
+	#define g_PreviewPhongFresnelRanges	g_PreviewPhongFresnelRanges_unused.xyz
+	//#define UNUSED					g_PreviewPhongFresnelRanges_unused.w
+
+	const float4 g_PreviewPhongBoosts:	register( c14 );
+	#define  g_PreviewPhongAlbedoBoost		g_PreviewPhongBoosts.x
+	#define  g_PreviewPhongBoost			g_PreviewPhongBoosts.y
+	#define  g_PreviewPatternScale				g_PreviewPhongBoosts.z
+	//#define UNUSED						g_PreviewPhongBoosts.w
+	
+	const float3 g_cAmbientCube[6]						: register( PSREG_AMBIENT_CUBE ); // 4 through 9
+	PixelShaderLightInfo cLightInfo[3]					: register( PSREG_LIGHT_INFO_ARRAY ); // 20 through 25
+
+#endif
+
+#define		 g_flBlendYPow			7
+#define		 g_flBlendZPow			7
+#define		 g_flAnodizedBaseExponent 0.004f
+#define		 g_flAnodizedBasePhongIntensity 1.0
+#define		 g_cAnodizedBase		float3( 0.05f, 0.05f, 0.05f )
+
+struct PS_INPUT
+{
+	float4 vBaseUV_PatternUV	: TEXCOORD0;
+	float4 vWearUV_GrungeUV		: TEXCOORD1;
+	#if ( PREVIEW == 1 )
+		float4   lightAtten				: TEXCOORD2;
+		float3   worldPos				: TEXCOORD3;
+		float3   vWorldNormal			: TEXCOORD4;
+	#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 cOut = float4( 0.0f, 0.0f, 0.0f, 1.0f );
+
+	float4 fvAoSrc = tex2D( AOSampler, i.vBaseUV_PatternUV.xy );
+	cOut = float4( i.vBaseUV_PatternUV.xy, 0, 1 );
+	float flCavity = fvAoSrc.r;
+
+	// part masks allow different parts of the gun to be treated with different colors or styles
+	float4 fvMasks = tex2D( MasksSampler, i.vBaseUV_PatternUV.xy );
+
+	float flPaintBlend = fvAoSrc.a;
+	float flPaintWear = tex2D( ScratchesSampler, i.vWearUV_GrungeUV.xy ).g;
+	#if ( PAINTSTYLE != 8 )
+		flPaintBlend += flPaintWear * flCavity;
+		flPaintBlend *= g_flWearAmt * 6.0f + 1.0f;
+		#if ( ( PAINTSTYLE == 2 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 7 ) || ( PAINTSTYLE == 9 ) ) // Paint patterns and durability
+			float4 fvPattern = tex2D( PatternSampler, i.vBaseUV_PatternUV.zw );
+			float flCuttableArea = 1.0f;
+			#if ( ( PAINTSTYLE == 2 ) || ( PAINTSTYLE == 5 ) )
+				flCuttableArea = 1.0f - saturate( fvMasks.g + fvMasks.b );
+			#endif
+			// cut through
+			flPaintBlend += smoothstep( 0.5f, 0.6f, fvPattern.a ) * smoothstep( 1.0f, 0.9f, fvPattern.a );
+			#if ( PAINTSTYLE == 5 )
+				// rescale the alpha to represent exponent in the range of 0-255 and let the cutout mask area fall off the top end
+				fvPattern.a = saturate( fvPattern.a * 2.0f );
+			#elif ( PAINTSTYLE == 9 )
+				flPaintBlend *= max ( 1.0f - flCuttableArea, smoothstep( 0.0f, 0.5f, fvPattern.a ) );
+				// rescale the alpha to represent exponent in the range of 0-255 and let the cutout mask area fall off the top end
+				fvPattern.a = lerp( fvPattern.a, saturate( fvPattern.a * 2.0f ), fvMasks.r );
+				// indestructible paint
+			#else
+				// indestructible paint
+				flPaintBlend *= max ( 1.0f - flCuttableArea, smoothstep( 0.0f, 0.5f, fvPattern.a ) );
+			#endif
+		#endif
+		#if ( ( ( EXPONENTMODE == 1 ) || ( PREVIEW == 1 ) ) && ( ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) ) )
+			float flPaintExpBlend = smoothstep( 0.99f, 1.0f, flPaintBlend );
+		#else
+			float flPaintExpBlend = flPaintBlend;
+		#endif
+	#elif ( ( EXPONENTMODE == 1 ) || ( PREVIEW == 1 ) )
+		float flPaintExpBlend = flPaintBlend;
+	#endif
+
+	#if ( ( PAINTSTYLE == 2 ) || ( PAINTSTYLE == 3 ) ) // paint wears off in layers
+		float3 fvPaintEdges = float3( 1.0f, 1.0f, 1.0f );
+		float3 spread = 0.06f * g_flWearAmt; // spread of partially worn paint increases as the gun becomes more worn
+		spread.y *= 2.0f;
+		spread.z *= 3.0f;
+
+		fvPaintEdges.x = smoothstep ( 0.58f, 0.56f - spread.x, flPaintBlend );
+		fvPaintEdges.y = smoothstep ( 0.56f - spread.x, 0.54f - spread.y, flPaintBlend );
+		fvPaintEdges.z = smoothstep ( 0.54f - spread.y, 0.52f - spread.z, flPaintBlend );
+	#endif
+
+	#if ( ( PAINTSTYLE != 8 ) && ( PAINTSTYLE != 9 ) )
+		flPaintBlend = smoothstep( 0.58f, 0.68f, flPaintBlend );
+	#elif ( PAINTSTYLE == 9 )
+		flPaintBlend = lerp( smoothstep( 0.58f, 0.68f, flPaintBlend ), flPaintBlend, fvMasks.r );
+	#endif
+
+	#if ( ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) ) // Anodized paint scratches through uncolored base coat
+		float flPaintEdges = smoothstep ( 0.0f, 0.01f, flPaintBlend );
+	#endif
+
+	// ------------------------------------------------------------------------------------------------------
+	// Exponent texture
+	// ------------------------------------------------------------------------------------------------------
+	#if ( ( EXPONENTMODE == 1 ) || ( PREVIEW == 1 ) )
+
+		float4 cExp = tex2D( ExponentSampler, i.vBaseUV_PatternUV.xy );
+		#if ( ( PREVIEW == 1 ) && ( PREVIEWPHONGALBEDOTINT == 0 ) )
+			cExp.g = 0.0f;
+		#endif
+		float4 cPaintExp = cExp;
+
+		#if ( ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) || ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) ) // Anodized/metallic
+			#if ( PAINTSTYLE == 8 )
+				flPaintBlend = 1.0f - step( flPaintExpBlend, 0.996f ) * fvMasks.r;
+			#elif ( PAINTSTYLE == 9 )
+				flPaintBlend = lerp( flPaintBlend, 1.0f - step( flPaintExpBlend, 0.996f ), fvMasks.r );
+			#else
+				flPaintBlend = saturate( 1.0f + flPaintExpBlend - fvMasks.r );
+			#endif
+
+			// exponent
+			#if ( PAINTSTYLE == 5 )
+				float flPatternExponentBlend = max( max( fvMasks.g, fvMasks.b ), flPaintBlend );
+				cPaintExp.r = lerp( fvPattern.a, cExp.r, flPatternExponentBlend );
+			#elif ( PAINTSTYLE == 9 )
+				cPaintExp.r = lerp( g_flPaintExponent, fvPattern.a, fvMasks.r );
+				cPaintExp.r = lerp( cPaintExp.r, cExp.r, flPaintBlend );	
+			#else
+				cPaintExp.r = lerp( g_flPaintExponent, cExp.r, flPaintBlend );
+			#endif
+
+			// phongalbedo
+			#if ( PAINTSTYLE == 9 )
+				cPaintExp.g = saturate( fvMasks.r + flPaintBlend * cExp.g );
+			#else
+				cPaintExp.g = lerp ( 1.0f, cExp.g, flPaintBlend );
+			#endif
+
+			cPaintExp.a = 1.0;
+		#else // Everything else not anodized
+			cPaintExp = lerp ( float4( g_flPaintExponent, 0.0f, 0.0f, 1.0f ), cExp, flPaintBlend );
+			cPaintExp.a = 1.0;
+		#endif
+
+		#if ( PREVIEW == 0 )
+			cOut = cPaintExp;
+		#endif
+	#endif
+	// ------------------------------------------------------------------------------------------------------
+	// Diffuse texture
+	// ------------------------------------------------------------------------------------------------------
+	#if ( ( EXPONENTMODE == 0 ) || ( PREVIEW == 1 ) )
+
+		float4 cBase = tex2D( BaseSampler, i.vBaseUV_PatternUV.xy );
+
+		float3 cPaint = g_cCamo0;
+
+		// ambient occlusion
+		float flAo = fvAoSrc.g;
+
+		// apply grunge to paint only in creases
+		float4 cGrunge = tex2D( GrungeSampler, i.vWearUV_GrungeUV.zw );
+		#if ( ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) )
+			float flGrunge = cGrunge.r * cGrunge.g * cGrunge.b;
+		#endif
+		cGrunge = lerp( 1.0f, cGrunge, ( pow( ( 1.0f - flCavity ), 4.0f ) * 0.25f + 0.75f * g_flWearAmt ) );
+
+		// ------------------------------------------------------------------------------------------------------
+		// Solid style
+		// ------------------------------------------------------------------------------------------------------
+		#if ( PAINTSTYLE == 1 ) 
+			// apply color in solid blocks using masking from the part kit MasksSampler
+			cPaint = lerp( cPaint, g_cCamo1, fvMasks.r );
+			cPaint = lerp( cPaint, g_cCamo2, fvMasks.g );
+			cPaint = lerp( cPaint, g_cCamo3, fvMasks.b );
+		#endif
+
+		// ------------------------------------------------------------------------------------------------------
+		// Hydrographic/anodized multicolored style
+		// ------------------------------------------------------------------------------------------------------
+		#if ( ( PAINTSTYLE == 2 ) || ( PAINTSTYLE == 5 ) )
+			// create camo using pattern
+			cPaint = lerp( lerp( lerp( g_cCamo0, g_cCamo1, fvPattern.r ), g_cCamo2, fvPattern.g ), g_cCamo3, fvPattern.b );
+   
+			// apply any masking from the last two masks from MasksSampler, allowing some areas to be solid color
+			cPaint = lerp( cPaint, g_cCamo2, fvMasks.g );
+			cPaint = lerp( cPaint, g_cCamo3, fvMasks.b );
+		#endif
+
+		// ------------------------------------------------------------------------------------------------------
+		// Spraypaint/anodized airbrushed style
+		// ------------------------------------------------------------------------------------------------------
+		#if ( ( PAINTSTYLE == 3 ) || ( PAINTSTYLE == 6 ) )
+			// apply spraypaint via box map based on mesh's object-space position as stored in the position pmap
+			float4 fvNormalSrc = tex2D( NormalsSampler, i.vBaseUV_PatternUV.xy );
+			float2 fvPosCoord = float2( i.vBaseUV_PatternUV.x, 1.0 - i.vBaseUV_PatternUV.y );
+			float4 fvPos = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+
+			#if ( CHEAPMODE == 0 ) // if supersampling is not disabled
+				//super sampling of position map
+				float2 offsets[17] = { float2( -0.00107234f ,-0.00400203f ),
+									   float2( 0.00195312f, -0.00338291f ),
+									   float2( 0.00400203f, -0.00107234f ),
+									   float2( -0.000714896f, -0.00266802f ),
+									   float2( 0.000976565f, -0.00169146f ),
+									   float2( 0.00266802f, -0.000714896f ),
+									   float2( -0.00338291f, -0.00195312f ),
+									   float2( -0.00169146f, -0.000976565f ),
+									   float2( 0.0f, 0.0f ),
+									   float2( 0.00169146f, 0.000976565f ),
+									   float2( 0.00338291f, 0.00195312f ),
+									   float2( -0.00266802f, 0.000714896f ),
+									   float2( -0.000976565f, 0.00169146f ),
+									   float2( 0.000714896f, 0.00266802f ),
+									   float2( -0.00400203f, 0.00107234f ),
+									   float2( -0.00195312f, 0.00338291f ),
+									   float2( 0.00107234, 0.00400203 ) };
+				for ( int k = 0; k < 17; k++ )
+				{
+					fvPos += tex2D( OSPosSampler, fvPosCoord + offsets[k] ) * 0.05882353;
+				}
+			#else
+				fvPos = tex2D( OSPosSampler, fvPosCoord );
+			#endif
+
+			//extract integer HDR values out from the RGBA vtf
+			//developer.valvesoftware.com/wiki/Valve_Texture_Format#HDR_compression
+			fvPos.rgb = (fvPos.rgb * (fvPos.a * 16.0f) );
+
+			float3 fvNormal = normalize( fvNormalSrc.xyz * 2.0f - 1.0f );
+   
+			// Project the mask in object-space x, y and z
+			float2 flCoord;
+
+			
+			#if ( PREVIEW == 1 )
+			
+				// apply the preview pattern scale to only the scale portion of the pattern transform.
+				
+				float2x2 tempMatrix = { g_PreviewPatternScale, 0, 0, g_PreviewPatternScale };
+				float2x2 tempMatrix2 = { g_patternTexCoordTransform[0].xy, g_patternTexCoordTransform[1].xy };
+				tempMatrix = mul( tempMatrix, tempMatrix2 );
+				
+				flCoord.x = dot( fvPos.yz, tempMatrix[0] ) + g_patternTexCoordTransform[0].w;
+				flCoord.y = dot( fvPos.yz, tempMatrix[1] ) + g_patternTexCoordTransform[1].w;
+				float3 fvTexX = tex2D( PatternSampler, flCoord ).rgb;
+
+				flCoord.x = dot( fvPos.xz, tempMatrix[0] ) + g_patternTexCoordTransform[0].w;
+				flCoord.y = dot( fvPos.xz, tempMatrix[1] ) + g_patternTexCoordTransform[1].w;
+				float3 fvTexY = tex2D( PatternSampler, flCoord ).rgb;
+
+				flCoord.x = dot( fvPos.yx, tempMatrix[0] ) + g_patternTexCoordTransform[0].w;
+				flCoord.y = dot( fvPos.yx, tempMatrix[1] ) + g_patternTexCoordTransform[1].w;
+				float3 fvTexZ = tex2D( PatternSampler, flCoord ).rgb;
+				
+			#else
+
+				flCoord.x = dot( fvPos.yz, g_patternTexCoordTransform[0].xy ) + g_patternTexCoordTransform[0].w;
+				flCoord.y = dot( fvPos.yz, g_patternTexCoordTransform[1].xy ) + g_patternTexCoordTransform[1].w;
+				float3 fvTexX = tex2D( PatternSampler, flCoord ).rgb;
+
+				flCoord.x = dot( fvPos.xz, g_patternTexCoordTransform[0].xy ) + g_patternTexCoordTransform[0].w;
+				flCoord.y = dot( fvPos.xz, g_patternTexCoordTransform[1].xy ) + g_patternTexCoordTransform[1].w;
+				float3 fvTexY = tex2D( PatternSampler, flCoord ).rgb;
+
+				flCoord.x = dot( fvPos.yx, g_patternTexCoordTransform[0].xy ) + g_patternTexCoordTransform[0].w;
+				flCoord.y = dot( fvPos.yx, g_patternTexCoordTransform[1].xy ) + g_patternTexCoordTransform[1].w;
+				float3 fvTexZ = tex2D( PatternSampler, flCoord ).rgb;
+				
+			#endif
+			
+			
+   
+			// smooth blend the three projections across the object-space surface normals
+			float yBlend = abs( dot( fvNormal.xyz, float3( 0.0f, 1.0f, 0.0f ) ) );
+			yBlend = pow( yBlend, g_flBlendYPow );
+
+			float zBlend = abs( dot( fvNormal.xyz, float3( 0.0f, 0.0f, 1.0f ) ) );
+			zBlend = pow( zBlend, g_flBlendZPow );
+   
+			float3 fvPatternMask = lerp( lerp( fvTexX, fvTexY, yBlend ), fvTexZ, zBlend );
+
+			#if ( PAINTSTYLE == 3 )// paint wears off in layers
+				fvPatternMask.xyz *= fvPaintEdges.xyz;
+			#endif
+
+			cPaint = lerp( lerp( lerp( g_cCamo0, g_cCamo1, fvPatternMask.r ), g_cCamo2, fvPatternMask.g ), g_cCamo3, fvPatternMask.b );
+			#if ( PAINTSTYLE == 6 )
+				// apply any masking from the last two masks from MasksSampler, allowing some areas to be solid color
+				cPaint = lerp( cPaint, g_cCamo2, fvMasks.g );
+				cPaint = lerp( cPaint, g_cCamo3, fvMasks.b );
+			#endif
+		#endif
+
+		// ------------------------------------------------------------------------------------------------------
+		// Anodized style
+		// ------------------------------------------------------------------------------------------------------
+		#if ( PAINTSTYLE == 4 )	
+			cPaint.rgb = g_cCamo0.rgb;
+		#endif
+
+		#if ( ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) )
+			// chipped edges of anodized dye
+			cPaint = lerp( cPaint, g_cAnodizedBase, flPaintEdges );
+			cGrunge.rgb = lerp( cGrunge.rgb, float3( 1.0f, 1.0f, 1.0f ), flPaintEdges );
+
+			// anodize only in areas specified by the masks texture
+			flPaintBlend = saturate( 1.0f + flPaintBlend - fvMasks.r );
+		#endif
+
+		// ------------------------------------------------------------------------------------------------------
+		// Custom painted style
+		// ------------------------------------------------------------------------------------------------------
+		#if ( PAINTSTYLE == 7 )
+			cPaint = fvPattern.rgb;
+		#endif
+		// ------------------------------------------------------------------------------------------------------
+		// Antiqued or Gunsmith style
+		// ------------------------------------------------------------------------------------------------------
+
+		#if ( PAINTSTYLE == 8 )
+			float4 fvPattern = tex2D( PatternSampler, i.vBaseUV_PatternUV.zw );
+		#endif
+
+		#if ( ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) )
+			float flPatinaBlend = flPaintWear * flAo * flCavity * flCavity;
+			flPatinaBlend = smoothstep( 0.1f, 0.2f, flPatinaBlend * g_flWearAmt );
+
+			float flOilRubBlend = saturate( flCavity * flAo - g_flWearAmt * 0.1f ) - flGrunge;
+			flOilRubBlend = smoothstep( 0.0f, 0.15f, flOilRubBlend + 0.08f );
+
+			float3 cPatina = lerp( g_cCamo1, g_cCamo2, g_flWearAmt );
+			float3 cOilRubColor = lerp( g_cCamo1, g_cCamo3, pow( g_flWearAmt, 0.5 ) );
+			cPatina = lerp( cOilRubColor, cPatina, flOilRubBlend ) * fvPattern.rgb;
+
+			float3 vLumCoefficients = { 0.3, 0.59, 0.11 };
+			float fPatternLum = dot( fvPattern.rgb, vLumCoefficients );
+
+			float3 cScratches = g_cCamo0 * fPatternLum;
+
+			cPatina = lerp( cPatina, cScratches, flPatinaBlend );
+
+			#if ( PAINTSTYLE == 8 )
+				cPaint = cPatina;
+				flPaintBlend = 1.0f - fvMasks.r;
+			#elif ( PAINTSTYLE == 9 )
+				cPaint = lerp ( fvPattern.rgb, cPatina, fvMasks.r );
+				flPaintBlend = flPaintBlend * ( 1.0f - fvMasks.r );
+			#endif
+		#endif
+
+		// ------------------------------------------------------------------------------------------------------
+		// All paints
+		// ------------------------------------------------------------------------------------------------------
+
+		float3 cModulation = fvAoSrc.b;
+		cPaint.rgb *= cGrunge.rgb;
+
+		// On very dark paints, increase the modulation slightly by adding
+		float3 lumCoefficients = { 0.3, 0.59, 0.11 };
+		float flModulationLum = dot( cPaint.rgb, lumCoefficients );
+		flModulationLum = 1.0f - smoothstep( 0.08f, 0.15f, flModulationLum );
+
+		#if ( ( PAINTSTYLE == 1 ) || ( PAINTSTYLE == 2 ) || ( PAINTSTYLE == 3 ) || ( PAINTSTYLE == 7 ) )
+			flModulationLum *= 0.03f;
+			cModulation = cModulation.rgb * ( cPaint.rgb + flModulationLum ) * 0.5f;
+		#elif ( PAINTSTYLE == 9 )
+			flModulationLum *= lerp( 0.03f, 0.005f, fvMasks.r );
+			cModulation = cModulation.rgb * ( cPaint.rgb + flModulationLum ) * lerp( 0.5f, 2.0f, fvMasks.r );
+		#else
+			flModulationLum *= 0.005f;
+			cModulation = cModulation.rgb * ( cPaint.rgb + flModulationLum ) * 2.0f;
+		#endif
+
+		
+		cPaint = saturate( cPaint + cModulation );
+
+		cPaint.rgb *= flAo;
+
+		cOut.rgb = lerp( cPaint, cBase, flPaintBlend );
+
+		// ------------------------------------------------------------------------------------------------------
+		// Specular Intensity Mask
+		// ------------------------------------------------------------------------------------------------------
+		#if ( PAINTSTYLE == 9 )
+			#if ( PHONGALBEDOFACTORMODE == 1 )
+				float flSpecMask = lerp( g_flPaintPhongIntensity, 1.0f, fvMasks.r ) * flAo * cGrunge.a;
+			#else
+				float flSpecMask = lerp( g_flPaintPhongIntensity, g_flPhongAlbedoFactor, fvMasks.r ) * flAo * cGrunge.a;
+			#endif
+		#else
+			float flSpecMask = g_flPaintPhongIntensity * flAo * cGrunge.a;
+		#endif
+		#if ( ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) || ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) )// anodized/metallic
+			// phongalbedoboost must be increased in the material for the anodized look, so in areas that are 
+			// already using phongalbedo the specular intensity must be reduced in order to retain approximately 
+			// the same intensity as the originally authored texture
+			float flInvPaintBlend = 1.0f - flPaintBlend;
+
+			float4 cOrigExp = tex2D( ExponentSampler, i.vBaseUV_PatternUV.xy );
+			#if ( ( PREVIEW == 1 ) && ( PREVIEWPHONGALBEDOTINT == 0 ) )
+				cOrigExp.g = 0.0f;
+			#endif
+			#if ( PAINTSTYLE == 8 )
+				flSpecMask *= lerp( flOilRubBlend * ( 1.0f - flPatinaBlend * g_flWearAmt ), 1.0f, flPatinaBlend );
+			#elif ( PAINTSTYLE == 9 )
+				float flPaintSpecBlend = smoothstep( 0.9f, 1.0f, flPaintBlend ) * fvMasks.r;
+				flSpecMask *= lerp(  smoothstep( 0.01f, 0.0f, flPaintBlend ), lerp( flOilRubBlend * ( 1.0f - flPatinaBlend * g_flWearAmt ), 1.0f, flPatinaBlend ), fvMasks.r );
+				flSpecMask = lerp( flSpecMask, cBase.a, flPaintSpecBlend );
+				flPaintSpecBlend = smoothstep( 0.9f, 1.0f, flPaintBlend ) * ( 1.0f - fvMasks.r );
+			#else
+				flSpecMask *= lerp( g_flPaintPhongIntensity, g_flAnodizedBasePhongIntensity, flPaintEdges );
+			#endif
+
+			float flPhongAlbedoBlend = flPaintBlend;
+
+			float flAdjustedBase = 1.0f;
+			#if ( PHONGALBEDOFACTORMODE == 1 )
+				flAdjustedBase = lerp( 1.0, g_flPhongAlbedoFactor, cOrigExp.g * flPhongAlbedoBlend );
+				cOut.a = lerp( flSpecMask, cBase.a * flAdjustedBase, flPaintBlend );
+			#else
+				cOut.a = lerp( flSpecMask * g_flPhongAlbedoFactor, cBase.a, flPhongAlbedoBlend );
+			#endif
+
+			#if ( PAINTSTYLE == 9 )
+				cOut.a = lerp( flSpecMask, cBase.a * flAdjustedBase, flPaintSpecBlend );
+			#endif
+
+		#else // everything else
+			float flPaintSpecBlend = smoothstep( 0.9f, 1.0f, flPaintBlend );
+			flSpecMask *= smoothstep( 0.01f, 0.0f, flPaintBlend );
+			cOut.a = lerp( flSpecMask, cBase.a, flPaintSpecBlend );
+		#endif
+
+
+	#endif
+
+	#if ( PREVIEW == 1 )
+
+			float3 diffuseLighting = float3( 0.0f, 0.0f, 0.0f );
+			// TODO ENVMAP
+			float3 envMapColor = float3( 0.0f, 0.0f, 0.0f );
+
+			float3 vWorldPos = i.worldPos;
+			float3 vEyeDir = normalize( g_EyePos - vWorldPos );
+			float3 vWorldNormal = normalize ( i.vWorldNormal.xyz );
+			float fFresnelRanges = Fresnel( vWorldNormal, vEyeDir, g_PreviewPhongFresnelRanges );
+
+			float3 linearColor = PixelShaderDoLighting( vWorldPos, vWorldNormal, 
+				float3( 0.0f, 0.0f, 0.0f), false,
+				true, i.lightAtten, g_cAmbientCube, 
+				NormalizeSampler, NUM_LIGHTS, cLightInfo, false,
+				false, NULL, 1.0f );
+
+			float3 specularLighting, rimLighting;
+
+			PixelShaderDoSpecularLighting( vWorldPos, vWorldNormal, cPaintExp.r * 255.0f, vEyeDir,
+				i.lightAtten, NUM_LIGHTS, cLightInfo, false, NULL, fFresnelRanges,
+				false, 1.0f, 1.0f,
+				specularLighting, rimLighting );
+
+			#if ( ( PREVIEWPHONGALBEDOTINT == 1 ) || ( PAINTSTYLE == 4 ) || ( PAINTSTYLE == 5 ) || ( PAINTSTYLE == 6 ) || ( PAINTSTYLE == 8 ) || ( PAINTSTYLE == 9 ) )
+				specularLighting *= lerp( (float3)g_PreviewPhongBoost, g_PreviewPhongAlbedoBoost * cOut.rgb, cPaintExp.g );
+			#else
+				specularLighting *= g_PreviewPhongBoost;
+			#endif
+
+			specularLighting *= cOut.a * fFresnelRanges; // specular mask
+
+			cOut.rgb *= linearColor;
+			cOut.rgb += specularLighting;
+			
+	#endif
+	
+	#if ( PREVIEW == 1 )
+		return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR );
+	#else
+		return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+	#endif
+	
+}

@@ -1,0 +1,80 @@
+//-----------------------------------------------------------------------------
+//
+// VPC macros common to all Qt-based projects. Gives access to Qt headers and
+// provides build rules for Qt's custom build steps.
+//
+//-----------------------------------------------------------------------------
+
+$Macro QT_ROOT						"$SRCDIR\thirdparty\lgpl\qt"
+$Macro QT_MOC_TOOL					"$QT_ROOT\bin\moc.exe"
+$Macro QT_UI_TOOL					"$QT_ROOT\bin\uic.exe"
+$Macro QT_QRC_TOOL					"$QT_ROOT\bin\rcc.exe"
+$Macro QT_TARGET_SUBDIR				"generated_code_DO_NOT_CHECK_THESE_IN"
+
+$Macro QT_MOC_DEFINES				"-DUNICODE -DWIN32 -DQT_LARGEFILE_SUPPORT -DQT_DLL -DQT_NO_DEBUG -DQT_GUI_LIB -DQT_CORE_LIB -DQT_THREAD_SUPPORT -D_MSC_VER=1400"
+$Macro QT_MOC_INCLUDES				"-I;$QT_ROOT\include\QtCore; -I;$QT_ROOT\include\QtGui; -I;$QT_ROOT\include; -I;$QT_ROOT\include\ActiveQt; -I;.; -I;$QT_ROOT\mkspecs\win32-msvc2005"
+
+$Macro QT_MOC_COMMAND_PREFIX		"$QT_MOC_TOOL $QT_MOC_DEFINES $QT_MOC_INCLUDES"
+$Macro QT_UI_COMMAND_PREFIX			"$QT_UI_TOOL"
+$Macro QT_QRC_COMMAND_PREFIX		"$QT_QRC_TOOL"
+
+//-----------------------------------------------------------------------------
+// NOTE: The standard here is that the terminal _H, _MOC, _UI is for the extension
+// that it is processing.
+//-----------------------------------------------------------------------------
+
+$Macro QT_OUTPUT_H					"$(InputDir)$QT_TARGET_SUBDIR\moc_$(InputName).cpp"
+$Macro QT_OUTPUT_MOC				"$(InputPath)"
+$Macro QT_OUTPUT_UI					"$(InputDir)$QT_TARGET_SUBDIR\ui_$(InputName).h"
+$Macro QT_OUTPUT_QRC				"$(InputDir)$QT_TARGET_SUBDIR\qrc_$(InputName).cpp"
+
+$Macro QT_COMMAND_SUFFIX_H			"$(InputPath) -o $QT_OUTPUT_H"
+$Macro QT_COMMAND_SUFFIX_MOC		"$(InputName).cpp -o $QT_OUTPUT_MOC"
+$Macro QT_COMMAND_SUFFIX_UI			"$(InputPath) -o $QT_OUTPUT_UI"
+$Macro QT_COMMAND_SUFFIX_QRC		"$(InputPath) -o $QT_OUTPUT_QRC"
+
+$Macro QT_DESCRIPTION_H				"Processing QT Keywords: $(InputFileName)"
+$Macro QT_DESCRIPTION_MOC			"Processing QT Keywords: $(InputFileName)"
+$Macro QT_DESCRIPTION_UI			"Processing UI Form: $(InputFileName)"
+$Macro QT_DESCRIPTION_QRC			"Processing QRC: $(InputFileName)"
+
+$Macro QT_PREBUILD_H   				"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $QT_OUTPUT_H $SRCDIR " "\n"
+$Macro QT_PREBUILD_MOC				"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $QT_OUTPUT_MOC $SRCDIR " "\n"
+$Macro QT_PREBUILD_UI   			"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $QT_OUTPUT_UI $SRCDIR " "\n"
+$Macro QT_PREBUILD_QRC   			"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $QT_OUTPUT_QRC $SRCDIR " "\n"
+
+$Macro QT_CUSTOM_BUILD_H			"$QT_PREBUILD_H $QT_MOC_COMMAND_PREFIX $QT_COMMAND_SUFFIX_H"
+$Macro QT_CUSTOM_BUILD_MOC			"$QT_PREBUILD_MOC $QT_MOC_COMMAND_PREFIX $QT_COMMAND_SUFFIX_MOC"
+$Macro QT_CUSTOM_BUILD_UI			"$QT_PREBUILD_UI $QT_UI_COMMAND_PREFIX $QT_COMMAND_SUFFIX_UI"
+$Macro QT_CUSTOM_BUILD_QRC			"$QT_PREBUILD_QRC $QT_QRC_COMMAND_PREFIX $QT_COMMAND_SUFFIX_QRC"
+
+// <xxxx>.cpp files that have Q_OBJECT need to have moc.exe run on them to generate <xxxx>.moc
+// having a <xxxx>.moc in the project guarantees a pre build dependency and runs moc.exe on the <xxxx>.cpp file
+// <xxxx>.cpp is expected to have a #include "xxxx.moc" at its bottom.
+// There was no way with vcproj's to express this multiple phase generate->build pattern.
+$CustomBuildStep "moc"
+{
+	$AdditionalDependencies "$(InputName).cpp"
+	$CommandLine			"$QT_CUSTOM_BUILD_MOC"
+	$Description			"$QT_DESCRIPTION_MOC"
+	$Outputs				"$QT_OUTPUT_MOC"
+}
+
+// <xxxx>.ui files need to have uic.exe run on them to generate <xxxx>.h
+$CustomBuildStep "ui"
+{
+	$CommandLine			"$QT_CUSTOM_BUILD_UI"
+	$Description			"$QT_DESCRIPTION_UI"
+	$Outputs				"$QT_OUTPUT_UI"
+}
+
+$CustomBuildStep "qrc"
+{
+	$AdditionalDependencies "$(InputName).cpp"
+	$CommandLine			"$QT_CUSTOM_BUILD_QRC"
+	$Description			"$QT_DESCRIPTION_QRC"
+	$Outputs				"$QT_OUTPUT_QRC"
+}
+
+
+

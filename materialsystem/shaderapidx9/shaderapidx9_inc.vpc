@@ -1,0 +1,93 @@
+$Project
+{
+	$Folder "ShaderApiDx9"
+	{
+		$Folder	"Source Files"
+		{
+			$File	"$SHADERAPIDX9DIR\colorformatdx8.cpp"
+			$File	"$SHADERAPIDX9DIR\d3d_async.cpp"								
+			$File	"$SRCDIR\public\filesystem_helpers.cpp"  [!$OSXALL]
+			$File	"$SHADERAPIDX9DIR\hardwareconfig.cpp"
+			$File	"$SHADERAPIDX9DIR\meshbase.cpp"
+			$File	"$SHADERAPIDX9DIR\meshdx8.cpp"
+			$File	"$SHADERAPIDX9DIR\recording.cpp"							[$WINDOWS && !$GL]
+			$File	"$SHADERAPIDX9DIR\shaderapidx8.cpp"
+			$File	"$SHADERAPIDX9DIR\shaderdevicebase.cpp"
+			$File	"$SHADERAPIDX9DIR\shaderapibase.cpp"
+			$File	"$SHADERAPIDX9DIR\shaderdevicedx8.cpp"
+			$File	"$SHADERAPIDX9DIR\shadershadowdx8.cpp"
+			$File	"$SHADERAPIDX9DIR\texturedx8.cpp"
+			$File	"$SHADERAPIDX9DIR\TransitionTable.cpp"
+			$File	"$SHADERAPIDX9DIR\cvballoctracker.cpp"
+			$File	"$SHADERAPIDX9DIR\vertexdecl.cpp"
+			$File	"$SHADERAPIDX9DIR\vertexshaderdx8.cpp"
+			$File	"$SHADERAPIDX9DIR\wmi.cpp"									[$WINDOWS && !$GL]
+			$File	"$SHADERAPIDX9DIR\textureheap.cpp"							[$X360]
+			$File	"$SRCDIR\common\ps3\vjobutils.cpp"							[$PS3]
+			$File	"$SRCDIR\common\ps3\spu_job_shared.cpp"						[$PS3]
+			$File	"$SHADERAPIDX9DIR\winutils.cpp"							[!$WINDOWS]
+		}
+
+		$Folder	"Nvidia Stereo Header Files" [$WINDOWS && !$GL]
+		{
+			$File   "$SHADERAPIDX9DIR\hl2stereo.h"
+		}
+
+		$Folder	"DirectX Header Files" [$WINDOWS && !$GL]
+		{
+			$File	"$SRCDIR\dx9sdk\include\d3dx9.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9anim.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9core.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9effect.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9math.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9math.inl"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9mesh.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9shader.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9shape.h"
+			$File	"$SRCDIR\dx9sdk\include\d3dx9tex.h"
+		}
+		
+		$Folder	"Public Header Files"
+		{
+			$File	"$SRCDIR\public\shaderapi\IShaderDevice.h"
+			$File	"$SRCDIR\public\shaderapi\ishaderutil.h"
+			$File	"$SRCDIR\public\shaderapi\ishaderapi.h"
+			$File	"$SRCDIR\public\shaderapi\ishaderdynamic.h"
+			$File	"$SRCDIR\public\shaderapi\ishadershadow.h"
+			$File	"$SRCDIR\public\shaderapi\commandbuffer.h"
+			$File	"$SRCDIR\public\materialsystem\idebugtextureinfo.h"
+			$File	"$SRCDIR\public\materialsystem\ivballoctracker.h"
+			$File	"$SRCDIR\public\materialsystem\shader_vcs_version.h"
+			$File	"$SRCDIR\public\vjobs\root.h"
+		}
+
+		$Folder	"Header Files"
+		{
+			$File	"$SHADERAPIDX9DIR\TransitionTable.h"
+			$File	"$SHADERAPIDX9DIR\vertexdecl.h"
+			$File	"$SHADERAPIDX9DIR\colorformatdx8.h"
+			$File	"$SHADERAPIDX9DIR\d3d_async.h"					[$WINDOWS]
+			$File	"$SHADERAPIDX9DIR\dynamicib.h"
+			$File	"$SHADERAPIDX9DIR\dynamicvb.h"
+			$File	"$SHADERAPIDX9DIR\hardwareconfig.h"
+			$File	"$SHADERAPIDX9DIR\meshbase.h"
+			$File	"$SHADERAPIDX9DIR\imeshdx8.h"
+			$File	"$SHADERAPIDX9DIR\locald3dtypes.h"
+			$File	"$SHADERAPIDX9DIR\recording.h"
+			$File	"$SHADERAPIDX9DIR\shaderapidx8.h"
+			$File	"$SHADERAPIDX9DIR\shaderdevicebase.h"
+			$File	"$SHADERAPIDX9DIR\shaderapibase.h"
+			$File	"$SHADERAPIDX9DIR\shaderdevicedx8.h"
+			$File	"$SHADERAPIDX9DIR\shaderapidx8_global.h"
+			$File	"$SHADERAPIDX9DIR\shadershadowdx8.h"
+			$File	"$SHADERAPIDX9DIR\stubd3ddevice.h"
+			$File	"$SHADERAPIDX9DIR\texturedx8.h"
+			$File	"$SHADERAPIDX9DIR\vertexshaderdx8.h"
+			$File	"$SHADERAPIDX9DIR\wmi.h"							[$WINDOWS && !$GL]
+			$File	"$SHADERAPIDX9DIR\textureheap.h"					[$X360]
+			$File	"$SHADERAPIDX9DIR\hardwareconfig_ps3nonvirt.h"		[$PS3]
+			$File	"$SHADERAPIDX9DIR\hardwareconfig_ps3nonvirt.inl"	[$PS3]
+			$File	"$SHADERAPIDX9DIR\shaderapidx8_ps3nonvirt.inl"		[$PS3]
+		}
+	}
+}

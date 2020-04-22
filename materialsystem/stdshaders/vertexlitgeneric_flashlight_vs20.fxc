@@ -1,0 +1,132 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+//  STATIC: "TEETH"			"0..1"
+
+//	DYNAMIC: "SKINNING"		"0..1"
+
+#include "common_fog_vs_supportsvertexfog_fxc.h"
+#include "common_vs_fxc.h"
+ 
+static const bool g_bSkinning		= SKINNING ? true : false;
+static const int  g_FogType			= DOWATERFOG;
+static const bool g_bTeeth			= TEETH ? true: false;
+
+const float4 cLightPosition								: register( SHADER_SPECIFIC_CONST_0 );
+const float4 cWorldToTextureTransform[4]				: register( SHADER_SPECIFIC_CONST_1 );
+const float4 cAttenuationFactors						: register( SHADER_SPECIFIC_CONST_5 );
+const float4 cBaseTexCoordTransform[2]					: register( SHADER_SPECIFIC_CONST_6 );
+const float4 cNormalMapOrDetailTexCoordTransform[2]		: register( SHADER_SPECIFIC_CONST_8 );
+const float4 cTeethAttenuationConst						: register( SHADER_SPECIFIC_CONST_10 );
+
+struct VS_INPUT
+{
+	// This is all of the stuff that we ever use.
+	float4 vPos				: POSITION;
+	float4 vBoneWeights		: BLENDWEIGHT;
+	float4 vBoneIndices		: BLENDINDICES;
+	float4 vNormal			: NORMAL;
+	
+	float2 vBaseTexCoord	: TEXCOORD0;
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPos					: POSITION;			// Projection-space position	
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float  fog						: FOG;
+#endif
+
+	float4 spotTexCoord						: TEXCOORD0;
+	
+	float2 baseTexCoord						: TEXCOORD1;
+	float3 vWorldToLight					: TEXCOORD2;
+	float3 worldNormal						: TEXCOORD3;
+
+	//float2 detailCoords					: TEXCOORD4;
+	float3 worldPos							: TEXCOORD5;	
+#if HARDWAREFOGBLEND || DOPIXELFOG
+	float3 projPos_fogFactorW				: TEXCOORD6;
+#else
+	float4 projPos_fogFactorW				: TEXCOORD6;
+#endif
+	
+	float4 vDiffuse							: COLOR0;
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;	
+	
+	// Perform skinning
+	float3 worldNormal, worldPos;
+	SkinPositionAndNormal( 
+		g_bSkinning, 
+		v.vPos, v.vNormal.xyz,
+		v.vBoneWeights, v.vBoneIndices,
+		worldPos, worldNormal );
+
+	if( g_bSkinning )
+	{
+		worldNormal = normalize( worldNormal );
+	}
+	
+	o.vProjPos = mul( float4( worldPos, 1 ), cViewProj );
+	
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.vProjPos.y = -o.vProjPos.y;
+	o.vProjPos.z = 2.0f * o.vProjPos.z - o.vProjPos.w;
+#endif // _PS3
+	
+	o.worldPos = worldPos;
+	o.projPos_fogFactorW.xyz = o.vProjPos.xyz;
+
+#if HARDWAREFOGBLEND
+	o.fog = CalcFixedFunctionFog( worldPos, g_FogType );
+#endif
+#if !DOPIXELFOG && !HARDWAREFOGBLEND
+	o.projPos_fogFactorW.w = CalcNonFixedFunctionFog( worldPos, g_FogType );
+#endif
+
+	o.spotTexCoord.x = dot( worldPos, cWorldToTextureTransform[0].xyz ) + cWorldToTextureTransform[0].w;
+	o.spotTexCoord.y = dot( worldPos, cWorldToTextureTransform[1].xyz ) + cWorldToTextureTransform[1].w;
+	o.spotTexCoord.z = dot( worldPos, cWorldToTextureTransform[2].xyz ) + cWorldToTextureTransform[2].w;
+	o.spotTexCoord.w = dot( worldPos, cWorldToTextureTransform[3].xyz ) + cWorldToTextureTransform[3].w;
+	
+	o.baseTexCoord.x = dot( v.vBaseTexCoord, cBaseTexCoordTransform[0].xy ) + cBaseTexCoordTransform[0].w;
+	o.baseTexCoord.y = dot( v.vBaseTexCoord, cBaseTexCoordTransform[1].xy ) + cBaseTexCoordTransform[1].w;
+	
+	float3 vWorldPosToLight = cLightPosition.xyz - worldPos;
+	o.vWorldToLight = vWorldPosToLight;
+	
+	float3 distatten;
+	distatten.z = dot( vWorldPosToLight, vWorldPosToLight );
+	distatten.y = rsqrt( distatten.z );
+	distatten.x = 1.0f;
+	
+	float dist = distatten.z * distatten.y;
+	
+	distatten.z = 1 / distatten.z;
+
+	float endFalloffFactor = dist - cAttenuationFactors.w;
+	endFalloffFactor *= cLightPosition.w;
+	endFalloffFactor = saturate( endFalloffFactor );
+	
+	float vertAtten = dot( distatten, cAttenuationFactors.xyz ) * endFalloffFactor;
+	
+	if( g_bTeeth )
+	{
+		float mouthAtten = dot( worldNormal.xyz, cTeethAttenuationConst.xyz );
+		mouthAtten = max( mouthAtten, 0.0f );
+		mouthAtten *= cTeethAttenuationConst.w;
+		vertAtten *= mouthAtten;
+	}
+	
+	o.vDiffuse = vertAtten;
+	o.worldNormal = worldNormal;
+	
+	return o;
+}
+
+
+

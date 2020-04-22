@@ -1,0 +1,16 @@
+//-----------------------------------------------------------------------------
+//	DXSDK_MACROS.VPC
+//
+//	Directory macros for projects that use D3D
+//-----------------------------------------------------------------------------
+
+$MacroRequired				"SRCDIR"
+
+$Macro DXSDKLIBPLATSUBDIR	"\."		[$WIN32]
+$Macro DXSDKLIBPLATSUBDIR	"\x64"		[$WIN64]
+
+$Macro DXSDKDIR "$SRCDIR\thirdparty\dxsdk"
+
+$Macro DXSDKINCLUDE	"$DXSDKDIR\include"
+
+$Macro LIBDXSDK	"$DXSDKDIR\lib$DXSDKLIBPLATSUBDIR"

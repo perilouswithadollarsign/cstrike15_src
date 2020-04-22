@@ -1,0 +1,77 @@
+//-----------------------------------------------------------------------------
+// PHONEMEEXTRACTOR.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin\phonemeextractors"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_win32_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE;../common,../hlfaceposer,../sapi51/include"
+		$PreprocessorDefinitions			"$BASE;PHONEMEEXTRACTOR_EXPORTS"
+	}
+	
+	$Linker
+	{
+		$AdditionalDependencies				"odbc32.lib odbccp32.lib"
+	}
+}
+
+$Project "Phonemeextractor"
+{
+	$Folder	"Source Files"
+	{
+		$File	"extractor_utils.cpp"
+		$File	"$SRCDIR\public\phonemeconverter.cpp"
+		$File	"$SRCDIR\public\sentence.cpp"
+		$File	"phonemeextractor.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"talkback.h"
+	}
+	
+	$Folder	"SAPI Header Files"
+	{
+		$File	"..\sapi51\include\sapi.h"
+		$File	"..\sapi51\include\sapiddk.h"
+		$File	"..\sapi51\include\spddkhlp.h"
+		$File	"..\sapi51\include\spdebug.h"
+		$File	"..\sapi51\include\sperror.h"
+		$File	"..\sapi51\include\sphelper.h"
+	}
+	
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\tier0\basetypes.h"
+		$File	"$SRCDIR\public\tier0\dbg.h"
+		$File	"$SRCDIR\public\tier0\fasttimer.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\mathlib\mathlib.h"
+		$File	"$SRCDIR\public\phonemeconverter.h"
+		$File	"$SRCDIR\public\phonemeextractor\phonemeextractor.h"
+		$File	"$SRCDIR\public\tier0\platform.h"
+		$File	"$SRCDIR\public\sentence.h"
+		$File	"$SRCDIR\public\string_t.h"
+		$File	"$SRCDIR\public\tier1\strtools.h"
+		$File	"$SRCDIR\public\tier1\utllinkedlist.h"
+		$File	"$SRCDIR\public\tier1\utlmemory.h"
+		$File	"$SRCDIR\public\tier1\utlvector.h"
+		$File	"$SRCDIR\public\mathlib\vector.h"
+		$File	"$SRCDIR\public\mathlib\vector2d.h"
+		$File	"$SRCDIR\public\vstdlib\vstdlib.h"
+	}
+	
+	$Folder	"Link Libraries"
+	{
+		$File	"$SRCDIR\lib\public\mathlib.lib"
+		$File	"..\sapi51\lib\i386\sapi.lib"
+	}
+}

@@ -1,0 +1,93 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "VERTEXCOLOR"		"0..1"
+
+// DYNAMIC: "NUM_LIGHTS"		"0..4"					[ps20b]
+// DYNAMIC: "NUM_LIGHTS"		"0..4"					[ps30]
+// DYNAMIC: "AMBIENT_LIGHT"		"0..1"
+
+// Includes =======================================================================================
+#include "common_vertexlitgeneric_dx9.h"
+
+// Texture Samplers ===============================================================================
+sampler g_tColorSampler				: register( s0 );
+sampler g_tBumpSampler				: register( s1 );
+sampler g_tDummySampler				: register( s2 );
+
+// Shaders Constants and Globals ==================================================================
+const float4 g_mViewProj0			: register( c0 );	// 1st row of matrix
+const float4 g_mViewProj1			: register( c1 );	// 2nd row of matrix
+const float4 g_vCameraPosition		: register( c2 );
+const float3 g_ambientCube[6]		: register( c3 );
+								  //: register( c4 );
+								  //: register( c5 );
+								  //: register( c6 );
+								  //: register( c7 );
+								  //: register( c8 );
+
+PixelShaderLightInfo g_lightInfo[3]	: register( c9 ); // 2 registers each - 6 registers total
+								  //: register( c10 );
+								  //: register( c11 );
+								  //: register( c12 );
+								  //: register( c13 );
+								  //: register( c14 );
+
+// Interpolated values ============================================================================
+struct PS_INPUT
+{
+	float2 vUv0					: TEXCOORD0;
+	float3 vWorldNormal			: TEXCOORD1;
+	float3 vWorldTangent		: TEXCOORD2;
+	float3 vWorldBinormal		: TEXCOORD3;
+	float3 vWorldPosition		: TEXCOORD4;
+	float4 vLightAtten			: TEXCOORD5;
+	#if ( VERTEXCOLOR )
+		float4 vVertexColor		: COLOR0;
+	#endif
+};
+
+// Main ===========================================================================================
+float4 main( PS_INPUT i ) : COLOR
+{
+	// Color
+	float4 cBaseColor = tex2D( g_tColorSampler, i.vUv0.xy );
+
+	// Bump
+	float4 vBumpTexel = tex2D( g_tBumpSampler, i.vUv0.xy );
+
+	// Combine bump layers into tangetn normal
+	float3 vTangentNormal = ( vBumpTexel * 2.0f ) - 1.0f;
+
+	// Transform into world space
+	float3 vWorldNormal = Vec3TangentToWorld( vTangentNormal.xyz, i.vWorldNormal.xyz, i.vWorldTangent.xyz, i.vWorldBinormal.xyz );
+
+	// Lighting
+	float3 cDiffuse = float3( 0.0f, 0.0f, 0.0f );
+	#if ( VERTEXCOLOR )
+	{
+		// Use interpolated vertex colors
+		cDiffuse.rgb = i.vVertexColor.rgb;
+	}
+	#else
+	{
+		// Compute lighting
+		cDiffuse.rgb = PixelShaderDoLighting( i.vWorldPosition.xyz, normalize( vWorldNormal.xyz ),
+				float3( 0.0f, 0.0f, 0.0f ), false, AMBIENT_LIGHT, i.vLightAtten.xyzw,
+				g_ambientCube, g_tDummySampler, NUM_LIGHTS, g_lightInfo, false,
+				false, g_tDummySampler );
+	}
+	#endif
+
+	//===============//
+	// Combine terms //
+	//===============//
+	float4 result;
+	result.rgb = cBaseColor.rgb;
+	result.rgb *= cDiffuse.rgb;
+
+	// Set alpha to...
+	result.a = 0.0f;
+
+	return FinalOutput( result, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR ); //go back to final output when it'll fit.
+}
+  

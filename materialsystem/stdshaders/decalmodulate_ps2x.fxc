@@ -1,0 +1,59 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+// paired with "vertexlit_and_unlit_generic_vs##"
+
+// STATIC: "VERTEXALPHA"		"0..1"
+// STATIC: "FOGFADE"		"0..1"
+#include "common_fog_ps_fxc.h"
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+sampler TexSampler	: register( s0 );
+
+const float4 g_FogParams				: register( PSREG_FOG_PARAMS );
+const float4 g_EyePos_SpecExponent		: register( PSREG_EYEPOS_SPEC_EXPONENT );
+const float4 g_FogTweakParams			: register( c0 );
+#define g_fFogExponentTweak	g_FogTweakParams.x
+#define g_fFogScaleTweak	g_FogTweakParams.y
+
+#define FOG_START_FADE ( g_FogTweakParams.z ) //0.1
+#define FOG_END_FADE ( g_FogTweakParams.w ) //0.30
+
+struct PS_INPUT
+{
+	float2 baseTexCoord				: TEXCOORD0;		// Base texture coordinate
+	
+	float4 worldPos_projPosZ		: TEXCOORD1;		// Necessary for pixel fog
+
+    float4 color					: COLOR1;
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 result = tex2D( TexSampler, i.baseTexCoord );
+	
+	// Blend towards grey based on alpha
+	float flFactor = 1.0;
+#if VERTEXALPHA
+	flFactor *= i.color.w;
+#endif
+	result.xyz = lerp( float3( 0.5, 0.5, 0.5 ), result.xyz, flFactor ); 
+
+	// Since we're blending with a mod2x, we need to compensate with this hack
+	// NOTE: If the fog color (not fog density) is extremely dark, this can makes some decals seem
+	//       a little transparent, but it's better than not doing this
+	float flFogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos_SpecExponent.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+	float flAdjustedFogFactor = pow( saturate( g_fFogScaleTweak * flFogFactor ), g_fFogExponentTweak );
+
+	if ( FOGFADE )
+	{
+		float flFogFadeAmount = clamp( ( flFogFactor - FOG_START_FADE ) / ( FOG_END_FADE - FOG_START_FADE ), 0.0, 1.0 );
+		result.xyz = lerp( result.xyz, float3( 0.5, 0.5, 0.5 ), flFogFadeAmount );
+		
+		return FinalOutput( result, flAdjustedFogFactor, PIXEL_FOG_TYPE_RANGE, TONEMAP_SCALE_NONE );
+	}
+	else
+	{
+		return FinalOutput( result, flAdjustedFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE );
+	}
+}

@@ -1,0 +1,31 @@
+"schproj2"
+{
+	"../public/resourcefile/schema/particles.g.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+	"../public/resourcefile/resourceintrospection.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+	"../public/resourcefile/resourcetype.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+	"../public/resourcefile/resourcedictionary.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+	"../public/resourcefile/schema/resourceidlist.g.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+	"../public/resourcefile/schema/resourceextreflist.g.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+	"../public/resourcefile/schema/sheet.g.h"
+	{
+		"clArgs" "/I \"..\\common\" /I \"..\\public\" /I \"..\\public\\tier0\" /I \"..\\public\\tier1\" /D \"WIN32\" /D \"_WIN32\" /D \"_DEBUG\" /D \"DEBUG\" /D \"_LIB\" /D \"_CRT_SECURE_NO_DEPRECATE\" /D \"_CRT_NONSTDC_NO_DEPRECATE\" /D \"_DLL_EXT=.dll\" /D \"COMPILER_MSVC32\" /D \"COMPILER_MSVC\" /D \"_MBCS\""
+	}
+}

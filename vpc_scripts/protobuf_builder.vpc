@@ -1,0 +1,72 @@
+
+$MacroRequired	GENERATED_PROTO_DIR
+
+// Indicate that this VPC file has been included so that the VPC files
+// that declare .proto files can require that this is included first
+// by using $MacroRequired	PROTOBUF_BUILDER_INCLUDED
+$Macro PROTOBUF_BUILDER_INCLUDED "1"
+
+$CustomBuildStep "proto"
+{
+	$Description	"Running Protocol Buffer Compiler on $(InputFileName)..."
+	$CommandLine	"if not exist $GENERATED_PROTO_DIR mkdir $GENERATED_PROTO_DIR" "\n" \
+					"$SRCDIR\devtools\bin\protoc.exe --proto_path=$SRCDIR\thirdparty\protobuf-2.5.0\src --proto_path=$(InputDir) --proto_path=$SRCDIR\gcsdk --proto_path=$SRCDIR\game\shared --proto_path=$SRCDIR\game\shared\cstrike15 --proto_path=$SRCDIR\common --cpp_out=$GENERATED_PROTO_DIR $(InputPath)" [$WINDOWS]
+	$CommandLine	"mkdir -p $GENERATED_PROTO_DIR 2> /dev/null;"  \
+					"$SRCDIR/devtools/bin/osx32/protoc --proto_path=$SRCDIR\thirdparty\protobuf-2.5.0\src --proto_path=$(InputDir) --proto_path=$SRCDIR\gcsdk --proto_path=$SRCDIR\game\shared --proto_path=$SRCDIR\game\shared\cstrike15 --proto_path=$SRCDIR\common --cpp_out=$GENERATED_PROTO_DIR $(InputPath)" [$OSXALL]
+	$CommandLine	"mkdir -p $GENERATED_PROTO_DIR 2> /dev/null;"  \
+					"$SRCDIR/devtools/bin/linux/protoc --proto_path=$SRCDIR\thirdparty\protobuf-2.5.0\src --proto_path=$(InputDir) --proto_path=$SRCDIR\gcsdk --proto_path=$SRCDIR\game\shared --proto_path=$SRCDIR\game\shared\cstrike15 --proto_path=$SRCDIR\common --cpp_out=$GENERATED_PROTO_DIR $(InputPath)" [$LINUX]
+	$Outputs		"$GENERATED_PROTO_DIR\$(InputName).pb.cc;$GENERATED_PROTO_DIR\$(InputName).pb.h"
+}
+
+
+$Configuration
+{
+	$Compiler
+	{
+		// General
+		$AdditionalIncludeDirectories		"$BASE;$GENERATED_PROTO_DIR;$SRCDIR\thirdparty\protobuf-2.5.0\src"
+		$PreprocessorDefinitions			"$BASE;PROTOBUF"
+	}
+}
+
+$Project
+{
+	$Folder "Protobuf Files"
+	{
+		$Folder "Google Protobuf Headers"
+		{
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/descriptor.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/descriptor.pb.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/extension_set.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/generated_message_reflection.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/generated_message_util.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/io/coded_stream.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/message.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/message_lite.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/reflection_ops.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/repeated_field.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/stubs/common.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/stubs/once.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/unknown_field_set.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/wire_format.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/wire_format_lite.h"
+			$File "$SRCDIR/thirdparty/protobuf-2.5.0/src/google/protobuf/wire_format_lite_inl.h"
+		}
+
+		$Folder "Helpers"
+		{
+			$File "$SRCDIR/common/protobuf_helpers.h"
+			$File "$SRCDIR/common/protobuf_helpers.cpp"
+			{
+				$Configuration
+				{
+					$Compiler [$WINDOWS]
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+					}
+				}
+			}
+		}
+	}
+}
+

@@ -1,0 +1,182 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "BASETEXTURE"				"0..1"
+// STATIC: "REFLECT"					"0..1"
+// STATIC: "REFRACT"					"0..1"
+// STATIC: "ENVMAPMASK"					"0..1"
+
+#include "common_fog_ps_fxc.h"
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..1"	[ps20b] [PC]
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"	[ps20b] [CONSOLE]
+
+#if defined( SHADER_MODEL_PS_2_0 )
+	#define WRITE_DEPTH_TO_DESTALPHA 0
+#endif
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+sampler RefractSampler			: register( s0 );
+sampler BaseTextureSampler		: register( s1 );
+sampler ReflectSampler			: register( s2 );
+#if BASETEXTURE
+	sampler LightmapSampler			: register( s3 );
+#endif
+#if ENVMAPMASK
+	sampler EnvMapMaskSampler		: register( s6 );
+#endif
+sampler NormalSampler			: register( s4 );
+
+const float4 g_vRefractTint			: register( c1 );
+const float g_flReflectance			: register( c3 );
+const float4 g_vReflectTint			: register( c4 );
+const float4 g_ReflectRefractScale	: register( c5 ); // xy - reflect scale, zw - refract scale
+
+const float4 g_PixelFogParams		: register( PSREG_FOG_PARAMS );
+const float4 g_EyePos				: register( PSREG_EYEPOS_SPEC_EXPONENT );
+
+static const bool g_bReflect = REFLECT ? true : false;
+static const bool g_bRefract = REFRACT ? true : false;
+
+struct PS_INPUT
+{
+	float4 vBumpTexCoordXY_vTexCoordXY : TEXCOORD0;
+	float4 vPositionToCameraRayTs_projW		: TEXCOORD1;
+	float4 vReflectXY_vRefractYX	: TEXCOORD2;
+	float4 vProjPos					: TEXCOORD4;
+	float3 worldPos					: TEXCOORD5;
+
+#if BASETEXTURE
+	float4 lightmapTexCoord1And2		: TEXCOORD6_centroid;
+	float4 lightmapTexCoord3			: TEXCOORD7_centroid;
+#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	// Load normal and expand range
+	float4 vNormalTexel = tex2D( NormalSampler, i.vBumpTexCoordXY_vTexCoordXY.xy );
+	float3 vNormalTs = normalize( ( vNormalTexel.xyz * 2.0 ) - 1.0 );
+
+	// Perform division by W only once
+	float ooW = 1.0f / i.vPositionToCameraRayTs_projW.w;
+	//float2 unwarpedRefractTexCoord = i.vReflectXY_vRefractYX.wz * ooW;
+
+	// Vectorize the dependent UV calculations (reflect = .xy, refract = .wz)
+	#ifdef NV3X
+		float4 vDependentTexCoords = vNormalTs.xyxy * vNormalTexel.a * g_ReflectRefractScale.xyzw;
+	#else
+		float4 vN;
+		vN.xy = vNormalTs.xy;
+		vN.w = vNormalTs.x;
+		vN.z = vNormalTs.y;
+		float4 vDependentTexCoords = vN * vNormalTexel.a * g_ReflectRefractScale.xyzw;
+	#endif
+
+	vDependentTexCoords.xyzw += i.vReflectXY_vRefractYX.xyzw * ooW;
+	float2 vReflectTexCoord = vDependentTexCoords.xy;
+	float2 vRefractTexCoord = vDependentTexCoords.wz;
+
+	// Sample reflection
+	float3 vReflectColor = float3( 0.0f, 0.0f, 0.0f );
+	#if ( REFLECT )
+	{
+		vReflectColor.rgb = tex2D( ReflectSampler, vReflectTexCoord ).rgb;
+		vReflectColor.rgb *= g_vReflectTint.rgb;
+	}
+	#endif
+
+	// Sample refraction
+	float3 vRefractColor = float3( 0.0f, 0.0f, 0.0f );
+	#if ( REFRACT )
+	{
+		vRefractColor = tex2D( RefractSampler, vRefractTexCoord ).rgb;
+		vRefractColor.rgb *= g_vRefractTint.rgb;
+	}
+	#endif
+
+	// Schlick Fresnel
+	float3 vPositionToCameraDirTs = normalize( i.vPositionToCameraRayTs_projW.xyz );
+	float flNdotV = saturate( dot( vPositionToCameraDirTs.xyz, vNormalTs.xyz ) );
+	float flFresnel = g_flReflectance + ( ( 1.0f - g_flReflectance ) * pow( 1.0f - flNdotV, 5.0f ) );
+	//flFresnel = 1.0f - flFresnel;
+	//return flFresnel;
+
+	float flRefractMask = 0.0f;
+	#if BASETEXTURE
+		float4 baseSample = tex2D( BaseTextureSampler, i.vBumpTexCoordXY_vTexCoordXY.zw );
+		flRefractMask = baseSample.a;
+
+		float2 bumpCoord1;
+		float2 bumpCoord2;
+		float2 bumpCoord3;
+		ComputeBumpedLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3.xy,
+			bumpCoord1, bumpCoord2, bumpCoord3 );
+
+		float4 lightmapSample1 = tex2D( LightmapSampler, bumpCoord1 );
+		float3 lightmapColor1 = lightmapSample1.rgb;
+		float3 lightmapColor2 = tex2D( LightmapSampler, bumpCoord2 ).rgb;
+		float3 lightmapColor3 = tex2D( LightmapSampler, bumpCoord3 ).rgb;
+
+		float3 dp;
+		dp.x = saturate( dot( vNormalTs, bumpBasis[0] ) );
+		dp.y = saturate( dot( vNormalTs, bumpBasis[1] ) );
+		dp.z = saturate( dot( vNormalTs, bumpBasis[2] ) );
+		dp *= dp;
+
+		float3 diffuseLighting = dp.x * lightmapColor1 +
+							dp.y * lightmapColor2 +
+							dp.z * lightmapColor3;
+		float sum = dot( dp, float3( 1.0f, 1.0f, 1.0f ) );
+		diffuseLighting *= LIGHT_MAP_SCALE / sum;
+		float3 diffuseComponent = baseSample.rgb * diffuseLighting;
+	#endif
+
+	// Mask
+	float3 vSpecMask = float3( 1.0f, 1.0f, 1.0f );
+	#if ( REFLECT && ENVMAPMASK )
+	{
+		vSpecMask.rgb = tex2D( EnvMapMaskSampler, i.vBumpTexCoordXY_vTexCoordXY.zw ).rgb;
+	}
+	#endif
+
+	// NOTE: the BASETEXTURE path hasn't been tested (or really written for that matter, just copied from water)
+	// What I think should happen is that the alpha of base texture should be its 'translucency'
+	// which should indicate how much refraction to use.
+	// We should add an envmapmask to deal with how much reflection to use
+	// along with all the focus, etc. features
+	float4 result = float4( 0.0f, 0.0f, 0.0f, 1.0f );
+	#if ( REFLECT || REFRACT )
+	{
+		// Refraction
+		result.rgb = vRefractColor.rgb * ( 1.0f - flFresnel );
+
+		// Add in diffuse component applying fresnel to pixels with no spec mask
+		#if ( BASETEXTURE )
+		{
+			result.rgb += lerp( diffuseComponent.rgb, diffuseComponent.rgb * ( 1.0f - flFresnel ), vSpecMask.rgb );
+		}
+		#endif
+
+		// Add reflection
+		result.rgb += ( vReflectColor.rgb * flFresnel ) * vSpecMask.rgb;
+	}
+	#else // No reflect or refract
+	{
+		#if ( BASETEXTURE )
+		{
+			result.rgba = float4( diffuseComponent.rgb, flRefractMask );
+		}
+		#endif
+	}
+	#endif
+
+	float fogFactor = 0.0f;
+	#if ( PIXELFOGTYPE == PIXEL_FOG_TYPE_RANGE )
+	{
+		fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_PixelFogParams, g_EyePos.xyz, i.worldPos.xyz, i.vProjPos.z );
+	}
+	#endif
+
+	return FinalOutput( result.rgba, fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE, ( WRITE_DEPTH_TO_DESTALPHA != 0 ), i.vProjPos.z );
+}

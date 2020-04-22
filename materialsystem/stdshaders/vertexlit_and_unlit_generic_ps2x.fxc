@@ -1,0 +1,775 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "SFM"						"0..0" [ps20] [ps20b] [PC]
+// STATIC: "SFM"						"0..1" [ps30] [PC]
+// STATIC: "SFM"						"0..0" [CONSOLE]
+
+// STATIC: "DETAILTEXTURE"				"0..1"
+// STATIC: "CUBEMAP"					"0..1"
+// STATIC: "DIFFUSELIGHTING"			"0..1"
+// STATIC: "ENVMAPMASK"					"0..1"
+// STATIC: "BASEALPHAENVMAPMASK"		"0..1"
+// STATIC: "SELFILLUM"					"0..1"
+// STATIC: "VERTEXCOLOR"				"0..1"
+// STATIC: "FLASHLIGHT"					"0..1"
+// STATIC: "SELFILLUM_ENVMAPMASK_ALPHA" "0..1"
+// STATIC: "DETAIL_BLEND_MODE"          "0..9"
+
+// disable outline, glow, soft edges, seamless base/detail(doesn't seem to be used)
+// STATIC: "OUTLINE"                    "0..0"
+// STATIC: "OUTER_GLOW"                 "0..0"
+// STATIC: "SOFT_MASK"                  "0..0"
+// STATIC: "SEAMLESS_BASE"              "0..0"
+// STATIC: "SEAMLESS_DETAIL"            "0..0"
+// STATIC: "DISTANCEALPHA"              "0..0"
+// STATIC: "DISTANCEALPHAFROMDETAIL"    "0..0"
+
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..3"	[ps20b] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..2"	[ps30]  [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..1"	[ps20b] [CONSOLE]
+// STATIC: "SHADER_SRGB_READ"			"0..1"	[XBOX]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[PC]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[SONYPS3]
+// STATIC: "DESATURATEWITHBASEALPHA"	"0..1"
+// STATIC: "LIGHTING_PREVIEW"			"0..0"	[PC]		// Disabled. Unused on CS:GO --Thorsten
+// STATIC: "LIGHTING_PREVIEW"			"0..0"	[CONSOLE]
+// STATIC: "ENVMAPFRESNEL"				"0..1"
+// STATIC: "SRGB_INPUT_ADAPTER"			"0..1"	[ps20b]
+
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[CONSOLE]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..0"	[ps20] [PC]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[ps20b] [ps30] [PC]
+// STATIC: "CSM_MODE"					"0..0"	[CONSOLE]
+// STATIC: "CSM_MODE"					"0..0"	[ps20] [ps20b] [PC]
+// STATIC: "CSM_MODE"					"0..3"	[ps30] [PC]
+
+// STATIC: "CSM_BLENDING"				"0..1"
+
+// STATIC: "DECAL_BLEND_MODE"           "0..2"
+
+// STATIC: "TINTMASKTEXTURE"			"0..1"	[ps30] // not enough combos to support this - use vertexlit..bump or phong
+// STATIC: "TINTMASKTEXTURE"			"0..0"	[ps20] [ps20b]
+// STATIC: "TINTMASKTEXTURE"			"0..0"	[CONSOLE]
+
+
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"	[ps20b]
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"	[ps30]
+// DYNAMIC: "WRITEWATERFOGTODESTALPHA"	"0..1"
+// DYNAMIC: "UBERLIGHT"					"0..1"	[ps30] [PC]
+
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[CONSOLE]
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[ps20b] [PC]
+// DYNAMIC: "CASCADE_SIZE"				"0..0"  [ps20] [ps30] [PC]
+
+// DYNAMIC: "SMOKEGRENADEBLEND"			"0..1"
+
+// SKIP: ( $SFM == 0 ) && ( $UBERLIGHT == 1 )
+
+// detail blend mode 6 = ps20b only
+// SKIP: $DETAIL_BLEND_MODE == 6				[ps20]
+
+// SKIP: ( $FLASHLIGHT == 1 ) && ( $CUBEMAP == 1 ) [PC]
+// SKIP: ($DETAILTEXTURE == 0 ) && ( $DETAIL_BLEND_MODE != 0 )
+// SKIP: ($DETAILTEXTURE == 0 ) && ( $SEAMLESS_DETAIL )
+// SKIP: ($ENVMAPMASK || $SELFILLUM_ENVMAPMASK_ALPHA) && ($SEAMLESS_BASE || $SEAMLESS_DETAIL)
+// SKIP: $BASEALPHAENVMAPMASK && $ENVMAPMASK
+// SKIP: $BASEALPHAENVMAPMASK && $SELFILLUM
+// SKIP: $SELFILLUM && $SELFILLUM_ENVMAPMASK_ALPHA
+// SKIP: $SELFILLUM_ENVMAPMASK_ALPHA && (! $ENVMAPMASK)
+// SKIP: $BASEALPHAENVMAPMASK && ($SEAMLESS_BASE || $SEAMLESS_DETAIL)
+// SKIP: ($DISTANCEALPHA == 0) && ($DISTANCEALPHAFROMDETAIL || $SOFT_MASK || $OUTLINE || $OUTER_GLOW)
+// SKIP: ($DETAILTEXTURE == 0) && ($DISTANCEALPHAFROMDETAIL)
+
+// envmap stuff is meaningless if we're not using a cubemap
+// SKIP: ( $CUBEMAP == 0 ) && ( ( $ENVMAPFRESNEL == 1 ) || ( $BASEALPHAENVMAPMASK == 1 ) )
+// SKIP: ( $CUBEMAP == 0 ) && ( $ENVMAPMASK == 1 ) && ( $SELFILLUM_ENVMAPMASK_ALPHA == 0 )
+
+
+// We don't care about flashlight depth unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )	[ps20b]
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )	[ps30]
+
+// We don't care about uberlight unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $UBERLIGHT == 1 )	[ps30]
+
+// DISTANCEALPHA-related skips
+// SKIP: ($DISTANCEALPHA) && ($ENVMAPMASK || $BASEALPHAENVMAPMASK || $SELFILLUM || $SELFILLUM_ENVMAPMASK_ALPHA || $ENVMAPFRESNEL)
+// SKIP: ($DISTANCEALPHA) && ($SEAMLESS_BASE || $SEAMLESS_DETAIL || $CUBEMAP )
+// SKIP: ($DISTANCEALPHA) && ($WRITEWATERFOGTODESTALPHA || $PIXELFOGTYPE || $FLASHLIGHT || $FLASHLIGHTSHADOWS )
+
+// SKIP: $SEAMLESS_BASE && $SRGB_INPUT_ADAPTER
+
+// Don't do this with seamless textures for now until we determine if we want to use this.  Could probably skip more here to save some combos
+// skipping detailtextures to keep combos down
+// SKIP: $DESATURATEWITHBASEALPHA && ( $SEAMLESS_BASE || $DETAILTEXTURE )
+
+// These don't make sense together since they both use the base alpha channel
+// Also, using the same constant for the desaturate amount and the selfillumtint
+// SKIP: $DESATURATEWITHBASEALPHA && ( $SELFILLUM || $SELFILLUM_ENVMAPMASK_ALPHA )
+
+// These won't fit in ps20 at the same time.
+// SKIP: $DESATURATEWITHBASEALPHA && $BASEALPHAENVMAPMASK
+
+// SKIP: $FLASHLIGHTSHADOWS && ($LIGHTING_PREVIEW == 3)
+
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CASCADE_SIZE != 0 ) 
+// SKIP: ( $CASCADED_SHADOW_MAPPING != 0 ) && ( $SFM != 0 ) 
+// SKIP: ( $CASCADED_SHADOW_MAPPING != 0 ) && ( $FLASHLIGHT != 0 ) 
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CSM_MODE != 0 ) 
+
+#define PC_FLASHLIGHT ((FLASHLIGHT == 1) && !defined( _GAMECONSOLE ))
+
+#include "common_fog_ps_supportsvertexfog_fxc.h"
+#include "shader_constant_register_map.h"
+#include "common_flashlight_fxc.h"
+#include "common_vertexlitgeneric_dx9.h"
+#include "common_decaltexture_fxc.h"
+
+ 
+
+const float4 g_EnvmapTint_SPF					: register( c0 ); //SPF=Single Pass Flashlight, stored in previously unused alpha.
+const float4 g_DiffuseModulation				: register( c1 );
+const float4 g_ShadowTweaks						: register( c2 );
+const float4 g_EnvmapParams					: register( c19 );
+#define g_EnvmapContrast g_EnvmapParams.x
+#define g_DiffuseCubemapScale g_EnvmapParams.y
+#define g_fvDiffuseCubemapMin g_EnvmapParams.z
+#define g_fvDiffuseCubemapMax g_EnvmapParams.w
+const float4 g_EnvmapSaturation_SelfIllumMask	: register( c3 );
+const float4 g_SelfIllumTintOrSaturateFactor_and_BlendFactor	: register( c4 );
+
+// glow params
+const float4 g_GlowParameters					: register( c5 );
+const float4 g_GlowColor						: register( c6 );
+#define GLOW_UV_OFFSET				g_GlowParameters.xy
+#define OUTER_GLOW_MIN_DVALUE		g_GlowParameters.z
+#define OUTER_GLOW_MAX_DVALUE		g_GlowParameters.w
+#define OUTER_GLOW_COLOR			g_GlowColor
+
+const float4 g_DistanceAlphaParams				: register( c7 );
+#define SOFT_MASK_MAX g_DistanceAlphaParams.x
+#define SOFT_MASK_MIN g_DistanceAlphaParams.y
+#define g_flBaseAlphaEnvMapMaskBias g_DistanceAlphaParams.z
+#define g_flBaseAlphaEnvMapMaskScale g_DistanceAlphaParams.w
+
+const float4 g_OutlineColor						: register( c8 );
+#define OUTLINE_COLOR g_OutlineColor
+
+const float4 g_OutlineParams					: register( c9 );
+
+#define OUTLINE_MIN_VALUE0 g_OutlineParams.x
+#define OUTLINE_MIN_VALUE1 g_OutlineParams.y
+#define OUTLINE_MAX_VALUE0 g_OutlineParams.z
+#define OUTLINE_MAX_VALUE1 g_OutlineParams.w
+
+#if DETAILTEXTURE
+const float3 g_DetailTint						: register( c10 );
+#endif
+
+const float2 g_flSelfIllumScale_g_flIsDecal		: register( c11 );
+#define g_flSelfIllumScale	g_flSelfIllumScale_g_flIsDecal.x
+#define g_flIsDecal g_flSelfIllumScale_g_flIsDecal.y
+
+const float4 g_ShaderControls					: register( c12 );
+
+#define g_fInverseBlendTintByBaseAlpha		g_ShaderControls.x
+#define g_fWriteDepthToAlpha				g_ShaderControls.y
+#define g_fEnvMapMaskInTintMaskTexture		g_ShaderControls.z
+#define g_fVertexAlpha						g_ShaderControls.w
+
+const float4 g_FresnelConstants					: register( c13 );
+#define g_flFresnelBias				g_FresnelConstants.x
+#define g_flFresnelScale			g_FresnelConstants.y
+#define g_flFresnelExp				g_FresnelConstants.z
+#define g_flBaseAlphaEnvMapMaskExp	g_FresnelConstants.w
+
+#if defined( SHADER_MODEL_PS_2_B )
+const float4 g_vCSMLightColor					: register( c14 );
+#endif
+
+const float4 g_EyePos_BaseTextureTranslucency	: register( c20 );
+const float4 g_FogParams						: register( c21 );
+
+#if SELFILLUM || SELFILLUM_ENVMAPMASK_ALPHA
+	#define g_SelfIllumTint			g_SelfIllumTintOrSaturateFactor_and_BlendFactor.xyz
+#elif DESATURATEWITHBASEALPHA
+	#define g_SaturateFactor		g_SelfIllumTintOrSaturateFactor_and_BlendFactor.x
+#endif
+#define g_DetailBlendFactor			g_SelfIllumTintOrSaturateFactor_and_BlendFactor.w
+#define g_EnvmapSaturation			g_EnvmapSaturation_SelfIllumMask.xyz
+#define g_SelfIllumMaskControl		g_EnvmapSaturation_SelfIllumMask.w
+
+const float4 g_FlashlightAttenuationFactors	    : register( c22 );
+const float3 g_FlashlightPos						: register( c23 );
+const float4x4 g_FlashlightWorldToTexture		: register( c24 ); // through c27
+
+//const float g_flTime : register( c25 );
+
+#if UBERLIGHT
+// ps_3_0 and up (over 32 registers)
+const float3 g_vSmoothEdge0						: register( PSREG_UBERLIGHT_SMOOTH_EDGE_0 );		
+const float3 g_vSmoothEdge1						: register( PSREG_UBERLIGHT_SMOOTH_EDGE_1 );
+const float3 g_vSmoothOneOverWidth				: register( PSREG_UBERLIGHT_SMOOTH_EDGE_OOW );
+const float4 g_vShearRound						: register( PSREG_UBERLIGHT_SHEAR_ROUND );
+const float4 g_aAbB								: register( PSREG_UBERLIGHT_AABB );
+const float4x4 g_FlashlightWorldToLight			: register( PSREG_UBERLIGHT_WORLD_TO_LIGHT );
+#endif
+
+sampler BaseTextureSampler		: register( s0 );
+samplerCUBE EnvmapSampler		: register( s1 );
+sampler DetailSampler			: register( s2 );
+sampler EnvmapMaskSampler		: register( s4 );
+sampler RandRotSampler			: register( s6 );	// RandomRotation sampler
+sampler FlashlightSampler		: register( s7 );
+sampler ShadowDepthSampler		: register( s8 );	// Flashlight shadow depth map sampler
+sampler DepthSampler			: register( s10 );	// depth buffer sampler for depth blending
+sampler SelfIllumMaskSampler	: register( s11 );	// selfillummask
+
+#if ( DECAL_BLEND_MODE != 2 )
+	sampler DecalSampler		: register( s12 );
+#endif
+
+#if ( TINTMASKTEXTURE )
+	sampler TintMaskSampler		: register( s13 );
+#endif
+
+#if defined(_PS3)
+// Needed for optimal shadow filter code generation on PS3.
+#pragma texformat ShadowDepthSampler DEPTH_COMPONENT24
+#endif
+
+struct PS_INPUT
+{
+	// Stuff that isn't seen by the pixel shader
+	float4 projPos										: POSITION;	
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float  fog											: FOG;
+#endif
+	
+	// Stuff that is seen by the pixel shader
+	float4 baseTexCoord_baseTexCoord2u					: TEXCOORD0;	// Base texture coordinates in .xy, seamless in .xyz, 2nd (decal) uv set 'u' in .w
+	float4 detailTexCoord_baseTexCoord2v				: TEXCOORD1;	// Detail texture coordinates in .xy, seamless in .xyz, 2nd (decal) uv set 'v' in .w
+
+	float4 vWorldNormal_fogFactorW						: TEXCOORD2;	// world space normal in .xyz, fog factor in .w
+
+	float4 vWorldPos_csmXform0z							: TEXCOORD3;	// world pos in .xyz, csm lightToWorldxformcascade0.z in .w
+
+	float4 directionalLightingColor_flShadowDimScalar	: TEXCOORD4;
+
+	float4 csmXform0or1_csmXform2						: TEXCOORD5;	// csm lightToWorldxformcascade0 or 1.xy in .xy lightToWorldxformcascade2.xy in .zw
+	float4 color  										: TEXCOORD6;	// vertex color from lighting or unlit in .xyz
+
+	float4 vProjPos										: TEXCOORD7;	// proj pos .xyzw
+
+#if FLASHLIGHT && defined( SHADER_MODEL_PS_3_0 )
+	float4 flashlightSpacePos							: TEXCOORD8;
+#endif
+
+#if SEAMLESS_DETAIL || SEAMLESS_BASE
+	float3 SeamlessWeights								: COLOR0;			// x y z projection weights
+#endif
+
+#if defined( _X360 )
+	float2 vScreenPos : VPOS;
+#endif
+};
+
+#if defined( _X360 ) || defined( _PS3 )
+	#define SINGLE_PASS_FLASHLIGHT 1
+#else
+	#define SINGLE_PASS_FLASHLIGHT 0
+#endif
+
+#define FLASHLIGHT_ONLY ( FLASHLIGHT && !SINGLE_PASS_FLASHLIGHT )
+
+#if ( CASCADED_SHADOW_MAPPING ) && !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+	const bool g_bCSMEnabled : register(b0);
+	#undef CASCADE_SIZE
+	#define CASCADE_SIZE 1
+#endif
+
+#if ( ( !SFM ) && ( !FLASHLIGHT_ONLY ) && ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) )
+	#define CSM_ENABLED 1
+#else
+	#define CSM_ENABLED 0	
+#endif
+
+#if ( CSM_ENABLED )
+	sampler CSMDepthAtlasSampler : register( s15 );
+	
+	#if defined(_PS3)
+		// Needed for optimal shadow filter code generation on PS3.
+		#pragma texformat CSMDepthAtlasSampler DEPTH_COMPONENT24
+	#endif
+	
+	#if defined( SHADER_MODEL_PS_2_B )
+		#define CSM_VERTEXLIT_AND_UNLIT_GENERIC
+	#endif
+
+	#include "csm_common_fxc.h"
+#endif
+
+float Luminance( float3 cColor )
+{
+	// Formula for calculating luminance based on NTSC standard
+	return dot( cColor.rgb, float3( 0.2125, 0.7154, 0.0721 ) );
+}
+
+#if LIGHTING_PREVIEW == 2
+LPREVIEW_PS_OUT main( PS_INPUT i ) : COLOR
+#else
+float4_color_return_type main( PS_INPUT i ) : COLOR
+#endif
+{
+
+
+	HALF4 baseColor = HALF4( 1.00f, 1.0f, 1.0f, 1.0f );
+	#if ( SEAMLESS_BASE )
+	{
+		baseColor =
+			i.SeamlessWeights.x * tex2D( BaseTextureSampler, i.baseTexCoord_baseTexCoord2u.yz )+
+			i.SeamlessWeights.y * tex2D( BaseTextureSampler, i.baseTexCoord_baseTexCoord2u.zx )+
+			i.SeamlessWeights.z * tex2D( BaseTextureSampler, i.baseTexCoord_baseTexCoord2u.xy );
+
+		#if defined ( _X360 ) && ( SHADER_SRGB_READ == 1 )
+		{
+			// Do this after the blending to save shader ops
+			#if defined ( CSTRIKE15 )
+				// [mariod] - 2.2 reads of srgb textures in cstrike15
+				baseColor.rgb = GammaToLinear( baseColor.rgb );
+			#else
+				baseColor.rgb = X360GammaToLinear( baseColor.rgb );
+			#endif
+		}
+		#endif
+	}
+	#else
+	{
+		baseColor = h4tex2Dsrgb( BaseTextureSampler, i.baseTexCoord_baseTexCoord2u.xy );
+		
+		#if ( SRGB_INPUT_ADAPTER )
+		{
+			baseColor.rgb = GammaToLinear( baseColor.rgb );
+		}
+		#endif
+	}
+	#endif
+
+	HALF distAlphaMask;
+	#if( DISTANCEALPHA && ( DISTANCEALPHAFROMDETAIL == 0 ) )
+	{
+		 distAlphaMask = baseColor.a;
+	}
+	#endif
+
+	HALF4 detailColor;
+	#if ( DETAILTEXTURE )
+	{
+		#if( SEAMLESS_DETAIL )
+		{
+			detailColor = 
+					i.SeamlessWeights.x * tex2D( DetailSampler, i.detailTexCoord_baseTexCoord2v.yz )+
+					i.SeamlessWeights.y * tex2D( DetailSampler, i.detailTexCoord_baseTexCoord2v.zx )+
+					i.SeamlessWeights.z * tex2D( DetailSampler, i.detailTexCoord_baseTexCoord2v.xy );
+		}
+		#else
+		{
+			detailColor = tex2D( DetailSampler, i.detailTexCoord_baseTexCoord2v.xy );
+		}
+		#endif
+		detailColor.rgb *= g_DetailTint;
+
+		#if ( DISTANCEALPHA && ( DISTANCEALPHAFROMDETAIL == 1 ) )
+		{
+			distAlphaMask = detailColor.a;
+			detailColor.a = 1.0;									// make tcombine treat as 1.0
+		}
+		#endif
+		baseColor = TextureCombine( baseColor, detailColor, DETAIL_BLEND_MODE, g_DetailBlendFactor );
+	}
+	#endif
+
+	#if ( DESATURATEWITHBASEALPHA )
+	{
+		float grey = dot( baseColor.rgb, float3( 0.3, 0.59, 0.11 ) );
+		baseColor.rgb = lerp( baseColor.rgb, ( float3 )grey, baseColor.a * g_SaturateFactor );
+	}
+	#endif
+
+	#if ( DISTANCEALPHA )
+	{
+		// now, do all distance alpha effects
+		if ( OUTLINE && ( distAlphaMask >= OUTLINE_MIN_VALUE0 ) && ( distAlphaMask <= OUTLINE_MAX_VALUE1 ) )
+		{
+			float oFactor = 1.0f;
+			if ( distAlphaMask <= OUTLINE_MIN_VALUE1 )
+			{
+				oFactor = smoothstep( OUTLINE_MIN_VALUE0, OUTLINE_MIN_VALUE1, distAlphaMask );
+			}
+			else
+			{
+				oFactor = smoothstep( OUTLINE_MAX_VALUE1, OUTLINE_MAX_VALUE0, distAlphaMask );
+			}
+			baseColor = lerp( baseColor, OUTLINE_COLOR, oFactor );
+		}
+
+		float mskUsed;
+		#if ( SOFT_MASK )
+		{
+			mskUsed = smoothstep( SOFT_MASK_MIN, SOFT_MASK_MAX, distAlphaMask );
+			baseColor.a *= mskUsed;
+		}
+		#else
+		{
+			mskUsed = distAlphaMask >= 0.5f;
+			#if ( DETAILTEXTURE )
+			{
+				baseColor.a *= mskUsed;
+			}
+			#else
+			{
+				baseColor.a = mskUsed;
+			}
+			#endif
+		}
+		#endif
+
+		#if ( OUTER_GLOW )
+		{
+			float glowTexel;
+			#if ( DISTANCEALPHAFROMDETAIL )
+			{
+				glowTexel = tex2D( DetailSampler, i.detailTexCoord_baseTexCoord2v.xy+GLOW_UV_OFFSET ).a;
+			}
+			#else
+			{
+				glowTexel = tex2D( BaseTextureSampler, i.baseTexCoord_baseTexCoord2u.xy+GLOW_UV_OFFSET ).a;
+			}
+			#endif
+
+			float4 glowc = OUTER_GLOW_COLOR * smoothstep( OUTER_GLOW_MIN_DVALUE, OUTER_GLOW_MAX_DVALUE, glowTexel );
+			baseColor = lerp( glowc, baseColor, mskUsed );
+		}
+		#endif
+	}
+	#endif
+
+	HALF3 specularFactor = 1.0h;
+	HALF4 envmapMaskTexel;
+    #if ( ENVMAPMASK )
+	{
+		envmapMaskTexel = h4tex2D( EnvmapMaskSampler, i.baseTexCoord_baseTexCoord2u.xy );
+		specularFactor *= (HALF)envmapMaskTexel.xyz;	
+	}
+	#endif
+
+	#if ( BASEALPHAENVMAPMASK )
+	{
+		specularFactor *= saturate( g_flBaseAlphaEnvMapMaskScale * pow( baseColor.a, g_flBaseAlphaEnvMapMaskExp ) + g_flBaseAlphaEnvMapMaskBias );
+	}
+	#endif
+
+	#if ( ENVMAPFRESNEL )
+	{
+		float3 vEyeDir = normalize( g_EyePos_BaseTextureTranslucency.xyz - i.vWorldPos_csmXform0z.xyz );
+		float flFresnel = 1-saturate( dot( normalize( i.vWorldNormal_fogFactorW.xyz ), vEyeDir ) );
+		flFresnel = g_flFresnelScale * pow( flFresnel, g_flFresnelExp ) + g_flFresnelBias;
+		specularFactor *= flFresnel;
+	}
+	#endif
+	
+	float flDirectionalShadow = 1.0f;	
+	#if ( CSM_ENABLED )
+	{
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+		if ( g_bCSMEnabled )
+		{
+#endif	
+#if !defined( _X360 ) && !defined( _PS3 ) && defined( SHADER_MODEL_PS_2_B )
+			flDirectionalShadow = CSMComputeShadowing( i.vWorldPos_csmXform0z.xyz, i.csmXform0or1_csmXform2.xy, i.csmXform0or1_csmXform2.zw, i.vWorldPos_csmXform0z.w );
+#else
+			flDirectionalShadow = CSMComputeShadowing( i.vWorldPos_csmXform0z.xyz );
+#endif
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+		}
+#endif	
+	}
+	#endif
+
+	HALF3 diffuseLighting = HALF3( 1.0f, 1.0f, 1.0f );
+	#if ( DIFFUSELIGHTING || VERTEXCOLOR && !( VERTEXCOLOR && DIFFUSELIGHTING ) )
+	{
+		diffuseLighting = (HALF3)i.color.rgb;
+
+		diffuseLighting.rgb += i.directionalLightingColor_flShadowDimScalar.rgb * flDirectionalShadow;
+
+		#if ( CSM_ENABLED && !VERTEXCOLOR )
+		{
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+			if ( g_bCSMEnabled )
+			{
+#endif	
+				#if ( !FLASHLIGHT )
+				{
+					float flSunAmount = i.directionalLightingColor_flShadowDimScalar.w;
+
+					#if ( CSM_BLENDING == 1 )
+		
+						if ( flSunAmount > 0.0f )
+						{
+							float3 direct = flSunAmount * g_vCSMLightColor.rgb;
+							float3 indirect = i.color.rgb;
+
+							// Apply csm shadows
+							diffuseLighting.rgb = ( direct * flDirectionalShadow ) + indirect;
+						}
+
+					#else
+						float flSunPercent = flSunAmount / Luminance( diffuseLighting.rgb );
+						float flShadowScalar = 1.0 - ( flSunPercent * ( 1.0 - flDirectionalShadow ) );
+
+						/* Debug - blink full shadows
+						if ( step( frac( g_flTime * 0.5 ), 0.5 ) )
+						{
+							flShadowScalar = 1.0 - flSunPercent;
+						}
+						//*/
+
+						// Apply csm shadows
+						diffuseLighting.rgb *= flShadowScalar;
+
+						// Desaturate shadow color since we only have a grayscale dim factor
+						diffuseLighting.rgb = lerp( diffuseLighting.bgr, diffuseLighting.rgb, flShadowScalar * 0.5 + 0.5 );
+					#endif
+				}
+				#endif
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+			}
+#endif					
+		}
+		#endif
+
+	}
+	#endif
+
+	HALF3 albedo = baseColor.rgb;
+	HALF alpha = 1.0f;
+	#if ( !BASEALPHAENVMAPMASK && !SELFILLUM )
+	{
+		alpha *= lerp( 1.0h, baseColor.a, (HALF)g_EyePos_BaseTextureTranslucency.w );
+	}
+	#endif
+
+	#if ( FLASHLIGHT )
+	{
+		int nShadowSampleLevel = 0;
+		bool bDoShadows = false;
+		// Do shadow mapping on shader models 2b and 30.
+		#if ( FLASHLIGHTSHADOWS && (defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0) ) )
+		{
+			nShadowSampleLevel = FLASHLIGHTDEPTHFILTERMODE;
+			bDoShadows = true;
+		}
+		#endif
+
+		float4 flashlightSpacePosition;
+		#if defined( SHADER_MODEL_PS_3_0 )
+			flashlightSpacePosition = i.flashlightSpacePos;
+		#else
+			flashlightSpacePosition = TransformFlashlightWorldToTexture( i.vWorldPos_csmXform0z.xyz, g_FlashlightWorldToTexture );
+		#endif
+
+		// We want the N.L to happen on the flashlight pass, but can't afford it on ps20
+		bool bUseWorldNormal = true;
+		#if ( defined( SHADER_MODEL_PS_2_0 ) && ( DETAILTEXTURE ) )
+		{
+			bUseWorldNormal = false;
+		}
+		#endif
+		
+		HALF3 flashlightColor = DoFlashlight( g_FlashlightPos, i.vWorldPos_csmXform0z.xyz, flashlightSpacePosition,
+			i.vWorldNormal_fogFactorW.xyz, g_FlashlightAttenuationFactors.xyz, 
+			g_FlashlightAttenuationFactors.w, FlashlightSampler, ShadowDepthSampler,
+			RandRotSampler, nShadowSampleLevel, bDoShadows, i.vProjPos.xy / i.vProjPos.w, false, g_ShadowTweaks, bUseWorldNormal );
+
+		#if ( UBERLIGHT )
+		{
+			float4 uberLightPosition = mul( float4( i.vWorldPos_csmXform0z.xyz, 1.0f ), g_FlashlightWorldToLight ).yzxw;
+			flashlightColor *= uberlight( uberLightPosition.xyz, g_vSmoothEdge0, g_vSmoothEdge1,
+							   g_vSmoothOneOverWidth, g_vShearRound.xy, g_aAbB, g_vShearRound.zw );
+		}
+		#endif
+
+		//add to diffuse in single pass flashlight mode, replace diffuse in additive two pass mode
+		#if defined ( _GAMECONSOLE )
+		{
+			diffuseLighting += flashlightColor;
+		}
+		#else
+		{
+			diffuseLighting = (diffuseLighting * g_EnvmapTint_SPF.a) + flashlightColor;
+		}
+		#endif
+	}
+	#endif
+
+	#if ( DECAL_BLEND_MODE != 2 )
+		float3 decalLighting = diffuseLighting;
+	#endif
+
+	#if ( defined( SHADER_MODEL_PS_2_0 ) )
+	{
+		// This branch means that g_fInverseBlendTintByBaseAlpha doesn't work with ps20, but we don't care since we're dropping ps20
+		diffuseLighting *= g_DiffuseModulation.rgb;
+	}
+	#else
+	{
+		#if ( TINTMASKTEXTURE )
+			// Optionally use inverseblendtint texture to blend in the diffuse modulation (saturated add of g_fInverseBlendTintByBaseAlpha turns this on/off)
+			float4 tintMask = h4tex2Dsrgb( TintMaskSampler, i.baseTexCoord_baseTexCoord2u.xy ).rgba; // use g channel since common use will be mono or dxt1 (greater precision in g).
+			// g_fInverseBlendTintByBaseAlpha will be 0 in this combo so that tintMask.g has an effect, or -1 if notint is set in the material
+			diffuseLighting *= lerp( HALF3( 1.0h, 1.0h, 1.0h ), (HALF3)g_DiffuseModulation.rgb, saturate( tintMask.g + (HALF)g_fInverseBlendTintByBaseAlpha ) );
+				
+			specularFactor = g_fEnvMapMaskInTintMaskTexture ? tintMask.r : specularFactor;
+		#else
+			// Optionally use basealpha to blend in the diffuse modulation (saturated add of g_fInverseBlendTintByBaseAlpha turns this on/off)
+			diffuseLighting *= lerp( HALF3( 1.0h, 1.0h, 1.0h ), (HALF3)g_DiffuseModulation.rgb, saturate( baseColor.a + (HALF)g_fInverseBlendTintByBaseAlpha ) );
+		#endif
+	}
+	#endif
+
+	alpha *= (HALF)g_DiffuseModulation.a;
+
+	#if ( VERTEXCOLOR && DIFFUSELIGHTING )
+	{
+		albedo *= (HALF)i.color.rgb;
+	}
+	#endif
+
+	alpha = lerp( alpha, alpha * (HALF)i.color.a, (HALF)g_fVertexAlpha );
+
+	HALF3 diffuseComponent = albedo * diffuseLighting;
+
+	#if ( DECAL_BLEND_MODE != 2 )
+		float4 decalColor = tex2D( DecalSampler, float2(i.baseTexCoord_baseTexCoord2u.w, i.detailTexCoord_baseTexCoord2v.w ) );
+		diffuseComponent = TextureCombineDecal( diffuseComponent, decalColor, decalLighting );
+	#endif
+
+	#if ( DETAILTEXTURE )
+	{
+		diffuseComponent = TextureCombinePostLighting( diffuseComponent, detailColor, DETAIL_BLEND_MODE, g_DetailBlendFactor );
+	}
+	#endif
+
+	#if !( FLASHLIGHT && defined( SHADER_MODEL_PS_2_0 ) )
+	{
+		#if SELFILLUM_ENVMAPMASK_ALPHA
+		{
+			// range of alpha:
+			// 0 - 0.125 = lerp(diffuse,selfillum,alpha*8)
+			// 0.125-1.0 = selfillum*(1+alpha-0.125)*8 (over bright glows)
+			float3 selfIllumComponent = g_SelfIllumTint * albedo;
+			half Adj_Alpha = 8 * envmapMaskTexel.a;
+			diffuseComponent = ( max( 0, 1 - Adj_Alpha ) * diffuseComponent) + Adj_Alpha * selfIllumComponent;
+		}
+		#elif SELFILLUM
+		{
+			float3 vSelfIllumMask = tex2D( SelfIllumMaskSampler, i.baseTexCoord_baseTexCoord2u.xy ).rgb;
+			vSelfIllumMask = lerp( baseColor.aaa, vSelfIllumMask, g_SelfIllumMaskControl );
+			diffuseComponent = lerp( diffuseComponent, g_SelfIllumTint * albedo, vSelfIllumMask * g_flSelfIllumScale );
+		}
+		#endif
+	}
+	#endif
+
+	HALF3 specularLighting = HALF3( 0.0h, 0.0h, 0.0h );
+	
+	//Single pass flashlight mode runs out of instructions and constant registers when both detail textures and cubemaps are enabled on PC. Silently drop cubemaps in that case.
+	#if ( !PC_FLASHLIGHT )
+	{
+		#if ( CUBEMAP )
+		{
+			float3 vEyeDir = g_EyePos_BaseTextureTranslucency.xyz - i.vWorldPos_csmXform0z.xyz;
+			float3 reflectVect = CalcReflectionVectorUnnormalized( i.vWorldNormal_fogFactorW.xyz, vEyeDir.xyz );
+
+			specularLighting = ENV_MAP_SCALE * texCUBE( EnvmapSampler, reflectVect ).rgb;
+			specularLighting *= specularFactor;
+			specularLighting *= g_EnvmapTint_SPF.rgb;
+
+			#if defined( SHADER_MODEL_PS_3_0 )
+			{
+				float3 cubemapLight = ( diffuseLighting - g_fvDiffuseCubemapMin ) * g_fvDiffuseCubemapMax;
+				specularLighting = lerp( specularLighting, specularLighting * cubemapLight, g_DiffuseCubemapScale ); //reduce the cubemap contribution when the pixel is in shadow
+		
+				float3 specularLightingSquared = specularLighting * specularLighting;
+				specularLighting = lerp( specularLighting, specularLightingSquared, g_EnvmapContrast );
+				float3 greyScale = dot( specularLighting, float3( 0.299f, 0.587f, 0.114f ) );
+				specularLighting = lerp( greyScale, specularLighting, g_EnvmapSaturation );
+			}
+			#endif
+		}
+		#endif
+	}
+	#endif
+
+	HALF3 result = diffuseComponent + specularLighting;
+	
+#if ( SMOKEGRENADEBLEND )
+	float flSmokeDistance = length( i.vWorldPos_csmXform0z.xyz - g_GlowColor.rgb ) * 0.0008f;
+	flSmokeDistance = smoothstep( 0.08f, 0.12f, flSmokeDistance );
+	//result.rgb = lerp( float3(1,0,0), result.rgb, flSmokeDistance );
+	alpha *= flSmokeDistance;
+#endif
+
+#if ( LIGHTING_PREVIEW == 0 )
+{
+	HALF fogFactor;
+	HALF flVertexFogFactor = 0.0f;
+	#if ( !HARDWAREFOGBLEND && !DOPIXELFOG )
+	{
+		flVertexFogFactor = (HALF)i.vWorldNormal_fogFactorW.w;
+	}
+	#endif
+	fogFactor = CalcPixelFogFactorSupportsVertexFog( PIXELFOGTYPE, g_FogParams, g_EyePos_BaseTextureTranslucency.xyz, i.vWorldPos_csmXform0z.xyz, i.vProjPos.z, flVertexFogFactor );
+	if ( PIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT && WRITEWATERFOGTODESTALPHA )
+	{
+		alpha = fogFactor;
+	}
+
+	
+
+	float4_color_return_type vOutput = FinalOutputHalf( float4( result.rgb, alpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, g_fWriteDepthToAlpha, i.vProjPos.z );
+	
+
+	#if ( defined( _X360 ) )
+	{
+		vOutput.xyz += ScreenSpaceOrderedDither( i.vScreenPos );
+	}
+	#endif
+
+	return vOutput;
+}
+#endif
+#if ( LIGHTING_PREVIEW == 1 )
+{
+	float dotprod = 0.2 + abs( dot( normalize(i.vWorldNormal_fogFactorW.xyz), normalize(g_EyePos_BaseTextureTranslucency.xyz - i.vWorldPos_csmXform0z.xyz) ) );
+	return FinalOutput( float4( dotprod * albedo * 
+		lerp( HALF3( 1.0h, 1.0h, 1.0h ), (HALF3)g_DiffuseModulation.rgb, saturate( baseColor.a + (HALF)g_fInverseBlendTintByBaseAlpha ) ) // color tint
+		, alpha ), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}
+#endif
+#if ( LIGHTING_PREVIEW == 2 )
+{
+	LPREVIEW_PS_OUT ret;
+	ret.flags = float4( 1, 1, 1, 1 );
+	ret.color = float4( albedo.xyz, alpha );
+	ret.normal = float4( i.vWorldNormal_fogFactorW.xyz, alpha );
+	ret.position = float4( i.vWorldPos_csmXform0z.xyz, alpha );
+	return FinalOutput( ret, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}
+#endif
+#if ( LIGHTING_PREVIEW == 3 )								// normal + depth
+    return float4( normalize( i.vWorldNormal_fogFactorW.xyz ), i.vProjPos.z );
+#endif
+}
+

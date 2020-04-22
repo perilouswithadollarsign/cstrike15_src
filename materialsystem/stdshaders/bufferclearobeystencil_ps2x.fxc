@@ -1,0 +1,28 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "RELOADZCULL"			"0..0"	[XBOX]
+// STATIC: "RELOADZCULL"			"0..0"	[PC]
+// STATIC: "RELOADZCULL"			"0..1"	[SONYPS3]
+
+#include "common_ps_fxc.h"
+
+struct PS_INPUT
+{
+	float4 vColor	: COLOR0;
+};
+
+HALF4 main( 
+	PS_INPUT i 
+#if RELOADZCULL
+	, out float flDepth : DEPTH
+#endif // RELOADZCULL
+	) : COLOR
+{
+#if RELOADZCULL
+	// When reloading Zcull memory on the PS3, we need to draw a quad with depth = 0 (so it doesn't get early-culled) but then emit a depth of 1.0
+	// because we need to guarantee that every pixel is rejected by the hardware and simply forces the ROP unit to update Zcull memory
+	flDepth = 1.0f;
+#endif // RELOADZCULL
+
+	return i.vColor;
+}

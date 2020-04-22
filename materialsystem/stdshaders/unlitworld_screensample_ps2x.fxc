@@ -1,0 +1,73 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+// SAMPLERS
+
+sampler			BaseSampler							: register( s0 );
+
+// REGISTERS
+
+//for normalized screen-space coords
+const float4			g_fvConstRegister17			: register( c17 );
+const float4			g_fvConstRegister18			: register( c18 );
+#define g_vEyePos		g_fvConstRegister18.xyz
+#define g_flElementDistance g_fvConstRegister18.w
+
+const float4	g_fvConstRegister0					: register( c0 );
+#define g_flOnePixelX		g_fvConstRegister0.x
+#define g_flOnePixelY		g_fvConstRegister0.y
+#define g_vOnePixel			g_fvConstRegister0.xy
+
+const float4 g_DiffuseModulation					: register( c1 );
+
+struct PS_INPUT
+{
+	//float4 lightAtten				: TEXCOORD2;
+	float3 worldPos					: TEXCOORD3;
+	float3x3 tangentSpaceTranspose	: TEXCOORD4;
+	//	     second row				: TEXCOORD5;
+	//	     third row				: TEXCOORD6;
+	float4 vProjPos					: TEXCOORD7;
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float2 vScreenPos = (i.vProjPos.xy / i.vProjPos.w) * g_fvConstRegister17.xy + g_fvConstRegister17.zw;
+	vScreenPos += (g_vOnePixel * 0.5f);
+	
+	float flEdgeThickness = 5.0f;
+	float flDist = smoothstep( 300.0f, 800.f, length( g_vEyePos.xyz - i.worldPos.xyz ) );
+	flEdgeThickness -= ( 3.5f * flDist );
+	
+	float flCenter = -1.0f;
+	float2 offsets[16] = {
+							float2(   0.5301946,  0.5073427   ),
+							float2(   0.0684771,  0.4128032   ),
+							float2(   0.5126259,  0.0365609   ),
+							float2(   0.0101744,  0.8379333   ),
+							float2(   0.1560884, -0.1649500   ),
+							float2(   0.9068975, -0.0846123   ),
+							float2(   0.6797046, -0.5736184   ),
+							float2(  -0.4168866,  0.8836493   ),
+							float2(  -0.5666743,  0.3535654   ),
+							float2(  -0.0424080, -0.6649325   ),
+							float2(   0.3658477, -0.8909833   ),
+							float2(  -0.4150895, -0.2524949   ),
+							float2(  -0.9276293,  0.0097100   ),
+							float2(   0.4289346,  0.9020033   ),
+							float2(  -0.6507930, -0.6037632   ),
+							float2(  -0.2034065,  0.1169684   )
+						};
+						
+	for ( int k = 0; k < 16; k++ )
+	{
+		flCenter += tex2D( BaseSampler, vScreenPos + g_vOnePixel * offsets[k] * flEdgeThickness ).g * 0.125f;
+	}
+	
+	flCenter = saturate( 1.0f - abs( flCenter ) );
+
+	float4 cOut = float4( g_DiffuseModulation.rgb * flCenter, 1 );
+	return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR );
+}

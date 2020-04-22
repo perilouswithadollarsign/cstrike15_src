@@ -1,0 +1,495 @@
+// STATIC: "ZOOM_ANIMATE_SEQ2"				"0..1"
+// STATIC: "DUALSEQUENCE"					"0..1"
+// STATIC: "ADDBASETEXTURE2"				"0..1"
+// STATIC: "EXTRACTGREENALPHA"				"0..1"
+// STATIC: "DEPTHBLEND"						"0..1" [CONSOLE]
+// STATIC: "DEPTHBLEND"						"0..1" [PC]
+// STATIC: "ANIMBLEND_OR_MAXLUMFRAMEBLEND1" "0..1"
+// STATIC: "CROP"							"0..1"
+// STATIC: "PACKED_INTERPOLATOR"			"0..1"
+// STATIC: "SPRITECARDVERTEXFOG"            "0..1"
+
+// STATIC: "HARDWAREFOGBLEND"				"0..0"	[CONSOLE]
+// STATIC: "HARDWAREFOGBLEND"				"0..1"	[PC] [vs20]
+// STATIC: "HARDWAREFOGBLEND"				"0..0"	[PC] [vs30]
+
+// STATIC: "PERPARTICLEOUTLINE"             "0..1"
+// DYNAMIC: "ORIENTATION"					"0..4"
+
+// If we aren't doing any sort of fog, then assume that HARDWAREFOGBLEND is forced to zero.
+
+// SKIP: $PERPARTICLEOUTLINE && ( $ORIENTATION == 3 )
+// SKIP: $DUALSEQUENCE && ( $PERPARTICLEOUTLINE || ( $ORIENTATION == 3 ) )
+// SKIP: $HARDWAREFOGBLEND && !SPRITECARDVERTEXFOG
+
+#include "common_vs_fxc.h"
+
+// Don't want to have extra combos, so define these two to be the same base on a single combo.  Bilch.
+#define ANIMBLEND ANIMBLEND_OR_MAXLUMFRAMEBLEND1
+#define MAXLUMFRAMEBLEND1 ANIMBLEND_OR_MAXLUMFRAMEBLEND1
+
+// VS_OUTPUT in a common file.
+#include "common_spritecard_fxc.h"
+
+const hlsl_float4x3 cModelView		: register(SHADER_SPECIFIC_CONST_0);
+const float4x4 cProj				: register(SHADER_SPECIFIC_CONST_3);
+
+#if ( ZOOM_ANIMATE_SEQ2 || SPRITECARDVERTEXFOG )
+const float4 ScaleParms             : register(SHADER_SPECIFIC_CONST_7);
+#define OLDFRM_SCALE_START (ScaleParms.x)
+#define OLDFRM_SCALE_END (ScaleParms.y)
+#define FOG_SCALE_FACTOR (ScaleParms.z)
+#endif
+
+const float4 SizeParms			: register(SHADER_SPECIFIC_CONST_8);
+const float4 SizeParms2			: register(SHADER_SPECIFIC_CONST_9);
+
+const float4 g_vCropFactor		: register(SHADER_SPECIFIC_CONST_11);
+
+const float4 g_vDepthFeatherProjToViewZW[ 2 ]	: register( SHADER_SPECIFIC_CONST_12 );
+
+#if !defined( SHADER_MODEL_VS_1_1 ) 
+const bool g_bUseInstancing		: register( SHADER_SPECIFIC_BOOL_CONST_0 );
+#endif
+
+#if 0 // JasonM - do we want control flow? - note that we moved these slightly
+const bool g_bZoomAnimateSeq2		: register( SHADER_SPECIFIC_BOOL_CONST_1 );
+const bool g_bExtractGreenAlpha		: register( SHADER_SPECIFIC_BOOL_CONST_2 );
+#endif
+
+#define MINIMUM_SIZE_FACTOR (SizeParms.x)
+#define MAXIMUM_SIZE_FACTOR (SizeParms.y)
+
+#define START_FADE_SIZE_FACTOR (SizeParms.z)
+#define END_FADE_SIZE_FACTOR (SizeParms.w)
+
+// alpha fade w/ distance
+#define START_FAR_FADE  ( SizeParms2.x )
+#define FAR_FADE_FACTOR ( SizeParms2.y )	   // alpha = 1-min(1,max(0, (dist-start_fade)*factor))
+
+// Define stuff for instancing on 360
+#if ( defined( _X360 ) && defined( SHADER_MODEL_VS_2_0 ) )
+#define CONST_PC 
+#define VERTEX_INDEX_PARAM_360 ,int Index:INDEX
+#define DO_INSTANCING 1
+#else
+#define CONST_PC const
+#define VERTEX_INDEX_PARAM_360
+#endif
+
+
+struct VS_INPUT
+{
+	// This is all of the stuff that we ever use.
+	float4 vTint            : COLOR;
+	float4 vPos				: POSITION;
+	float4 vTexCoord0		: TEXCOORD0;
+	float4 vTexCoord1		: TEXCOORD1;
+	float4 vParms           : TEXCOORD2;   // frame blend, rot, radius, yaw
+	// FIXME: remove this vertex element for (USE_INSTANCING == 1), need to shuffle the following elements down
+	float2 vCornerID        : TEXCOORD3;   // 0,0 1,0 1,1 0,1
+	float4 vTexCoord2		: TEXCOORD4;
+#if DUALSEQUENCE
+	float4 vSeq2TexCoord0   : TEXCOORD5;
+	float4 vSeq2TexCoord1   : TEXCOORD6; 
+	float4 vParms1          : TEXCOORD7;  // second frame blend, ?,?,?
+#endif
+#if PERPARTICLEOUTLINE
+	float4 vecOutlineTint	: TEXCOORD5;
+#endif
+#if ( ORIENTATION == 3 )									// orient to normal
+	float4 vecNormal		: TEXCOORD5;
+#endif
+};
+
+#define BLENDFACTOR v.vParms.x
+#define ROTATION v.vParms.y
+#define RADIUS v.vParms.z
+#define YAW (v.vParms.w)
+
+#define ONE_OVER_255 0.00392156863
+
+#if ( ZOOM_ANIMATE_SEQ2 ) 
+float getlerpscaled( float l_in, float s0, float s1, float ts )
+{
+	l_in = 2.0*(l_in-.5);
+	l_in *= lerp(s0,s1,ts);
+	return 0.5+0.5*l_in;
+}
+
+float getlerpscale_for_old_frame( float l_in, float ts )
+{
+	return getlerpscaled( l_in, OLDFRM_SCALE_START, OLDFRM_SCALE_END, ts);
+}
+
+float getlerpscale_for_new_frame( float l_in, float ts )
+{
+	return getlerpscaled( l_in, 1.0, OLDFRM_SCALE_START, ts );
+}
+#endif // ZOOM_ANIMATE_SEQ2
+
+#ifdef DO_INSTANCING
+void InstancedVertexRead( inout VS_INPUT v, int index )
+{
+	// Duplicate each VB vertex 4 times (and generate vCornerID - the only thing that varies per-corner)
+	float4 vTint;
+	float4 vPos;
+	float4 vTexCoord0;
+	float4 vTexCoord1;
+	float4 vParms;
+	float4 vTexCoord2;
+	float4 vSeq_TexCoord0; // NOTE: April XDK compiler barfs on var names which have a number in the middle! (i.e. vSeq2TexCoord0)
+	float4 vSeq_TexCoord1;
+	float4 vParms1;
+	float4 vecOutlineTint;
+	float4 vecNormal;
+
+	int spriteIndex = index / 4;
+	int cornerIndex = index - 4*spriteIndex;
+	asm
+	{
+		// NOTE: using a computed index disables the post-transform cache, so there are VS perf ramifications
+		vfetch vTint,			spriteIndex, color0;
+		vfetch vPos,			spriteIndex, position0;
+		vfetch vTexCoord0,		spriteIndex, texcoord0;
+		vfetch vTexCoord1,		spriteIndex, texcoord1;
+		vfetch vParms,			spriteIndex, texcoord2;
+		vfetch vTexCoord2,		spriteIndex, texcoord4;
+#if DUALSEQUENCE
+		vfetch vSeq_TexCoord0,	spriteIndex, texcoord5;
+		vfetch vSeq_TexCoord1,	spriteIndex, texcoord6;
+		vfetch vParms1,			spriteIndex, texcoord7;
+#endif
+#if PERPARTICLEOUTLINE
+		vfetch vecOutlineTint,  spriteIndex, texcoord5;
+#endif
+#if ( ORIENTATION == 3 )									// normal-aligned
+		vfetch vecNormal,  spriteIndex, texcoord5;
+#endif
+	};
+
+	v.vTint				= vTint;
+	v.vPos				= vPos;
+	v.vTexCoord0		= vTexCoord0;
+	v.vTexCoord1		= vTexCoord1;
+	v.vParms			= vParms;
+#if ADDBASETEXTURE2
+	v.vTexCoord2		= vTexCoord2;
+#endif
+#if DUALSEQUENCE
+	v.vSeq2TexCoord0	= vSeq_TexCoord0;
+	v.vSeq2TexCoord1	= vSeq_TexCoord1;
+	v.vParms1			= vParms1;
+#endif
+#if PERPARTICLEOUTLINE
+	v.vecOutlineTint = vecOutlineTint;
+#endif
+#if ORIENTATION == 3
+	v.vecNormal = vecNormal;
+#endif
+
+
+	// Compute vCornerID - order is: (0,0) (1,0) (1,1) (0,1)
+	//   float2 IDs[4] = { {0,0}, {1,0}, {1,1}, {0,1} };
+	//   v.vCornerID.xy = IDs[ cornerIndex ];
+	// This compiles to 2 ops on 360 (MADDs with abs/sat register read/write modifiers):
+	v.vCornerID.xy = float2( 1.5f, 0.0f ) + cornerIndex*float2( -1.0f, 1.0f );
+	v.vCornerID.xy = saturate( float2(1.5f, -3.0f) + float2( -1.0f, 2.0f )*abs( v.vCornerID.xy ) );
+}
+#endif
+
+VS_OUTPUT main( CONST_PC VS_INPUT v
+			    VERTEX_INDEX_PARAM_360 )
+{
+	VS_OUTPUT o;
+
+#ifdef DO_INSTANCING
+	if ( g_bUseInstancing )
+	{
+		InstancedVertexRead( v, Index );
+	}
+#endif
+
+	#if ( !DUALSEQUENCE )
+	{
+		#if ( PERPARTICLEOUTLINE )
+		{
+			o.vecOutlineTint = GammaToLinear( v.vecOutlineTint );
+		}
+		#else
+		{
+			o.vecOutlineTint = 1;
+		}
+		#endif
+	}
+	#endif
+
+#if SHADER_MODEL_VS_1_1
+	float4 tint = v.vTint;
+#else
+	float4 tint = GammaToLinear( v.vTint );
+#endif
+
+	float2 sc_yaw;
+	sincos( YAW, sc_yaw.y, sc_yaw.x );
+
+	float2 sc;
+	sincos( ROTATION, sc.y, sc.x );
+
+	float2 ix = 2 * v.vCornerID.xy - 1;
+	
+	#if ( CROP )
+	{
+		ix *= g_vCropFactor.xy;
+	}
+	#endif
+
+	float x1 = dot( ix, sc );
+	float y1 = sc.x * ix.y - sc.y * ix.x;
+
+	float4 projPos;
+	float3 worldPos;
+	worldPos = mul4x3( v.vPos, cModel[0] );
+
+	float rad = RADIUS;
+	float3 v2p = ( worldPos - cEyePos );
+	float l = length(v2p);
+	rad=max(rad, MINIMUM_SIZE_FACTOR * l);
+	// now, perform fade out
+#ifndef SHADER_MODEL_VS_1_1
+	if ( rad > START_FADE_SIZE_FACTOR * l )
+	{
+		if ( rad > END_FADE_SIZE_FACTOR *l )
+		{
+			tint = 0;
+			rad = 0;											// cull so we emit 0-sized sprite
+		}
+		else
+		{
+			tint *= 1-(rad-START_FADE_SIZE_FACTOR*l)/(END_FADE_SIZE_FACTOR*l-START_FADE_SIZE_FACTOR*l);
+		}
+	}
+#endif
+
+
+#ifndef SHADER_MODEL_VS_1_1
+	// perform far fade
+	float tscale =  1-min(1, max(0, (l-START_FAR_FADE)*FAR_FADE_FACTOR) );
+	tint *= tscale;
+
+	if ( tscale <= 0 )
+		rad = 0;											// cull so we emit 0-sized sprite
+#endif
+
+   	#if ( SPRITECARDVERTEXFOG )
+	{
+		// fade tint.a based upon fog amount
+		float ffactor = 0.0f;
+		#if ( HARDWAREFOGBLEND )
+		{
+			// On ps20 hardware, we use fixed-function fog blending, which has a fog factor of 1 for no fog, and 0 for fully fogged.
+			// Note that the shader constants for fog params are different in both states of HARDWAREFOGBLEND.
+			ffactor = CalcRangeFogFactorFixedFunction( worldPos, cEyePos, cRadialFogMaxDensity, cFogEndOverFogRange, cOOFogRange );
+		}
+		#else
+		{
+			// On ps2b and up, we blend fog in the pixel shader in such a way that we have a fog factor of 0 for no fog, and 1 for fully fogged.
+			// We want to multiply by 1 where there is no fog, so invert.
+			// Note that the shader constants for fog params are different in both states of HARDWAREFOGBLEND.
+			ffactor = CalcRangeFogFactorNonFixedFunction( worldPos, cEyePos, cRadialFogMaxDensity, cFogEndOverFogRange, cOOFogRange );
+			ffactor = 1.0f - ffactor; // map from [0,1]->[1,0]  Want 0 to be fully fogged instead of 1.
+		}
+		#endif
+		ffactor = lerp( 1, ffactor, FOG_SCALE_FACTOR );
+		tint.a *= ffactor;
+	}
+	#endif
+
+	if ( tint.a < ONE_OVER_255 )
+	{
+		// save fillrate by transforming completely transparent particles to a point
+		rad = 0;
+	}
+
+	rad = min( rad, MAXIMUM_SIZE_FACTOR * l );
+
+	#if ( ORIENTATION == 0 )
+	{
+		// Screen-aligned case
+		float3 viewPos;
+		viewPos = mul4x3( v.vPos, cModelView );
+				
+		float3 disp = float3( -x1, y1, 0 );
+	
+	 	float tmpx =	disp.x * sc_yaw.x + disp.z * sc_yaw.y;
+	 	disp.z =		disp.z * sc_yaw.x - disp.x * sc_yaw.y;
+	 	disp.x = tmpx;
+	
+		viewPos.xyz += disp * rad;
+
+		projPos  = mul( float4( viewPos, 1.0f ), cProj );
+	}
+	#endif
+	
+	#if ( ( ORIENTATION == 1 ) || ( ORIENTATION == 3 ) || ( ORIENTATION == 4 ) )
+	{
+		// Z-aligned case
+		if (l > rad/2)
+		{
+			float3 up = float3(0,0,1);
+			float3 right = normalize(cross(up, v2p));
+
+			#if ( ORIENTATION == 4 )
+			{
+				up = normalize(cross(right, v2p));
+			}
+			#endif
+
+			#if ( ORIENTATION == 3 )
+			{
+				float3 vNormal = v.vecNormal.xyz;
+				float3 vTrialVector = float3( 0, 0, 1 );
+				if ( abs( vNormal.z ) > 0.9 )
+				{
+					vTrialVector = float3( 1, 0, 0 );
+				}
+				up = normalize( cross( vNormal, vTrialVector ) );
+				right = cross( vNormal, up );
+			}
+			#else  // no yaw support for normal aligned
+			{
+				float tmpx = right.x * sc_yaw.x + right.y * sc_yaw.y;
+				right.y = right.y * sc_yaw.x - right.x * sc_yaw.y;
+				right.x = tmpx;
+			}
+			#endif
+
+			worldPos += ( x1 * rad ) * right;
+			worldPos += ( y1 * rad ) * up;
+		
+#ifndef SHADER_MODEL_VS_1_1
+			if (l < rad*2 )
+			{
+				tint *= smoothstep(rad/2,rad,l);
+			}
+#endif
+
+		}
+		
+		projPos  = mul( float4(worldPos, 1.0f), cViewProj );
+	}
+	#endif // ( ( ORIENTATION == 1 ) || ( ORIENTATION == 3 ) || ( ORIENTATION == 4 ) )
+
+	#if ( ORIENTATION == 2 )
+	{
+		// aligned with z plane case - easy
+		// Need to rotate it into the space of the control point though
+		// We're using cModelView to store that transformation since it's
+		// only used as cModelView in ORIENTATION mode 0.
+		float3 vOffset = mul3x3( float3( y1, x1, 0 ), ( float3x3 )cModelView );
+
+		float3 wpos = v.vPos.xyz + RADIUS * vOffset;
+		projPos  = mul( float4(wpos, 1.0f), cModelViewProj );
+	}
+	#endif
+
+	#if ( HAS_BLENDFACTOR0 )
+	{
+		o.blendfactor0 = float4( v.vParms.x, 0, 0, 0 );
+	}
+	#endif
+	
+	o.projPos		= projPos;
+	
+	#if ( CROP )
+	{
+		o.texCoord0_1.xy = lerp( v.vTexCoord0.zw, v.vTexCoord0.xy, v.vCornerID.xy * g_vCropFactor.xy + g_vCropFactor.zw );
+		o.texCoord0_1.wz = lerp( v.vTexCoord1.zw, v.vTexCoord1.xy, v.vCornerID.xy * g_vCropFactor.xy + g_vCropFactor.zw );
+	}
+	#else
+	{
+		o.texCoord0_1.xy = lerp( v.vTexCoord0.zw, v.vTexCoord0.xy, v.vCornerID.xy );
+		o.texCoord0_1.wz = lerp( v.vTexCoord1.zw, v.vTexCoord1.xy, v.vCornerID.xy );
+	}
+	#endif
+
+	#if ( ADDBASETEXTURE2 )
+	{
+		o.texCoord2.xy	= lerp( v.vTexCoord2.zw, v.vTexCoord2.xy, v.vCornerID.xy );
+	}
+	#endif
+
+	#if ( DUALSEQUENCE )
+	{
+		float2 lerpold = v.vCornerID.xy;
+		float2 lerpnew = v.vCornerID.xy;
+
+		#if ( ZOOM_ANIMATE_SEQ2 )
+		{
+			lerpold.x = getlerpscale_for_old_frame( v.vCornerID.x, v.vParms1.x );
+			lerpold.y = getlerpscale_for_old_frame( v.vCornerID.y, v.vParms1.x );
+			lerpnew.x = getlerpscale_for_new_frame( v.vCornerID.x, v.vParms1.x );
+			lerpnew.y = getlerpscale_for_new_frame( v.vCornerID.y, v.vParms1.x );
+		}
+		#endif
+
+		o.vSeq2TexCoord0_1.xy	= lerp( v.vSeq2TexCoord0.zw, v.vSeq2TexCoord0.xy, lerpold.xy );
+		o.vSeq2TexCoord0_1.wz	= lerp( v.vSeq2TexCoord1.zw, v.vSeq2TexCoord1.xy, lerpnew.xy );
+
+		o.blendfactor0.z = v.vParms1.x;
+	}
+	#endif
+
+	#if ( EXTRACTGREENALPHA )
+	{
+		o.blendfactor1 = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+														// Input range	  Output range
+		if ( v.vParms.x < 0.25f )						// 0.0 .. 0.25
+		{
+			o.blendfactor0.a = v.vParms.x * 2 + 0.5f;					// 0.5 .. 1.0
+			o.blendfactor0.g = 1 - o.blendfactor0.a;					// 0.5 .. 0.0
+		}
+		else if ( v.vParms.x < 0.75f )					// 0.25 .. 0.75
+		{
+			o.blendfactor1.g = v.vParms.x * 2 - 0.5f;					// 0.0 .. 1.0
+			o.blendfactor0.a = 1 - o.blendfactor1.g;					// 1.0 .. 0.0
+		}
+		else											// 0.75 .. 1.0	
+		{
+			o.blendfactor1.a = v.vParms.x * 2 - 1.5f;					// 0.0 .. 0.5
+			o.blendfactor1.g = 1 - o.blendfactor1.a;					// 1.0 .. 0.5
+		}
+	}
+	#endif
+
+	#if DEPTHBLEND
+		o.vProjPos = projPos;
+		// Compute fragment's viewspace Z from its projection space coord, saves PS 
+		o.vProjPos.z = dot( projPos, g_vDepthFeatherProjToViewZW[0] ); 
+		o.vProjPos.z /= dot( projPos, g_vDepthFeatherProjToViewZW[1] );
+	#endif
+
+	#if ( PACKED_INTERPOLATOR == 1 )
+	{
+		o.texCoord0_1.zw = tint.ra;		// use red to lerp between two colors in pixel shaders, alpha to modulate opacity
+	}
+	#else
+	{
+		o.argbcolor = tint;
+	}
+	#endif
+
+	#if ( !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 ) )
+	{
+		o.fog = 1.0f;
+	}
+	#endif
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	return o;
+}

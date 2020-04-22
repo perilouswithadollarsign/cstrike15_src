@@ -1,0 +1,97 @@
+//-----------------------------------------------------------------------------
+//	GAME_CONTROLS.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		"..\.."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE;$SRCDIR\public\game_controls;$SRCDIR\common\game_controls"
+		$PreprocessorDefinitions			"$BASE;GAMECONTROLS_LIB"
+		$PrecompiledHeaderFile				"Debug/game_controls.pch"
+	}
+}
+
+$Project "game_controls"
+{
+	$Folder	"Source Files"
+	{
+		$File	"animdata.cpp"
+		$File	"dynamicrect.cpp"
+		$File	"gamegraphic.cpp"
+		$File	"gametext.cpp"
+		$File	"GameLayer.cpp"
+		$File	"gamerect.cpp"
+		$File	"gamestage.cpp"
+		$File	"gameuidefinition.cpp"
+		$File	"gameuidynamictextures.cpp"
+		$File	"gameuischeme.cpp"
+		$File	"GameUISystem.cpp"
+		$File	"gameuisystemmgr.cpp"
+		$File	"gameuisystemsurface.cpp"
+		$File	"graphicgroup.cpp"
+		$File	"hitarea.cpp"
+		$File	"inputgameui.cpp"
+		$File	"keyrepeat.cpp"
+		$File	"textdisplay.cpp"
+		$File	"typedlog.cpp"
+		$File	"uigeometry.cpp"
+		
+		$Folder	"Scripting Source Files"
+		{
+			$File	"gameuiscriptsystem.cpp"
+			$File	"gameuiscriptinterface.cpp"
+			$File	"gameuiscript.cpp"
+			$File	"graphicscriptinterface.cpp"
+		}
+	}
+	
+
+
+	$Folder	"Header Files"
+	{
+		$File	"animdata.h"
+		$File	"dynamicrect.h"	
+		$File	"gametext.h"
+		$File	"gamelayer.h"
+		$File	"gamerect.h"
+		$File	"gamestage.h"
+		$File	"gameuidefinition.h"
+		$File	"gameuidynamictextures.h"
+		$File	"gameuischeme.h"
+		$File	"gameuisystem.h"
+		$File	"gameuisystemmgr.h"
+		$File	"gameuisystemsurface.h"
+		$File	"graphicgroup.h"
+		$File	"hitarea.h"
+		$File	"inputgameui.h"
+		$File	"gamegraphic.h"
+		$File	"keyrepeat.h"
+		$File	"$SRCDIR\common\game_controls\textdisplay.h"
+		$File	"typedlog.h"
+		$File	"uigeometry.h"
+		
+		$Folder	"Scripting Header Files"
+		{
+			$File	"gameuiscriptsystem.h"
+			$File	"gameuiscriptinterface.h"
+			$File	"gameuiscript.h"
+			$File	"graphicscriptinterface.h"
+		}
+	}
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\game_controls\igameuisystemmgr.h"
+		$File	"$SRCDIR\common\game_controls\textdisplay.h"
+		$File	"$SRCDIR\public\tier1\utlmemory.h"
+		$File	"$SRCDIR\public\tier1\utlrbtree.h"
+		$File	"$SRCDIR\public\tier1\utlvector.h"
+	}
+}

@@ -1,0 +1,14 @@
+;;wthkdll.def
+
+LIBRARY      "WTHKDLL"
+DESCRIPTION  'wintab hook dll'
+
+EXPORTS
+RecordHook		@100
+PlayHook	@101
+Record			@200
+Playback		@201
+get_num_pkts_recorded	@202
+get_num_pkts_played		@203
+display_record @204
+reset @205

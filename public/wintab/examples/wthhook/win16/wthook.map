@@ -1,0 +1,59 @@
+
+ wthook
+
+ Start     Length     Name                   Class
+ 0001:0000 00347H     WTHOOK_TEXT            CODE
+ 0001:0348 018FFH     _TEXT                  CODE
+ 0002:0000 00010H     NULL                   BEGDATA
+ 0002:0010 002A6H     _DATA                  DATA
+ 0002:02B6 0000EH     CDATA                  DATA
+ 0002:02C4 00000H     XIFB                   DATA
+ 0002:02C4 00000H     XIF                    DATA
+ 0002:02C4 00000H     XIFE                   DATA
+ 0002:02C4 00000H     XIB                    DATA
+ 0002:02C4 00000H     XI                     DATA
+ 0002:02C4 00000H     XIE                    DATA
+ 0002:02C4 00000H     XPB                    DATA
+ 0002:02C4 00004H     XP                     DATA
+ 0002:02C8 00000H     XPE                    DATA
+ 0002:02C8 00000H     XCB                    DATA
+ 0002:02C8 00000H     XC                     DATA
+ 0002:02C8 00000H     XCE                    DATA
+ 0002:02C8 00000H     XCFB                   DATA
+ 0002:02C8 00000H     XCFCRT                 DATA
+ 0002:02C8 00000H     XCF                    DATA
+ 0002:02C8 00000H     XCFE                   DATA
+ 0002:02C8 00000H     XIFCB                  DATA
+ 0002:02C8 00000H     XIFU                   DATA
+ 0002:02C8 00000H     XIFL                   DATA
+ 0002:02C8 00000H     XIFM                   DATA
+ 0002:02C8 00000H     XIFCE                  DATA
+ 0002:02C8 00000H     DBDATA                 DATA
+ 0002:02C8 000E4H     IOB                    DATA
+ 0002:03AC 00000H     IOBX                   DATA
+ 0002:03AC 0000CH     IOBE                   DATA
+ 0002:03B8 000E4H     IOB2                   DATA
+ 0002:049C 00000H     IOB2X                  DATA
+ 0002:049C 0000CH     IOB2E                  DATA
+ 0002:04A8 00000H     CONST                  CONST
+ 0002:04A8 00008H     HDR                    MSG
+ 0002:04B0 00146H     MSG                    MSG
+ 0002:05F6 00002H     PAD                    MSG
+ 0002:05F8 00001H     EPAD                   MSG
+ 0002:05FA 0000CH     _BSS                   BSS
+ 0002:0606 00000H     XOB                    BSS
+ 0002:0606 00000H     XO                     BSS
+ 0002:0606 00000H     XOE                    BSS
+ 0002:0606 00000H     XOFB                   BSS
+ 0002:0606 00000H     XOF                    BSS
+ 0002:0606 00000H     XOFE                   BSS
+ 0002:0610 00014H     c_common               BSS
+
+ Origin   Group
+ 0002:0   DGROUP
+
+ Address   Export                  Alias
+
+ 0001:13EA ___ExportedStub         ___ExportedStub
+
+Program entry point at 0001:0362

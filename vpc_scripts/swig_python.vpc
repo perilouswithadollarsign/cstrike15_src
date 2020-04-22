@@ -1,0 +1,89 @@
+//======= Copyright © 1996-2009, Valve Corporation, All rights reserved. ======
+//
+//	swig_python.vpc - Compile rules for swig -> c++ for Python modules
+//
+//	Include before defining the macro $SWIGFILE
+//
+//	Use like this (NOTE: Do not add the .i extension):
+//
+//	$Macro SWIGFILE	"foo"
+//	$Include "$SRCDIR/vpc_scripts/swig_python.vpc" 
+//
+//=============================================================================
+
+$MacroRequired		"PYTHONVER"
+
+$MacroRequired		"SRCDIR"
+
+$MacroRequired		"SWIGFILE"
+
+$Macro			SWIG_OUT_DIR	"swig_python$PYTHONVER_win64" [$WIN64]
+$Macro			SWIG_OUT_DIR	"swig_python$PYTHONVER" [!$WIN64]
+
+$Macro			SWIG_P_FILE	"$SWIGFILE.py"
+
+$Macro			SWIG_C_FILE	"$SWIGFILE_wrap_python$PYTHONVER.cpp"
+
+$Configuration
+{
+	$Compiler
+	{
+		$DisableSpecificWarnings			"4211;$BASE"
+	}
+
+	$PostBuildEvent [$WINDOWS]
+	{
+		$CommandLine    "CALL $SRCDIR\vpc_scripts\swig_install.cmd $SWIG_OUT_DIR\$SWIGFILE.py $OUTBINDIR\$SWIGFILE.py" "\n" "$BASE"
+	}
+}
+
+$Project
+{
+	$Folder "SWIG Source"
+	{
+		$File   "$SWIGFILE.i"
+		{
+			$Configuration
+			{
+				$CustomBuildStep
+				{
+					$CommandLine			"CALL $SRCDIR\vpc_scripts\swig_python.cmd $PYTHONVER $OUTBINDIR $SWIGFILE AUTOSWIG"						[$AUTOSWIG]
+					$CommandLine			"CALL $SRCDIR\vpc_scripts\swig_python.cmd $PYTHONVER $OUTBINDIR $SWIGFILE"								[!$AUTOSWIG]
+
+					$AdditionalDependencies	"$SWIGDEPS;$SRCDIR\vpc_scripts\swig_python.cmd;$SRCDIR\vpc_scripts\swig_install.cmd"
+					$AdditionalDependencies	"$BASE;$SRCDIR\vpc_scripts\swig_auto_dme.pl;$SRCDIR\public\$SWIGFILE\$SWIGFILE.cpp"						[$AUTOSWIG]
+
+					$Description			"SWIG produces C++, $SWIGFILE.i produces $SWIG_OUT_DIR\$SWIG_C_FILE"									[!$AUTOSWIG]
+					$Outputs				"$SWIG_OUT_DIR\$SWIG_C_FILE;$SWIG_OUT_DIR\$SWIG_P_FILE"													[!$AUTOSWIG]
+
+					$Description			"SWIG produces C++, $SWIGFILE.i produces $SWIG_OUT_DIR\$SWIG_C_FILE; $SWIG_OUT_DIR\auto_$SWIGFILE.i"	[$AUTOSWIG]
+					$Outputs				"$SWIG_OUT_DIR\$SWIG_C_FILE;$SWIG_OUT_DIR\$SWIG_P_FILE;$SWIG_OUT_DIR\auto_$SWIGFILE.i"					[$AUTOSWIG]
+				}
+			}
+		}
+	}
+
+	$Folder "Read Only"
+	{
+		$Folder "SWIG Generated Python Files"
+		{
+			$DynamicFile	"$OUTBINDIR\$SWIGFILE.py"
+		}
+
+		$Folder "SWIG Generated Source Files"
+		{
+			$DynamicFile	"$SWIG_OUT_DIR\auto_$SWIGFILE.i"	[$AUTOSWIG]
+			$DynamicFile	"$SWIG_OUT_DIR\$SWIG_C_FILE"
+			{
+				$Configuration
+				{
+					$Compiler
+					{
+						$AdditionalOptions			"/wd4127 /wd4244 /wd4505 /wd4706"
+					}
+
+				}
+			}
+		}
+	}
+}

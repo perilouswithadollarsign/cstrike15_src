@@ -1,0 +1,179 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "LIGHTING_PREVIEW"			"0..1"	[PC]
+// STATIC: "LIGHTING_PREVIEW"			"0..0"	[XBOX]
+
+#include "shader_constant_register_map.h"
+#include "common_fog_ps_fxc.h"
+
+sampler BaseSampler1					: register( s1 );	// Base map 1
+sampler BaseSampler2					: register( s2 );	// Base map 2
+sampler BaseSampler3					: register( s3 );	// Base map 3
+sampler BaseSampler4					: register( s4 );	// Base map 4
+sampler LightmapSampler					: register( s5 );
+
+const float4 g_FogParams				: register( PSREG_FOG_PARAMS );
+const float4 g_EyePos_SpecExponent		: register( PSREG_EYEPOS_SPEC_EXPONENT );
+
+#if ((defined(SHADER_MODEL_PS_2_B) || defined(SHADER_MODEL_PS_3_0)))
+
+static const float3 cSpecularColor = float3( 1.0, 1.0, 1.0 );
+
+#endif
+
+#if LIGHTING_PREVIEW == 0
+
+static const float3 g_cAmbientColor = float3( 0.0, 0.0, 0.0 );
+const float4 g_TintValuesTimesLightmapScale	: register( PSREG_CONSTANT_02 );
+
+#endif
+
+
+struct PS_INPUT
+{
+	float4 vBaseTexCoord					: TEXCOORD0;	// xy = blend 1 coord, zw = lightmap cord
+	float4 worldPos_projPosZ				: TEXCOORD1;
+//	float3 vWorldNormal						: TEXCOORD2;
+	float  flSpecPower						: TEXCOORD2;
+	float4 vFowCoord						: TEXCOORD3;	// xy = fow, zw = blend4 coord
+	float4 vAlphaBlend						: TEXCOORD4;
+//	float3 worldVertToEyeVector				: TEXCOORD5;
+	float4 vBlendCoords23					: TEXCOORD5;	// xy = blend2 coord, zw = blend3 coord
+	float4 vColorBlend1						: COLOR0;
+	float4 vColorBlend2						: COLOR1;
+	float4 vColorBlend3						: TEXCOORD6;
+	float4 vColorBlend4						: TEXCOORD7;
+};
+
+
+#if ( defined( SHADER_MODEL_PS_2_0 ) )
+
+float ComputeMultiBlendFactor( const float BlendEnd, const float BlendAmount, inout float Remaining )
+{
+	float Result = 0.0;
+   
+	Result = smoothstep( 0.0, BlendEnd, BlendAmount );
+	Result = clamp( Result, 0.0, Remaining );
+	Remaining -= Result;
+     
+	return Result;
+}
+
+#else
+
+sampler SpecSampler1					: register( s6 );	// Spec map 1
+sampler SpecSampler2					: register( s7 );	// Spec map 2
+sampler SpecSampler3					: register( s8 );	// Spec map 3
+sampler SpecSampler4					: register( s9 );	// Spec map 4
+
+float ComputeMultiBlendFactor( const float BlendStart, const float BlendEnd, const float BlendAmount, const float AlphaBlend, inout float Remaining )
+{
+	float Result = 0.0;
+   
+	if ( Remaining > 0.0 && BlendAmount > 0.0 )
+	{
+		float minb = max( 0.0, BlendEnd - BlendStart );
+		float maxb = min( 1.0, BlendEnd + BlendStart );
+
+		if ( minb != maxb )
+		{
+			Result = smoothstep( minb, maxb, BlendAmount );
+		}
+		else if ( BlendAmount >= minb )
+		{
+			Result = 1.0;
+		}
+
+	  	if ( BlendEnd < AlphaBlend )
+	  	{
+	  		float alpha = 2.0 - AlphaBlend - BlendEnd;
+	  		Result *= clamp( alpha, 0.0, 1.0 );
+   		}
+	}
+   
+	Result = clamp( Result, 0.0, Remaining );
+	Remaining -= Result;
+   
+	return Result;
+}
+
+#endif
+
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float blendfactor1 = 0.0;
+	float blendfactor2 = 0.0;
+	float blendfactor3 = 0.0;
+	float blendfactor4 = 0.0;
+	float remaining = 1.0;
+
+	float4	color1 = tex2D( BaseSampler1, i.vBaseTexCoord.xy ) * float4( i.vColorBlend1.rgb, 1.0 );
+	float4	color2 = tex2D( BaseSampler2, i.vBlendCoords23.xy ) * float4( i.vColorBlend2.rgb, 1.0 );
+	float4	color3 = tex2D( BaseSampler3, i.vBlendCoords23.zw ) * float4( i.vColorBlend3.rgb, 1.0 );
+	float4	color4 = tex2D( BaseSampler4, i.vFowCoord.zw ) * float4( i.vColorBlend4.rgb, 1.0 );
+
+#if ( defined( SHADER_MODEL_PS_2_0 ) )
+   
+	blendfactor1 = ComputeMultiBlendFactor( color1.a, i.vColorBlend1.a, remaining );
+	blendfactor2 = ComputeMultiBlendFactor( color2.a, i.vColorBlend2.a, remaining );
+	blendfactor3 = ComputeMultiBlendFactor( color3.a, i.vColorBlend3.a, remaining );
+//	blendfactor4 = ComputeMultiBlendFactor( color4.a, i.vColorBlend4.a, remaining );
+	blendfactor4 = remaining;
+
+#else
+
+	float4   spec1 = tex2D( SpecSampler1, i.vBaseTexCoord.xy ); 
+	float4   spec2 = tex2D( SpecSampler2, i.vBlendCoords23.xy );
+	float4   spec3 = tex2D( SpecSampler3, i.vBlendCoords23.zw );
+	float4   spec4 = tex2D( SpecSampler4, i.vFowCoord.zw );
+
+	blendfactor1 = ComputeMultiBlendFactor( spec1.a, color1.a, i.vColorBlend1.a, i.vAlphaBlend.r, remaining );
+	blendfactor2 = ComputeMultiBlendFactor( spec2.a, color2.a, i.vColorBlend2.a, i.vAlphaBlend.g, remaining );
+	blendfactor3 = ComputeMultiBlendFactor( spec3.a, color3.a, i.vColorBlend3.a, i.vAlphaBlend.b, remaining );
+//	blendfactor4 = ComputeMultiBlendFactor( spec4.a, color4.a, i.vColorBlend4.a, i.vAlphaBlend.a, remaining );
+	blendfactor4 = remaining;
+
+#endif
+
+	float3 vResult = ( color1.rgb * blendfactor1 ) + ( color2.rgb * blendfactor2 ) + ( color3.rgb * blendfactor3 ) + ( color4.rgb * blendfactor4 );
+
+#if ( ( defined( SHADER_MODEL_PS_2_B ) || defined( SHADER_MODEL_PS_3_0 ) ) )
+
+	float3 fSpecular = i.flSpecPower * cSpecularColor;
+	float3 fSpecFinal = float3( 0.0, 0.0, 0.0 );
+	if ( blendfactor1 > 0.0 )
+	{
+		fSpecFinal += spec1.rgb * i.vColorBlend1.rgb * blendfactor1;
+	}
+	if ( blendfactor2 > 0.0 )
+	{
+		fSpecFinal += spec2.rgb * i.vColorBlend2.rgb * blendfactor2;
+	}
+	if ( blendfactor3 > 0.0 )
+	{
+		fSpecFinal += spec3.rgb * i.vColorBlend3.rgb * blendfactor3;
+	}
+	if ( blendfactor4 > 0.0 )
+	{
+		fSpecFinal += spec4.rgb * i.vColorBlend4.rgb * blendfactor4;
+	}
+	
+	vResult.rgb += fSpecFinal * fSpecular;
+
+#endif
+
+
+#if LIGHTING_PREVIEW == 0
+	float3 lightmapColor = tex2D( LightmapSampler, i.vBaseTexCoord.zw );
+	float3 diffuseLighting = lightmapColor * g_TintValuesTimesLightmapScale.rgb;
+	diffuseLighting += g_cAmbientColor;
+	
+	vResult.rgb *= diffuseLighting;
+#endif
+	
+
+	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos_SpecExponent.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+	
+	return FinalOutput( float4( vResult, fogFactor ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+}

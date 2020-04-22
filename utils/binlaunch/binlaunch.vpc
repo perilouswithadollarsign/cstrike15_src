@@ -1,0 +1,56 @@
+ //-----------------------------------------------------------------------------
+//	BINLAUNCH.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro OUTBINDIR	"$SRCDIR\devtools\bin"
+
+$Include "$SRCDIR\vpc_scripts\source_exe_con_win32_base.vpc"
+
+$Configuration
+{
+	$PostBuildEvent
+	{
+		// Various projects like vpc and remotemirror use copies of the binlaunch.exe, so when binlaunch is built,
+		// it copies to those exes.
+		$CommandLine		"$BASE" "\n" \
+							"\n" \
+							"echo ... Copying BINLAUNCH.EXE to REMOTEMIRROR.EXE" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $SRCDIR\devtools\bin\remotemirror.exe $SRCDIR" "\n" \
+							"copy $OUTBINDIR\$(TargetFileName) $SRCDIR\devtools\bin\remotemirror.exe" "\n" \
+							"if ERRORLEVEL 1 goto BinLaunchCopyFailed" "\n" \
+							"\n" \
+							"echo ... Copying BINLAUNCH.EXE to SCHEMACOMPILER.EXE" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $SRCDIR\devtools\bin\schemacompiler.exe $SRCDIR" "\n" \
+							"copy $OUTBINDIR\$(TargetFileName) $SRCDIR\devtools\bin\schemacompiler.exe" "\n" \
+							"if ERRORLEVEL 1 goto BinLaunchCopyFailed" "\n" \
+							"\n" \
+							"goto BinLaunchCopyOK" "\n" \
+							"\n" \
+							":BinLaunchCopyFailed" "\n" \
+							"echo *** ERROR! binlaunch copy step failed." "\n" \
+							"del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+							"exit 1" "\n" \
+							"\n" \
+							":BinLaunchCopyOK" "\n" \
+							"\n"
+	}
+}
+
+$Project "binlaunch"
+{
+	$Folder	"Source Files"
+	{
+		$File	"binlaunch.cpp"
+		-$File	"$SRCDIR\public\tier0\memoverride.cpp"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		-$ImpLib tier0
+		-$Lib tier1
+		-$ImpLib vstdlib
+	}
+}

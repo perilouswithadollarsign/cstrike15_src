@@ -1,0 +1,107 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "WIDEN_TIPS"	"0..1"
+// DYNAMIC: "COMPRESSED_VERTS"			"0..1"
+
+// Includes
+#include "common_vs_fxc.h"
+
+// Globals
+const float4 g_flWidthParams	: register( SHADER_SPECIFIC_CONST_0 );
+#define g_flWidthExp g_flWidthParams.x
+#define g_flWidthScale g_flWidthParams.y
+#define g_flWidthBias g_flWidthParams.z
+#define g_flUVScale g_flWidthParams.w
+
+const float3 g_vEyePos	: register( SHADER_SPECIFIC_CONST_1 );
+
+//#define g_flUVScale 0.05
+/*
+#define g_flWidthExp 4
+#define g_flWidthScale 5
+#define g_flWidthBias 0.2
+*/
+
+/*
+#define g_flWidthExp 0.5
+#define g_flWidthScale 1.0
+#define g_flWidthBias 0.0
+*/
+
+// Structs
+struct VS_INPUT
+{
+	float4 vTexCoord0			: TEXCOORD0;	// distance to arm root, V texcoord, rel. position along arm, and t
+	float4 vBezierCage0			: TEXCOORD1;	// Bezier positions. 4th position in w coords of the first 3
+	float4 vBezierCage1			: TEXCOORD2;
+	float4 vBezierCage2			: TEXCOORD3;
+	float4 vColor				: TEXCOORD4;
+};
+
+struct VS_OUTPUT
+{
+    float4 vProjPosition		: POSITION;		// Projection-space position
+	float4 vWorldNormal			: TEXCOORD0;	// w is proj. z coord (for depth stuff)
+	float3 vWorldTangent		: TEXCOORD1;
+	float3 vWorldBinormal		: TEXCOORD2;
+	float3 vWorldPos			: TEXCOORD3;
+	float3 vUV					: TEXCOORD4;	// z is normalized dist from root
+	float4 vColor				: TEXCOORD5;
+};
+
+// Main
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	float3 vBezierCage3 = float3( i.vBezierCage0.w, i.vBezierCage1.w, i.vBezierCage2.w );
+
+	// bezier evaluation
+	float3 v0 = lerp( i.vBezierCage0.xyz, i.vBezierCage1.xyz, i.vTexCoord0.w );
+	float3 v1 = lerp( i.vBezierCage1.xyz, i.vBezierCage2.xyz, i.vTexCoord0.w );
+	float3 v2 = lerp( i.vBezierCage2.xyz, vBezierCage3.xyz, i.vTexCoord0.w );
+	v0 = lerp( v0, v1, i.vTexCoord0.w );
+	v1 = lerp( v1, v2, i.vTexCoord0.w );
+	float3 vWorldPos = lerp( v0, v1, i.vTexCoord0.w );		// world position
+
+	// eval bezier derivative to get a tangent
+	v0 = lerp( i.vBezierCage1.xyz - i.vBezierCage0.xyz, i.vBezierCage2.xyz - i.vBezierCage1.xyz, i.vTexCoord0.w );
+	v1 = lerp( i.vBezierCage2.xyz - i.vBezierCage1.xyz, vBezierCage3.xyz - i.vBezierCage2.xyz, i.vTexCoord0.w );
+	v0 = lerp( v0, v1, i.vTexCoord0.w );
+	float3 vWorldTan = normalize( v0 );
+
+	float flDistAlongArm = i.vTexCoord0.z;
+	//float flTotalArmLength = i.vTexCoord0.x / ( i.vTexCoord0.z - 1.0 );
+
+	float flWidthScale = g_flWidthScale + i.vColor.a * 0.5;
+
+#if WIDEN_TIPS == 1
+	float flWidth = g_flWidthBias + flWidthScale * pow( 1.0 - flDistAlongArm, g_flWidthExp );
+#else
+	// regular tapering
+	float flWidth = g_flWidthBias + flWidthScale * pow( flDistAlongArm, g_flWidthExp );
+#endif
+	//flWidth = flDistAlongArm;
+
+	// quad expansion
+	float3 vView = normalize( g_vEyePos - vWorldPos );
+	float3 vSpan = cross( vView, vWorldTan );	
+	vWorldPos += vSpan * flWidth * 2.0 * ( i.vTexCoord0.y - 0.5 );
+
+	// Transform into projection space
+	float4 vProjPosition = mul( float4( vWorldPos, 1.0f ), cViewProj );
+
+	o.vProjPosition = vProjPosition;
+	o.vColor = i.vColor;
+	
+	o.vWorldPos.xyz = vWorldPos.xyz;
+	o.vWorldNormal.xyz = normalize( vView - dot( vView, vWorldTan ) * vWorldTan );
+	o.vWorldTangent.xyz = vWorldTan;
+	o.vWorldBinormal.xyz = vSpan;
+	o.vWorldNormal.w = vProjPosition.z;
+
+	o.vUV.xy = i.vTexCoord0.xy * float2( g_flUVScale, 1.0 );
+	o.vUV.x = 1.0 - flDistAlongArm;
+	o.vUV.z = flDistAlongArm;
+	return o;
+}

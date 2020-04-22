@@ -1,0 +1,64 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "SHADER_SRGB_READ"			"0..1"	[XBOX]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[PC]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[SONYPS3]
+// STATIC: "SHADOWDEPTH"				"0..1"
+// STATIC: "ALPHATESTREF"				"0..1"
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..1"		[ps20b] [PC]
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"		[ps20b] [CONSOLE]
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"		[ps20]
+
+// SKIP: ( $ALPHATESTREF == 1 ) && ( $SHADOWDEPTH == 1 )
+
+#include "common_fog_ps_fxc.h"
+#include "common_ps_fxc.h"
+
+float4 g_FogParams						: register( c0 );
+float4 g_EyePos							: register( c1 );
+
+#if ( ALPHATESTREF )
+	#define g_AlphaTestRef g_EyePos.w
+#endif
+
+// VS_OUTPUT in a common file.
+#define PIXELSHADER
+#include "common_splinerope_fxc.h"
+
+sampler BaseTextureSampler	: register( s0 );
+sampler NormalSampler		: register( s1 );
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	#if ( SHADOWDEPTH == 0 )
+	{
+		float3 vNormalMapDir = tex2D( NormalSampler, i.texCoord.xy ).xyz; // Get the 3-vector from the normal map
+		float4 textureColor = tex2Dsrgb( BaseTextureSampler, i.texCoord.xy );
+
+		//Expand compacted vectors
+		vNormalMapDir = ( vNormalMapDir - 0.5 ) * 2.0;
+		float3 vLightDir = float3( 0.0f, 0.0f, 1.0f );
+
+		float lightDirDotNormalMap = dot( vNormalMapDir, vLightDir ); //normalMap dot dirLightDir
+
+		// do half-lambert on the dot
+		lightDirDotNormalMap = lightDirDotNormalMap * 0.5 + 0.5;
+		lightDirDotNormalMap = lightDirDotNormalMap * lightDirDotNormalMap;
+
+		float4 resultColor;
+		resultColor.xyz = lightDirDotNormalMap * ( textureColor.rgb * i.argbcolor.rgb );
+		resultColor.a = textureColor.a * i.argbcolor.a;
+		
+		#if ( ALPHATESTREF )
+		clip( resultColor.a - g_AlphaTestRef );
+		#endif
+
+		float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+		return FinalOutput( resultColor, fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, (WRITE_DEPTH_TO_DESTALPHA != 0), i.worldPos_projPosZ.w );
+	}
+	#else
+	{
+		return float4_color_return_type( 0.0f, 0.0f, 0.0f, 1.0f );
+	}
+	#endif
+}

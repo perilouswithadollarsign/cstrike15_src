@@ -1,0 +1,55 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+
+#include "common_vs_fxc.h"
+
+struct VS_INPUT
+{
+	float3 vPos						: POSITION;
+	float2 vBaseTexCoord			: TEXCOORD0;
+	float4 lightColor_InnerCos : TEXCOORD1;
+	float4 lightDir_OuterCos    : TEXCOORD2;
+	float3 lightOrigin          : TEXCOORD3;
+	float4 attnInfo             : TEXCOORD4;
+	float3 col : TEXCOORD5;
+
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos					: POSITION;	
+	float2 texCoord				: TEXCOORD0;
+	float4 lightColor_InnerCos : TEXCOORD1;
+	float4 lightDir_OuterCos    : TEXCOORD2;
+	float3 lightOrigin          : TEXCOORD3;
+	float4 attnInfo             : TEXCOORD4;
+	float3 SampleXYW            : TEXCOORD5;
+	float3 col : TEXCOORD6;
+
+};
+
+float4 Texel_Sizes : register (SHADER_SPECIFIC_CONST_0);
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+
+	VS_OUTPUT o;
+
+	o.projPos = float4( v.vPos, 1.0f );
+	//o.projPos.xyzw = mul( float4( v.vPos.xyz, 1.0f ), cModelViewProj );
+
+	float2 vSamplePos;
+	vSamplePos.x = o.projPos.x;
+	vSamplePos.y = -o.projPos.y; // invert Y
+	vSamplePos = (vSamplePos + o.projPos.w) * 0.5f;
+	o.SampleXYW = float3( vSamplePos.x, vSamplePos.y, o.projPos.w );
+
+	o.texCoord = v.vBaseTexCoord;
+
+	o.lightColor_InnerCos = v.lightColor_InnerCos;
+	o.lightDir_OuterCos = v.lightDir_OuterCos;
+	o.lightOrigin = v.lightOrigin;
+	o.col = v.col;
+	o.attnInfo = v.attnInfo;
+	return o;
+}

@@ -1,0 +1,9 @@
+$MacroRequired VPC_TRIVIAL_DEPENDENCY_PATH "$SRCDIR/vpc_scripts/vpc_trivial_dependency.txt"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;STATIC_LINK"	[$STATIC_LINK]
+	}
+}

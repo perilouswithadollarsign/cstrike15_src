@@ -1,0 +1,32 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// DYNAMIC: "ISFLOAT"			"0..1"
+
+#include "common_ps_fxc.h"
+
+sampler TexSampler0	: register( s0 );
+sampler TexSampler1	: register( s1 );
+
+struct PS_INPUT
+{
+	float2 tc	: TEXCOORD0;
+};
+
+const float4 bloomamount : register( c0 );
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 c0 = tex2D( TexSampler0, i.tc );			// Bloom texture
+	float4 c1 = tex2D( TexSampler1, i.tc );			// Base texture
+
+	float4 result = c0 + bloomamount.xxxx * c1;		// And some fraction of bloom to base
+
+#if ISFLOAT
+	result.r = SrgbLinearToGamma( result.r );		//
+	result.g = SrgbLinearToGamma( result.g );		// Linear to sRGB
+	result.b = SrgbLinearToGamma( result.b );		//
+#endif
+
+	return result;
+}
+

@@ -1,0 +1,52 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+// STATIC: "VERTEXCOLOR" "0..1" [=0]
+// STATIC: "TRANSFORMVERTS" "0..1" [=0]
+
+
+#include "common_vs_fxc.h"
+
+struct VS_INPUT
+{
+	float3 vPos						: POSITION;
+	float2 vBaseTexCoord			: TEXCOORD0;
+
+	#if VERTEXCOLOR
+		float4 vColor				: COLOR0;
+	#endif
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos					: POSITION;	
+	float2 baseTexCoord				: TEXCOORD0;
+
+	#if VERTEXCOLOR
+		float4 vColor				: TEXCOORD1;
+	#endif
+};
+
+float4 Texel_Sizes : register (SHADER_SPECIFIC_CONST_0);
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	if ( TRANSFORMVERTS )
+		o.projPos.xyzw = mul( float4( v.vPos.xyz, 1.0f ), cModelViewProj );
+	else
+		o.projPos = float4( v.vPos, 1.0f );
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	o.baseTexCoord = v.vBaseTexCoord;
+
+	#if ( VERTEXCOLOR )
+		o.vColor.rgba = v.vColor.rgba;
+	#endif
+
+	return o;
+}

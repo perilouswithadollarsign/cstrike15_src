@@ -1,0 +1,244 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "HALFLAMBERT"		"0..1"
+// STATIC: "FLASHLIGHT"			"0..1"
+// STATIC: "LIGHTWARPTEXTURE"	"0..1"
+// STATIC: "WORLD_NORMAL"		"0..0"	[vs20] [PC]
+// STATIC: "WORLD_NORMAL"		"0..1"	[vs30] [PC]
+// STATIC: "WORLD_NORMAL"		"0..0"	[CONSOLE]
+
+// DYNAMIC: "COMPRESSED_VERTS"	"0..1"
+// DYNAMIC: "SKINNING"			"0..1"
+#include "common_fog_vs_fxc.h"
+// DYNAMIC: "DYNAMIC_LIGHT"		"0..1"
+// DYNAMIC: "NUM_LIGHTS"		"0..4"
+// DYNAMIC: "TESSELLATION"		"0..0" [vs30] [PC]
+// DYNAMIC: "TESSELLATION"		"0..0" [CONSOLE]
+// DYNAMIC: "TESSELLATION"		"0..0" [vs20] [PC]
+
+// DYNAMIC: "MORPHING"			"0..0" [ = false ]
+
+// SKIP: ( $MORPHING || $SKINNING || $COMPRESSED_VERTS ) && $TESSELLATION
+
+#include "vortwarp_vs20_helper.h"
+
+static const bool g_bSkinning		= SKINNING ? true : false;
+static const int  g_iFogType		= DOWATERFOG;
+static const bool g_bHalfLambert	= HALFLAMBERT ? true : false;
+
+const float3 g_cEyeOrigin			:  register( SHADER_SPECIFIC_CONST_0 );
+const float4 g_vIrisProjectionU		:  register( SHADER_SPECIFIC_CONST_2 );
+const float4 g_vIrisProjectionV		:  register( SHADER_SPECIFIC_CONST_3 );
+const float4 g_vFlashlightPosition	:  register( SHADER_SPECIFIC_CONST_4 );
+
+#if ( WORLD_NORMAL )
+	const float4 g_vEyeVector			: register( SHADER_SPECIFIC_CONST_5 );
+#endif
+
+const float4x4 g_vFlashlightMatrix		:  register( SHADER_SPECIFIC_CONST_6 ); // 6 & 7 & 8 & 9
+#ifdef SHADER_MODEL_VS_3_0
+// NOTE: cMorphTargetTextureDim.xy = target dimensions,
+//		 cMorphTargetTextureDim.z = 4tuples/morph
+const float3 cMorphTargetTextureDim	: register( SHADER_SPECIFIC_CONST_10 );
+const float4 cMorphSubrect			: register( SHADER_SPECIFIC_CONST_11 );
+sampler2D morphSampler				: register( s0 );
+#endif
+
+
+
+#if TESSELLATION
+
+#include "tessellation_vs_fxc.h"
+
+const float4 g_SubDControls					: register( SHADER_SPECIFIC_CONST_1 );
+sampler2D BezierSampler						: register( s1 );
+sampler2D DispSampler						: register( s2 );
+// VS_INPUT defined in header
+
+#else // no TESSELLATION
+
+struct VS_INPUT
+{
+	float4 vPos					: POSITION;		// Position
+	float4 vBoneWeights			: BLENDWEIGHT;	// Skin weights
+	float4 vBoneIndices			: BLENDINDICES;	// Skin indices
+	float4 vTexCoord0			: TEXCOORD0;	// Base (sclera) texture coordinates
+
+	// Position deltas
+	float3 vPosFlex				: POSITION1;
+	
+#ifdef SHADER_MODEL_VS_3_0
+	float vVertexID				: POSITION2;
+#endif
+};
+
+#endif // TESSELLATION
+
+struct VS_OUTPUT
+{
+    float4 projPos							: POSITION;		// Projection-space position
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float  fog								: FOG;			// Fixed-function fog factor
+#endif
+	float4 vAmbientOcclUv_fallbackCorneaUv	: TEXCOORD0;	// Base texture coordinate
+	float4 cVertexLight						: TEXCOORD1;	// Vertex-lit color (Note: w is used for flashlight pass)
+	float4 vTangentViewVector				: TEXCOORD2;	// Tangent view vector (Note: w is used for flashlight pass)
+	float4 vWorldPosition_ProjPosZ			: TEXCOORD3;
+	float3 vWorldNormal						: TEXCOORD4;	// World-space normal
+	float3 vWorldTangent					: TEXCOORD5;	// World-space tangent
+	float4 vLightFalloffCosine01			: TEXCOORD6;	// Light falloff and cosine terms for first two local lights
+	float4 vLightFalloffCosine23			: TEXCOORD7;	// Light falloff and cosine terms for next two local lights
+
+	float3 vWorldBinormal					: COLOR0;		// World-space normal
+};
+
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	bool bDynamicLight = DYNAMIC_LIGHT ? true : false;
+
+	float2 baseTexCoords;
+	float3 vWorldPosition;
+
+	#if ( TESSELLATION )
+	{
+		float3 dummyNormal;
+		float2 patchCoords;
+		EvaluateSubdivisionSurface( v, g_SubDControls.x, g_SubDControls.y, g_SubDControls.z, BezierSampler, DispSampler,
+								    dummyNormal, vWorldPosition, baseTexCoords, patchCoords );
+	}
+	#else // not tessellating
+	{
+		float4 vPosition = v.vPos;
+		baseTexCoords = v.vTexCoord0.xy;
+
+		#if ( !defined( SHADER_MODEL_VS_3_0 ) || !MORPHING )
+		{
+			ApplyMorph( v.vPosFlex, vPosition.xyz );
+		}
+		#else
+		{
+			ApplyMorph( morphSampler, cMorphTargetTextureDim, cMorphSubrect, v.vVertexID, float3( 0, 0, 0 ), vPosition.xyz );
+		}
+		#endif
+
+		// Transform the position
+		SkinPosition( g_bSkinning, vPosition, v.vBoneWeights, v.vBoneIndices, vWorldPosition );
+	}
+	#endif // TESSELLATION
+
+	// Note: I'm relying on the iris projection vector math not changing or this will break
+	float3 vEyeSocketUpVector = normalize( -g_vIrisProjectionV.xyz );
+	float3 vEyeSocketLeftVector = normalize( -g_vIrisProjectionU.xyz );
+
+	o.vWorldPosition_ProjPosZ.xyz = vWorldPosition.xyz;
+
+	// Transform into projection space
+	float4 vProjPos = mul( float4( vWorldPosition, 1.0f ), cViewProj );
+	#if defined( _X360 )
+	{
+		// Without the isolate keyword here the output position for the flashlight pass is slightly behind the position of the main pass
+		// and the flashlight pass will be z-culled.
+		[isolate] o.projPos = vProjPos;
+	}
+	#else
+	{
+		o.projPos = vProjPos;
+	}
+	#endif
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+#if ( WORLD_NORMAL )
+	o.vWorldPosition_ProjPosZ.w = dot( g_vEyeVector, vWorldPosition.xyz - cEyePos.xyz );	// Linear depth
+#else
+	o.vWorldPosition_ProjPosZ.w = vProjPos.z;
+#endif
+
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	o.fog = CalcFixedFunctionFog( vWorldPosition, g_iFogType );
+#endif
+
+	// Normal = (Pos - Eye origin)
+	float3 vWorldNormal = normalize( vWorldPosition.xyz - g_cEyeOrigin.xyz );
+	o.vWorldNormal.xyz = vWorldNormal.xyz;
+
+	// Tangent & binormal
+	float3 vWorldTangent = normalize( cross( vEyeSocketUpVector.xyz, vWorldNormal.xyz ) );
+	o.vWorldTangent.xyz = vWorldTangent.xyz;
+
+	float3 vWorldBinormal = normalize( cross( vWorldNormal.xyz, vWorldTangent.xyz ) );
+	o.vWorldBinormal.xyz = vWorldBinormal.xyz * 0.5f + 0.5f;
+
+	float3 vWorldViewVector = normalize (vWorldPosition.xyz - cEyePos.xyz);
+	o.vTangentViewVector.xyz = Vec3WorldToTangentNormalized (vWorldViewVector.xyz, vWorldNormal.xyz, vWorldTangent.xyz, vWorldBinormal.xyz);
+
+	// AV - I think this will effectively make the eyeball less rounded left to right to help vertex lighting quality
+	// AV - Note: This probably won't look good if put on an exposed eyeball
+  	//float vNormalDotSideVec = -dot( vWorldNormal, g_vEyeballUp ) * 0.5f;
+  	float vNormalDotSideVec = -dot( vWorldNormal, vEyeSocketLeftVector) * 0.5f;
+	float3 vBentWorldNormal = normalize(vNormalDotSideVec * vEyeSocketLeftVector + vWorldNormal);
+
+	// Compute vertex lighting
+	o.cVertexLight.a = 0.0f; //Only used for flashlight pass
+	o.cVertexLight.rgb = DoLightingUnrolled( vWorldPosition, vBentWorldNormal, float3(0.0f, 0.0f, 0.0f), false, bDynamicLight, g_bHalfLambert, NUM_LIGHTS );
+
+	// Only interpolate ambient light for TF NPR lighting
+	bool bDoDiffuseWarp = LIGHTWARPTEXTURE ? true : false;
+	if ( bDoDiffuseWarp )
+	{
+		if( bDynamicLight )
+		{
+			o.cVertexLight.rgb = AmbientLight( vBentWorldNormal.xyz );
+		}
+		else
+		{
+			o.cVertexLight.rgb = float3( 0.0f, 0.0f, 0.0f );
+		}
+	}
+
+	// Light falloff for first two local lights
+	o.vLightFalloffCosine01.x = VertexAttenInternal( vWorldPosition.xyz, 0 );
+	o.vLightFalloffCosine01.y = VertexAttenInternal( vWorldPosition.xyz, 1 );
+	o.vLightFalloffCosine01.z = CosineTermInternal( vWorldPosition.xyz, vWorldNormal.xyz, 0, g_bHalfLambert );
+	o.vLightFalloffCosine01.w = CosineTermInternal( vWorldPosition.xyz, vWorldNormal.xyz, 1, g_bHalfLambert );
+
+	// Light falloff for next two local lights
+	o.vLightFalloffCosine23.x = VertexAttenInternal( vWorldPosition.xyz, 2 );
+	o.vLightFalloffCosine23.y = VertexAttenInternal( vWorldPosition.xyz, 3 );
+	o.vLightFalloffCosine23.z = CosineTermInternal( vWorldPosition.xyz, vWorldNormal.xyz, 2, g_bHalfLambert );
+	o.vLightFalloffCosine23.w = CosineTermInternal( vWorldPosition.xyz, vWorldNormal.xyz, 3, g_bHalfLambert );
+
+	// Texture coordinates set by artists for ambient occlusion
+	o.vAmbientOcclUv_fallbackCorneaUv.xy = baseTexCoords;
+
+	// Cornea uv for ps.2.0 fallback
+	float2 vCorneaUv; // Note: Cornea texture is a cropped version of the iris texture
+	vCorneaUv.x = dot( g_vIrisProjectionU, float4( vWorldPosition, 1.0f ) );
+	vCorneaUv.y = dot( g_vIrisProjectionV, float4( vWorldPosition, 1.0f ) );
+	float2 vSphereUv = ( vCorneaUv.xy * 0.5f ) + 0.25f;
+	o.vAmbientOcclUv_fallbackCorneaUv.wz = vCorneaUv.xy; // Note: wz unpacks faster than zw in ps.2.0!
+
+	// Step on the vertex light interpolator for the flashlight tex coords
+	bool bFlashlight = ( FLASHLIGHT != 0 ) ? true : false;
+	o.vTangentViewVector.w = 0.0f;
+	if ( bFlashlight )
+	{
+		o.cVertexLight = mul( float4( vWorldPosition.xyz, 1.0f ), g_vFlashlightMatrix );
+
+		o.vTangentViewVector.w = saturate( dot( vBentWorldNormal.xyz, normalize ( g_vFlashlightPosition.xyz - vWorldPosition.xyz ) ) ); // Flashlight N.L with modified normal
+
+		// Half lambert version
+		//o.cVertexLight.z = dot( vBentWorldNormal.xyz, normalize ( g_vFlashlightPosition.xyz - vWorldPosition.xyz ) ); // Flashlight N.L with modified normal
+		//o.cVertexLight.z = ( o.cVertexLight.z * 0.5f ) + 0.5f;
+		//o.cVertexLight.z *= o.cVertexLight.z;
+	}
+
+	return o;
+}

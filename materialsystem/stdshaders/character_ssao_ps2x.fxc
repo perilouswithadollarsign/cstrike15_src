@@ -1,0 +1,140 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "QUALITY_MODE"				"0..2" [ps30]
+// STATIC:  "QUALITY_MODE"				"0..1" [ps20b]
+// STATIC:  "QUALITY_MODE"				"0..0" [ps20]
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+// SAMPLERS
+sampler		BaseSampler				: register( s0 );
+
+//sampler		NoiseSampler			: register( s1 );
+//const float4	g_fvConstRegister0	: register( c0 );
+//#define g_vTimeUVOffset g_fvConstRegister0.xy
+
+struct PS_INPUT
+{
+	float2 vBaseUV					: TEXCOORD0;
+};
+
+float UnpackFloat2(float2 packed)
+{
+	return packed.x + ( packed.y * (1.0f / 256.0f) );
+}
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+
+	//sample basetexture
+	float4 vColorCenter = tex2D( BaseSampler, i.vBaseUV.xy );
+	
+	//float2 vSamplePerturb = (tex2D( NoiseSampler, g_vTimeUVOffset + i.vBaseUV.xy * 32.0f ).xy * 2.0f) - 1.0f;
+
+	float3 vCenterPos = float3( 0, 0, UnpackFloat2( vColorCenter.ba ) );
+	//clip( vCenterPos.z - 0.001f );
+
+	float3 vCenterNormal = normalize( float3( ((vColorCenter.xy * 2.0f) - 1.0f), 1 ) );
+
+	float flSSAO = 1.0f;
+
+		// experimenting with various poisson discs
+
+		//float2 offsets[16] = {
+		//					float2( -0.94201624,  -0.39906216 ),
+        //                    float2(  0.94558609,  -0.76890725 ),
+        //                    float2( -0.094184101, -0.92938870 ),
+        //                    float2(  0.34495938,   0.29387760 ),
+        //                    float2( -0.91588581,   0.45771432 ),
+        //                    float2( -0.81544232,  -0.87912464 ),
+        //                    float2( -0.38277543,   0.27676845 ),
+        //                    float2(  0.97484398,   0.75648379 ),
+        //                    float2(  0.44323325,  -0.97511554 ),
+        //                    float2(  0.53742981,  -0.47373420 ),
+        //                    float2( -0.26496911,  -0.41893023 ),
+        //                    float2(  0.79197514,   0.19090188 ),
+        //                    float2( -0.24188840,   0.99706507 ),
+        //                    float2( -0.81409955,   0.91437590 ),
+        //                    float2(  0.19984126,   0.78641367 ),
+        //                    float2(  0.14383161,  -0.14100790 )
+		//				};
+		//for ( int k = 0; k < 16; k++ )
+
+	#if QUALITY_MODE == 2
+		float2 offsets[16] = {
+								float2(   0.5301946,  0.5073427   ),
+								float2(   0.0684771,  0.4128032   ),
+								float2(   0.5126259,  0.0365609   ),
+								float2(   0.0101744,  0.8379333   ),
+								float2(   0.1560884, -0.1649500   ),
+								float2(   0.9068975, -0.0846123   ),
+								float2(   0.6797046, -0.5736184   ),
+								float2(  -0.4168866,  0.8836493   ),
+								float2(  -0.5666743,  0.3535654   ),
+								float2(  -0.0424080, -0.6649325   ),
+								float2(   0.3658477, -0.8909833   ),
+								float2(  -0.4150895, -0.2524949   ),
+								float2(  -0.9276293,  0.0097100   ),
+								float2(   0.4289346,  0.9020033   ),
+								float2(  -0.6507930, -0.6037632   ),
+								float2(  -0.2034065,  0.1169684   )
+						};
+		for ( int k = 0; k < 16; k++ )
+	#elif QUALITY_MODE == 1
+		float2 offsets[9] = {
+								float2(   0.7420793,  0.6406463   ),
+								float2(   0.1241058,  0.5777215   ),
+								float2(   0.8185505, -0.0552139   ),
+								float2(   0.0845212, -0.1639908   ),
+								float2(   0.1128483, -0.8857714   ),
+								float2(  -0.4971790,  0.6808146   ),
+								float2(  -0.5255098, -0.2983963   ),
+								float2(   0.6586789, -0.7424613   ),
+								float2(  -0.9488768,  0.1668307   )
+						};
+		for ( int k = 0; k < 9; k++ )
+	#else
+		float2 offsets[4] = {
+								float2(   0.6443077,  0.0112282   ),
+								float2(  -0.3698092, -0.6966258   ),
+								float2(   0.0570701,  0.7935340   ),
+								float2(  -0.6399019,  0.3894303   )
+						};
+		for ( int k = 0; k < 4; k++ )
+	#endif
+	{
+
+		#if QUALITY_MODE == 2
+			float4 vAOBuffer = tex2D( BaseSampler, i.vBaseUV.xy + offsets[k] * 0.001f );
+		#elif QUALITY_MODE == 1
+			float4 vAOBuffer = tex2D( BaseSampler, i.vBaseUV.xy + offsets[k] * 0.0015f );
+		#else
+			float4 vAOBuffer = tex2D( BaseSampler, i.vBaseUV.xy + offsets[k] * 0.002f );
+		#endif
+
+			float flSampleDepth = UnpackFloat2( vAOBuffer.ba );
+			float flDepthDiff = (flSampleDepth - vCenterPos.z);
+
+		#if QUALITY_MODE > 0
+
+			float3 vSampleNormal = normalize( float3( ((vAOBuffer.xy * 2.0f) - 1.0f), 1 ) );
+			float3 vSamplePos = float3( offsets[k], flSampleDepth );
+
+			float3 vHSV = ( vCenterPos - vSamplePos ); //HeightSpaceVector
+			float3 vHSVn = normalize( vHSV );
+
+			float flSampleAOContrib = abs( dot( vSampleNormal, vHSVn ) - dot( vCenterNormal, vHSVn ) );
+
+			
+			flSSAO -= flSampleAOContrib * step( abs(flDepthDiff), 0.015f ) * (length( vHSV ) * 0.1f);
+
+		#else
+
+			flSSAO -= 20.0f * flDepthDiff * step( abs(flDepthDiff), 0.015f );
+
+		#endif
+	}
+		
+	return float4( flSSAO.rrr, 1 );
+}

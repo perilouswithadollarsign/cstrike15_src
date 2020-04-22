@@ -1,0 +1,248 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "MODE" "0..3"
+// STATIC: "PALETTIZE" "0..1"
+
+// SKIP: ( $MODE == 1 )
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+#if ( PALETTIZE == 1 )
+	const int g_nColors : register( c0 );
+#else
+	#define g_nColors 3
+#endif
+const float g_flColorGamma : register( c1 );
+
+sampler sBaseTexture : register( s0 );
+sampler sEmbroideryNormal : register( s1 );
+sampler sBackingNormal : register( s2 );
+sampler sSphereNormal : register( s3 );
+sampler sSampleOffset : register( s4 );
+
+#define g_edgeNormalScale 512.0f
+#define g_detailScale 4.0f
+#define g_lum float3( 0.299, 0.587, 0.114 )
+
+struct PS_INPUT
+{
+	float2 vTexCoord			: TEXCOORD0;
+};
+
+float3 posterColor( float3 ic, float colorGamma, int nColors )
+{
+	ic = pow(ic, colorGamma);
+	ic = ic * nColors;
+	ic = floor(ic);
+	ic = ic / nColors;
+	ic = pow(ic,1.0/colorGamma);
+	// levels so there's no black or white
+	ic = ic * 0.93726 + 0.03137;
+	return ic;
+}
+
+float4 maxColor( float4 c1, float4 c2 )
+{
+	if ( dot( c1.rgb, g_lum ) > dot ( c2.rgb, g_lum ) )
+	{
+		return c1;
+	}
+	return c2;
+}
+
+
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float2 vOffsets[16] = { float2( -0.00160851f,  -0.006003045f  ),
+						float2( 0.00195312f,   -0.005074365f  ),
+						float2( 0.006003045f,  -0.00160851f   ),
+						float2( -0.001072344f, -0.00400203f   ),
+						float2( 0.0014648475f, -0.00253719f   ),
+						float2( 0.00400203f,   -0.001072344f  ),
+						float2( -0.005074365f, -0.00195312f   ),
+						float2( -0.00253719f,  -0.0014648475f ),
+						float2( 0.00253719f,    0.0014648475f ),
+						float2( 0.005074365f,   0.00195312f   ),
+						float2( -0.00400203f,   0.001072344f  ),
+						float2( -0.0014648475f, 0.00253719f   ),
+						float2( 0.001072344f,   0.00400203f   ),
+						float2( -0.006003045f,  0.00160851f   ),
+						float2( -0.00195312f,   0.005074365f  ),
+						float2( 0.00107234f,    0.00400203f   )  };
+
+	float4 texCol = tex2D( sBaseTexture, i.vTexCoord );
+
+	float3 tc = posterColor( texCol.rgb, g_flColorGamma, g_nColors );
+
+	// derive an arbitrary rotation for stitch direction from the posterized color intensity using hue
+	float rotation = -atan2( 1.732f * ( tc.g - tc.b ), 2 * ( tc.r - tc.g - tc.b ) );
+
+	float cr, sr;
+	sincos( rotation, cr, sr );
+
+	float2 tiledTexCoord = ( i.vTexCoord * g_detailScale );
+	float2 embroideryTexCoordRotated;
+	embroideryTexCoordRotated.x = tiledTexCoord.x * cr - tiledTexCoord.y * sr;
+	embroideryTexCoordRotated.y = tiledTexCoord.x * sr + tiledTexCoord.y * cr;
+
+	// Let's do that again, this time using the original result for perturbing the UVs so the stitches are extended slightly across color
+	// edge boundaries
+	float2 vTexCoord = i.vTexCoord;
+
+	float2 texOffset = ( 0.015625 * ( tex2D( sSampleOffset, embroideryTexCoordRotated.xy ) * 2.0f - 1.0f ) );
+	texOffset.x = texOffset.x * cr - texOffset.y * sr;
+	texOffset.y = texOffset.x * sr + texOffset.y * cr;
+	vTexCoord += texOffset;
+
+	texCol = tex2D( sBaseTexture, vTexCoord );
+	tc = posterColor( texCol.rgb, g_flColorGamma, g_nColors );
+	float alpha = step( 0.1f, texCol.a );
+
+	// noise reduction at color edge boundaries
+
+	float4 minCol = texCol;
+	int sampleCount = 0;
+	int k = 0;
+	for ( k = 0; k < 16; k = k + 2 )
+	{
+		float4 sampleTexCol = tex2D( sBaseTexture, vTexCoord + vOffsets[k] );
+		float3 oc = posterColor( sampleTexCol.rgb, g_flColorGamma, g_nColors );
+		bool isColorEdge = ( length( tc - oc ) > 0.001 );
+		sampleCount += isColorEdge;
+		minCol = maxColor( minCol, sampleTexCol );
+	}
+
+	if ( sampleCount > 3 )
+	{
+		tc = posterColor( minCol, g_flColorGamma, g_nColors );
+		texCol = minCol;
+	}
+
+	// Embroidery stitch normal
+	float4 embroideryNormSample = tex2D( sEmbroideryNormal, embroideryTexCoordRotated );
+	float embroiderAlpha = embroideryNormSample.a;
+
+	rotation = -atan2( 1.732f * ( tc.g - tc.b ), 2 * ( tc.r - tc.g - tc.b ) );
+	sincos( rotation, cr, sr );
+
+	embroideryTexCoordRotated.x = tiledTexCoord.x * cr - tiledTexCoord.y * sr;
+	embroideryTexCoordRotated.y = tiledTexCoord.x * sr + tiledTexCoord.y * cr;
+	embroideryNormSample = tex2D( sEmbroideryNormal, embroideryTexCoordRotated );
+	embroiderAlpha = embroideryNormSample.a;
+
+	float stitchingBlend = pow( embroiderAlpha, 0.25f ) * ( sampleCount < 2 ); // mask alpha
+
+	//rotation = -atan2( 1.732f * ( tc.g - tc.b ), 2 * ( tc.r - tc.g - tc.b ) );
+
+	#if ( MODE == 3 ) // anisodir
+		// return anisotropy direction and an alpha that defines where the aniso highlights do not appear (where we have backing 
+		// not stitching)
+		return float4( cr * 0.5f + 0.5f, sr * 0.5f + 0.5f, 0.0f, stitchingBlend * pow( embroiderAlpha, 8.0f ) );
+	#endif
+
+	float ao = 1.0f;
+
+	
+	float colorEdgeSamples = 1.0f;
+	float2 colorEdgeNormal = float2( 0.0f, 0.0f );
+	#if ( MODE == 2 )
+		float2 alphaEdgeNormal = float2( 0.0f, 0.0f );
+		float alphaEdgeSamples = 1.0f;
+	#endif
+
+	for ( k = 0; k < 16; k++ )
+	{
+		float4 sampleTexCol = tex2D( sBaseTexture, vTexCoord + vOffsets[k] * 1.5f );
+		float3 oc = posterColor( sampleTexCol.rgb, g_flColorGamma, g_nColors );
+
+		bool isColorEdge = ( length( tc - oc ) < 0.3f );
+
+		// edges between color islands
+		colorEdgeSamples += isColorEdge;
+		colorEdgeNormal -= isColorEdge * vOffsets[k];
+
+		#if ( MODE == 2 )
+			float sampleAlpha = sampleTexCol.a;
+			bool isAlphaEdge =  length( step( 0.1f, sampleAlpha ) - alpha ) < 0.01;
+
+			// outer edges of alpha
+			alphaEdgeSamples += isAlphaEdge;
+			alphaEdgeNormal -= isAlphaEdge * vOffsets[k];
+		#endif
+	}
+
+	colorEdgeNormal /= colorEdgeSamples;
+	colorEdgeNormal *= g_edgeNormalScale;
+
+	#if ( MODE == 2 )
+		alphaEdgeNormal /= alphaEdgeSamples;
+		alphaEdgeNormal *= g_edgeNormalScale;
+	#endif
+
+	#if ( MODE == 2 ) // bump
+		embroideryNormSample.xyz = embroideryNormSample.xyz * 2.0f - 1.0f;
+
+		float3 texNorm = embroideryNormSample.xyz;
+		// because we rotated the texcoord, we must also rotate the normal
+		texNorm.x = embroideryNormSample.x * cr - embroideryNormSample.y * sr;
+		texNorm.y = embroideryNormSample.x * sr + embroideryNormSample.y * cr;
+	#endif
+
+	#if ( MODE == 0 ) // diffuse
+		// generate ambient occlusion from stitching and posterized color island edges
+		ao *= 1.0f - abs( colorEdgeNormal.x ) - abs( colorEdgeNormal.y );
+		ao = pow( embroiderAlpha, 1.0f - ao );
+		ao = ao * ao * ao;
+		ao *= embroiderAlpha;
+
+		// diffuse color
+		#if ( PALETTIZE == 0 )
+		{
+			tc = texCol.rgb;
+		}
+		#endif
+
+		float3 baseColor = texCol.rgb;
+
+		// color burn the ao
+		baseColor = lerp( baseColor * baseColor, baseColor, ao );
+
+		//baseColor.rgb = lerp( float3( 0.0f, 0.0f, 0.0f ), baseColor.rgb, alpha );
+
+		float dropShadow = alpha;
+		for ( k = 0; k < 16; k++ )
+		{
+			float4 sampleTexCol = tex2D( sBaseTexture, vTexCoord + vOffsets[k] * 3.0f );
+			dropShadow += step( 0.1f, sampleTexCol.a );
+		}
+		dropShadow = dropShadow / 16.0f;
+		alpha = lerp( dropShadow, pow( embroiderAlpha, 0.75f ) + 0.1f, alpha );
+
+		return float4( baseColor, alpha ); // diffuse
+	#endif
+
+	#if ( MODE == 2 )
+
+		// Spherical normal gives the patch a bit of puffiness so that the anisotropic highlights in the final use-case 
+		// have some shape and orientation
+		float4 sphericalNormSample = tex2D( sSphereNormal, i.vTexCoord );
+		float3 sphericalNorm = sphericalNormSample.xyz * 2.0f - 1.0f;
+
+		texNorm.xy += sphericalNorm.xy  * 0.5f; // use full range in texture for precision, tone it down here.
+
+		// Add influence of posterized color normals and alpha edges
+		texNorm.xy += lerp( alphaEdgeNormal.xy, colorEdgeNormal.xy, stitchingBlend );
+		texNorm.xy += alphaEdgeNormal.xy;
+
+		texNorm = normalize( texNorm );
+
+		texNorm = texNorm * 0.5f + 0.5f;
+
+		// output normal 
+		return float4( texNorm, ao );
+	#endif
+
+	return 0;
+}

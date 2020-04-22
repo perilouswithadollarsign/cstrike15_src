@@ -1,0 +1,107 @@
+//-----------------------------------------------------------------------------
+//	LAUNCHER.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$Configuration
+{
+	$General
+	{
+		$AdditionalProjectDependencies	"$BASE;togl" [$OSXALL && $SDL]
+	}
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;LAUNCHERONLY;INCLUDE_SCALEFORM"
+		$PreprocessorDefinitions    "$BASE;ALLOW_TEXT_MODE=1" [$CSTRIKE_TRUNK_BUILD||$CSTRIKE_STAGING_BUILD]
+	}
+
+	$Linker [!$PS3]
+	{
+		$AdditionalDependencies		"$BASE shlwapi.lib winmm.lib wsock32.lib odbc32.lib odbccp32.lib $SRCDIR\dx9sdk\lib\dinput8.lib" [$WINDOWS]
+		$SystemFrameworks                                "Carbon;AppKit;OpenGL;IOKit"
+		$SystemFrameworks								"Carbon;AppKit;OpenGL;IOKit"
+		$SystemLibraries                                "iconv" [$OSXALL]
+		$SystemLibraries                                "SDL2"  [$LINUXALL]
+		// We run from the ./game dir, but want to look in the ./game/bin directory when loading libraries.
+		//   To dump rpath/runpath of a library, use "chrpath --list blah.so" or "objdump -x blah.so" or "readelf -d bin/launcher.so"
+		$GCC_ExtraLinkerFlags		"-Wl,--enable-new-dtags -Wl,-z,origin -Wl,-rpath,'$$ORIGIN' -L/usr/lib32 -L/usr/lib" [$LINUXALL]
+	}
+}
+
+$Configuration "Debug"
+{
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE Xonlined.lib" [$X360]
+	}
+}
+
+$Configuration "Release"
+{
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE Xonline.lib" [$X360]
+	}
+}
+
+$Project
+{
+	$Folder	"Source Files" [$PS3]
+	{
+		-$File	"$SRCDIR\common\ps3\prx.cpp"
+	}
+}
+
+$Project "launcher"
+{
+	$Folder	"Source Files"
+	{
+		$File	"$SRCDIR\public\filesystem_init.cpp"
+		$File	"launcher.cpp"
+		$File	"reslistgenerator.cpp"
+		$File	"prx.cpp"	[$PS3]
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\tier0\basetypes.h"
+		$File	"$SRCDIR\public\tier0\dbg.h"
+		$File	"$SRCDIR\common\engine_launcher_api.h"
+		$File	"$SRCDIR\public\tier0\fasttimer.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\tier0\icommandline.h"
+		$File	"ifilesystem.h"
+		$File	"$SRCDIR\public\vgui\IHTML.h"
+		$File	"$SRCDIR\public\vgui\IImage.h"
+		$File	"$SRCDIR\public\tier1\interface.h"
+		$File	"$SRCDIR\public\vgui\ISurface.h"
+		$File	"$SRCDIR\public\vgui\KeyCode.h"
+		$File	"$SRCDIR\public\tier0\mem.h"
+		$File	"$SRCDIR\public\tier0\memalloc.h"
+		$File	"$SRCDIR\public\vgui\MouseCode.h"
+		$File	"$SRCDIR\public\tier0\platform.h"
+		$File	"reslistgenerator.h"
+		$File	"$SRCDIR\public\string_t.h"
+		$File	"$SRCDIR\public\tier1\strtools.h"
+		$File	"$SRCDIR\public\mathlib\vector2d.h"
+		$File	"$SRCDIR\public\vgui\vgui.h"
+		$File	"$SRCDIR\public\vstdlib\vstdlib.h"
+	}
+
+	$folder	"Link Libraries"
+	{
+		$Lib			appframework
+		$Lib			tier2
+		$Lib			tier3
+		$ImplibExternal	steam_api							[ ( $WIN32 || $POSIX || $PS3 ) && !$NO_STEAM ]
+		$ImplibExternal	steam_api64							[ $WIN64 && !$NO_STEAM ]
+		$ImpLib			togl								[!$IS_LIB_PROJECT && $GL]
+		$ImpLib			SDL2							[$SDL && !$LINUXALL]
+	}
+}

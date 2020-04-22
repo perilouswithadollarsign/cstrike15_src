@@ -1,0 +1,105 @@
+//-----------------------------------------------------------------------------
+//	MATHLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;..\public\mathlib"
+		$PreprocessorDefinitions		"$BASE;MATHLIB_LIB"
+	}
+}
+
+$Project "mathlib"
+{
+	$Folder	"Source Files"
+	{
+		$File	"expressioncalculator.cpp"
+		$File	"color_conversion.cpp"
+		$File   "cholesky.cpp"
+		$File	"halton.cpp"
+		$File	"lightdesc.cpp"
+		$File	"mathlib_base.cpp"
+		$File	"powsse.cpp"
+		$File	"sparse_convolution_noise.cpp"
+		$File	"sseconst.cpp"
+		$File	"sse.cpp"
+		$File	"ssenoise.cpp"
+		$File	"anorms.cpp"
+		$File	"bumpvects.cpp"
+		$File	"IceKey.cpp"
+		$File 	"kdop.cpp"
+		$File	"imagequant.cpp"
+		$File   "spherical.cpp"
+		$File	"polyhedron.cpp"
+		$File	"quantize.cpp"
+		$File	"randsse.cpp"
+		$File	"simdvectormatrix.cpp"
+		$File	"vmatrix.cpp"
+		$File	"almostequal.cpp"
+		$File   "simplex.cpp"
+		$File   "eigen.cpp"
+		$File   "box_buoyancy.cpp" [!$OSX32] // doesn't compile in debug under GCC 4.2.X
+		$File   "camera.cpp"
+		$File   "planefit.cpp"
+		$File	"polygon.cpp"
+		$File   "volumeculler.cpp"
+		$File	"transform.cpp"
+		$File	"sphere.cpp"
+		$File	"capsule.cpp"
+	}
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\mathlib\anorms.h"
+		$File	"$SRCDIR\public\mathlib\bumpvects.h"		
+		$File	"$SRCDIR\public\mathlib\beziercurve.h"
+		$File   "$SRCDIR/public/mathlib/camera.h"
+		$File	"$SRCDIR\public\mathlib\compressed_3d_unitvec.h"
+		$File	"$SRCDIR\public\mathlib\compressed_light_cube.h"
+		$File	"$SRCDIR\public\mathlib\compressed_vector.h"
+		$File	"$SRCDIR\public\mathlib\expressioncalculator.h"		
+		$File	"$SRCDIR\public\mathlib\halton.h"
+		$File	"$SRCDIR\public\mathlib\IceKey.H"
+		$File	"$SRCDIR\public\mathlib\lightdesc.h"
+		$File	"$SRCDIR\public\mathlib\math_pfns.h"
+		$File	"$SRCDIR\public\mathlib\mathlib.h"
+		$File	"$SRCDIR\public\mathlib\noise.h"
+		$File	"$SRCDIR\public\mathlib\polyhedron.h"
+		$File	"$SRCDIR\public\mathlib\quantize.h"
+		$File	"$SRCDIR\public\mathlib\simdvectormatrix.h"
+		$File	"$SRCDIR\public\mathlib\spherical_geometry.h"		
+		$File	"$SRCDIR\public\mathlib\ssemath.h"		
+		$File	"$SRCDIR\public\mathlib\ssequaternion.h"		
+		$File	"$SRCDIR\public\mathlib\vector.h"
+		$File	"$SRCDIR\public\mathlib\vector2d.h"
+		$File	"$SRCDIR\public\mathlib\vector4d.h"
+		$File	"$SRCDIR\public\mathlib\vmatrix.h"
+		$File	"$SRCDIR\public\mathlib\vplane.h"
+		$File	"$SRCDIR\public\mathlib\simplex.h"
+		$File	"$SRCDIR\public\mathlib\eigen.h"
+		$File   "$SRCDIR\public\mathlib\box_buoyancy.h"
+		$File   "$SRCDIR\public\mathlib\cholesky.h"
+		$File   "$SRCDIR\public\mathlib\planefit.h"
+		$File   "$SRCDIR\public\mathlib\intvector3d.h"
+		$File   "$SRCDIR\public\mathlib\polygon.h"
+		$File   "$SRCDIR\public\mathlib\quadric.h"
+		$File   "$SRCDIR\public\mathlib\volumeculler.h"
+		$File   "$SRCDIR\public\mathlib\transform.h"
+		$File	"$SRCDIR/public/mathlib/sphere.h"
+		$File	"$SRCDIR/public/mathlib/capsule.h"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"noisedata.h"
+		$File	"sse.h"	
+	}
+}

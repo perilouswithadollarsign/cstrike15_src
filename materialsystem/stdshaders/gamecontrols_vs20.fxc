@@ -1,0 +1,29 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+
+#include "common_vs_fxc.h"
+
+struct VS_INPUT
+{
+	float3 vPos						: POSITION;
+	float3 vTexCoord				: TEXCOORD0;
+	float4 vColor					: COLOR0;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos					: POSITION;	
+	float3 vTexCoord				: TEXCOORD0;
+	float4 vColor					: TEXCOORD1;
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	o.projPos.xyzw = mul( float4( v.vPos.xyz, 1.0f ), cModelViewProj );  
+	o.vTexCoord = v.vTexCoord;
+	o.vColor.rgba = v.vColor.rgba;
+
+	return o;
+}

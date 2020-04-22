@@ -1,0 +1,179 @@
+//-----------------------------------------------------------------------------
+//	LAUNCHER_MAIN.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game"
+
+// Must be built explicitly as "default" in order to build a compliant submittable Disc.
+// Renames will not work.
+$Macro OUTBINNAME	"default"
+$Macro OUTBINNAME	"csgo"	[$WIN32]
+$Macro OUTBINNAME	"csgo_win64"	[$WIN64]
+$Macro OUTBINNAME	"csgo_osx" [$OSX32]
+$Macro OUTBINNAME	"csgo_osx64" [$OSX64]
+$Macro OUTBINNAME	"csgo_linux" [$LINUX32]
+$Macro OUTBINNAME	"csgo_linux64" [$LINUX64]
+
+$Include "$SRCDIR\vpc_scripts\source_exe_base.vpc"
+
+$Macro DEMOSUFFIX "_demo\"				[$DEMO]
+$MacroEmptyString DEMOSUFFIX "empty"	[!$DEMO]
+
+$Macro	"PS3MEMOVERRIDE" "--wrap=abort --wrap=malloc --wrap=calloc --wrap=memalign --wrap=realloc --wrap=reallocalign --wrap=malloc_usable_size --wrap=malloc_stats --wrap=free"
+
+$CustomBuildStep "fp"  
+{
+	$CommandLine    "$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_fp_rsx -o &quot;$(InputName).fpo&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy -I binary -O elf64-powerpc-celloslv2 -B powerpc &quot;$(InputName).fpo&quot; &quot;$(IntDir)\$(InputName).fp.ppu.o&quot;"
+	$Description	"Fragment Program $(InputFileName) produces $(InputName).fpo produces $(InputName).fp.ppu.o"
+	$Outputs		"$(InputName).fpo;$(IntDir)\$(InputName).fp.ppu.o"
+}
+
+$CustomBuildStep "vp"  
+{
+	$CommandLine    "$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_vp_rsx -o &quot;$(InputName).vpo&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy -I binary -O elf64-powerpc-celloslv2 -B powerpc &quot;$(InputName).vpo&quot; &quot;$(IntDir)\$(InputName).vp.ppu.o&quot;"
+	$Description	"Vertex Program $(InputFileName) produces $(InputName).vpo produces $(InputName).vp.ppu.o"
+	$Outputs		"$(InputName).vpo;$(IntDir)\$(InputName).vp.ppu.o"
+}
+
+$Configuration
+{
+	$Compiler
+	{
+		$ForceIncludes				" "
+		$PreprocessorDefinitions	"$BASE;RATINGSBUILD"	[$RATINGSBUILD]
+	}
+
+	$Compiler [$PS3 && !$CERT]
+	{
+		$ForcedUsingFiles			"?DbgSaveProj&#x0D;?DbgElfArgs=-dev -game csgo&#x0D;?FileServDir=$(SolutionDir)..&#x0D;?HomeDir=$(SolutionDir).."
+		$AdditionalIncludeDirectories	"$BASE;&quot;$(SN_PS3_PATH)/ppu/include&quot;"
+	}
+
+	$Linker [$WIN32]
+	{
+		$EnableLargeAddresses		"Support Addresses Larger Than 2 Gigabytes (/LARGEADDRESSAWARE)"
+		$FixedBaseAddress			"Generate a relocation section (/FIXED:NO)"
+	}
+	
+	$SNCLinker [$PS3]
+	{
+		// General
+		$AdditionalDependencies		"$BASE  libsysutil_game_stub.a libsysutil_stub.a"
+
+		// Command Line
+		$AdditionalOptions			"$BASE $PS3MEMOVERRIDE"
+	}
+
+	$Compiler [$PS3]
+	{
+		$PreprocessorDefinitions		"$BASE;PS3MEMOVERRIDEWRAP;PS3MAINELF"
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\common;$SRCDIR\public"
+	}
+
+	$Xbox360ImageConversion	[$X360]
+	{
+		// General
+		$AdditionalSections		"5841125A=$SRCDIR\common\xlast_$VPCGAME\$VPCGAME.spa"
+		$ProjectDefaults		"$SRCDIR\common\xlast_$VPCGAME$DEMOSUFFIX\$VPCGAME.xml"
+	}
+
+	$ConsoleDeployment [$X360]
+	{
+		$DeploymentRoot			"xe:\$VPCGAME$DEMOSUFFIX"
+	}
+
+	$PreBuildEvent [$WINDOWS]
+	{
+		$CommandLine		"if EXIST $OUTBINDIR\$OUTBINNAME.exe for /f $QUOTEdelims=$QUOTE %%A in ('attrib $QUOTE$OUTBINDIR\$OUTBINNAME.exe$QUOTE') do set valveTmpIsReadOnly=$QUOTE%%A$QUOTE" "\n" \
+							"set valveTmpIsReadOnlyLetter=%valveTmpIsReadOnly:~6,1%" "\n" \
+							"if $QUOTE%valveTmpIsReadOnlyLetter%$QUOTE==$QUOTER$QUOTE del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n"
+	}
+
+	$PreLinkEvent [$PS3]
+	{
+		$CommandLine		"call .\$(IntDir)\errorshader.vp.bat" "\n" \
+							"call .\$(IntDir)\errorshader.fp.bat" "\n"
+	}
+
+
+	$PostBuildEvent	[$X360]
+	{
+		// inherit and add
+		$CommandLine				"$BASE" \
+									"call $SRCDIR\vpc_scripts\valve_xbcp_wrapper.cmd $(TargetDir)$(TargetName).xex xE:\$VPCGAME$DEMOSUFFIX\default.xex" "\n"
+	}
+
+	$PostBuildEvent	[$WINDOWS]
+	{
+		// override with specific behavior
+		$CommandLine				"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$OUTBINNAME.exe $SRCDIR" "\n" \
+							"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$OUTBINNAME.pdb $SRCDIR" "\n" \
+									"copy $(TargetPath) $OUTBINDIR\$OUTBINNAME.exe" "\n"					\
+									"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+									"if exist $(TargetDir)$(TargetName).map copy $(TargetDir)$(TargetName).map $OUTBINDIR\$OUTBINNAME.map" "\n" \
+									"if exist $(TargetDir)$(TargetName).pdb copy $(TargetDir)$(TargetName).pdb $OUTBINDIR\$OUTBINNAME.pdb" "\n" \
+									"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$OUTBINNAME.dat $SRCDIR" "\n"								\
+									"$OUTBINDIR\bin\newdat $OUTBINDIR\$OUTBINNAME.exe" "\n"					\
+									"goto BuildEventOK" "\n" \
+									":BuildEventFailed" "\n" \
+									"echo *** ERROR! PostBuildStep FAILED for $(ProjectName)! EXE or DLL is probably running. ***" "\n" \
+									"del /q $(TargetPath)" "\n" \
+									"exit 1" "\n" \
+									":BuildEventOK" "\n"
+		$Description		"Publishing to $OUTBINDIR"
+		$ExcludedFromBuild	"No"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE &quot;$(SN_PS3_PATH)/ppu/lib/sn/libsn.a&quot; &quot;$(SN_PS3_PATH)/ppu/lib/sn/libsntuner.a&quot;"
+	}
+}
+
+
+$Project
+{
+	$Folder	"Source Files"
+	{
+		-$File	"$SRCDIR\public\tier0\memoverride.cpp"	[!$PS3]
+	}
+
+	$Folder	"Link Libraries" 
+	{
+		-$File	"$LIBPUBLIC\tier0.lib" 			[$WINDOWS||$LINUX]	
+		-$File	"$LIBPUBLIC\tier1.lib"			[$WINDOWS||$LINUX]
+		-$File	"$LIBPUBLIC\vstdlib.lib"		[$WINDOWS||$LINUX]
+
+		-$File "$LIBPUBLIC\$_IMPLIB_PREFIXtier0$_IMPLIB_EXT" [$POSIX]
+		-$File "$LIBPUBLIC\$_IMPLIB_PREFIXvstdlib$_IMPLIB_EXT" [$POSIX]
+		-$File "$LIBPUBLIC\tier1$_IMPLIB_EXT"	[$POSIX]
+
+
+		-$File	"$LIBPUBLIC\tier0_360.lib" 		[$X360]
+		-$File	"$LIBPUBLIC\tier1_360.lib"		[$X360]
+		-$File	"$LIBPUBLIC\vstdlib_360.lib"	[$X360]
+	}
+}
+
+$Project "launcher_main"
+{
+	$Folder	"Source Files"
+	{
+		$File	"$SRCDIR\public\ps3_pathinfo.h"
+		$File	"main.cpp"
+		$File   "errorrenderloop.cpp" [$PS3]
+		$File   "errorrenderloop.h"   [$PS3]
+		$File   "errorshader.vp"      [$PS3]
+		$File   "errorshader.fp"      [$PS3]
+		$File	"ps3_pathinfo.cpp"    [$PS3]
+	}
+
+	$Folder "Resources" [$WINDOWS]
+	{
+		$File	"launcher_main.rc"
+		$File	"$SRCDIR\launcher\res\launcher.ico"
+	}
+}

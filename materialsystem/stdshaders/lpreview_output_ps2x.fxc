@@ -1,0 +1,23 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler InputTexture	: register( s0 );
+sampler Albedo	: register( s1 );
+sampler Normal	: register( s2 );
+
+struct PS_INPUT
+{
+	float2 texCoord				: TEXCOORD0;
+};
+
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float3 normal = tex2D( Normal, i.texCoord );
+	float good = dot( normal, normal ) > 0.9;
+	float3 input=tex2D( InputTexture, i.texCoord );
+	float3 albedo=tex2D( Albedo, i.texCoord );
+	input=lerp( albedo, input, good );
+	return FinalOutput( float4(input.xyz,1), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

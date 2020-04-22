@@ -1,0 +1,14 @@
+﻿<Application x:Class="ResponseEditor.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:ResponseEditor"
+    xmlns:as="clr-namespace:ManagedAppSystem;assembly=responserules_cli"
+    StartupUri="Window1.xaml"
+    Startup="Application_Startup"
+             >
+    <Application.Resources>
+        <!-- Initialize global app system interface. -->
+        <as:AppSystemWrapper x:Key="AppSystem"  />
+        <local:ResponseSystemWPF x:Key="ResponseSystem" />
+    </Application.Resources>
+</Application>

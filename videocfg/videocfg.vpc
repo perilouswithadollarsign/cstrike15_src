@@ -1,0 +1,30 @@
+//-----------------------------------------------------------------------------
+//	VIDEOCFG.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\public\videocfg"
+	}
+}
+
+$Project "videocfg"
+{
+	$Folder	"Source Files"
+	{
+		$File	"videocfg.cpp"
+	}
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\videocfg\videocfg.h"
+	}
+}

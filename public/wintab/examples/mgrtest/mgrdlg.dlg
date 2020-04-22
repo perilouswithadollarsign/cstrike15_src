@@ -1,0 +1,33 @@
+DLGINCLUDE RCDATA DISCARDABLE
+BEGIN
+    "MGRDLG.H\0"
+END
+
+IDD_BUTTONS DIALOG 105, -8, 145, 205
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cursor/Button Settings"
+FONT 8, "Helv"
+BEGIN
+    LTEXT           "&Cursor", -1, 12, 9, 22, 8
+    COMBOBOX        IDC_CURSORS, 12, 18, 120, 53, CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Physical &Buttons", -1, 12, 33, 55, 8
+    COMBOBOX        IDC_NAMES, 12, 42, 120, 53, CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Logical Buttons", -1, 12, 77, 55, 8
+    COMBOBOX        IDC_LOGICAL, 12, 86, 120, 53, CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Mouse Action", -1, 12, 123, 55, 8
+    COMBOBOX        IDC_MOUSE, 12, 132, 120, 53, CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Pen Action", -1, 12, 147, 37, 8
+    COMBOBOX        IDC_PEN, 12, 156, 120, 53, CBS_DROPDOWNLIST | WS_VSCROLL | 
+                    WS_TABSTOP
+    PUSHBUTTON      "OK", IDOK, 6, 185, 40, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 52, 185, 40, 14, WS_GROUP
+    PUSHBUTTON      "&Default", IDC_DEFAULT, 98, 185, 40, 14, WS_GROUP
+    CONTROL         "", 107, "Static", SS_BLACKFRAME, 6, 6, 132, 55
+    CONTROL         "", 108, "Static", SS_BLACKFRAME, 6, 74, 132, 32
+    CONTROL         "", 109, "Static", SS_BLACKFRAME, 6, 120, 132, 56
+END
+

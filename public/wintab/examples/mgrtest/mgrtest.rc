@@ -1,0 +1,416 @@
+//Microsoft Developer Studio generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#define APSTUDIO_HIDDEN_SYMBOLS
+#include "windows.h"
+#undef APSTUDIO_HIDDEN_SYMBOLS
+#include "mgrtest.h"
+#include "mgrdlg.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+MGRTESTMENU MENU DISCARDABLE 
+BEGIN
+    POPUP "&Test"
+    BEGIN
+        MENUITEM "&Config Box Replacement",     IDM_CBRTEST
+        MENUITEM "Pressure Button &Marks Setting", IDM_PMSTEST
+        MENUITEM "Pressure &Response Setting",  IDM_PRSTEST
+        MENUITEM "&Old Handle Test",            IDM_HMGRTEST
+    END
+    POPUP "&Edit"
+    BEGIN
+        POPUP "&Default Contexts"
+        BEGIN
+            MENUITEM "&Digitizing...",              IDM_DEFDIG
+            MENUITEM "&System...",                  IDM_DEFSYS
+        END
+        POPUP "&Reset Default Context"
+        BEGIN
+            MENUITEM "&Digitizing...",              IDM_RESET_DEFDIG
+            MENUITEM "&System...",                  IDM_RESET_DEFSYS
+        END
+        POPUP "Set Default De&vice"
+        BEGIN
+            MENUITEM "&Digitizing...",              IDM_DEFDEV_DIG
+            MENUITEM "&System...",                  IDM_DEFDEV_SYS
+        END
+        POPUP "Set &CsrMask"
+        BEGIN
+            MENUITEM "&Digitizing...",              IDM_CSRMASK_DIG
+            MENUITEM "&System...",                  IDM_CSRMASK_SYS
+        END
+        POPUP "Set &xBtnMask"
+        BEGIN
+            MENUITEM "&Digitizing...",              IDM_XBTN_DIG
+            MENUITEM "&System...",                  IDM_XBTN_SYS
+        END
+        MENUITEM "Cursor &Button Maps",         IDM_BUTTMAPS
+        MENUITEM "Extended Cursor Button Maps", IDM_XBUTTMAPS
+        MENUITEM "&Out of Bounds Tracking",     IDM_OBT
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About MgrTest...",           IDM_ABOUT
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_INFOLIST DIALOG DISCARDABLE  76, 28, 199, 132
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "%s Choice"
+FONT 8, "Helv"
+BEGIN
+    LTEXT           "   %s to Use:",LBC_TITLE,24,6,126,12
+    CONTROL         "",-1,"Static",SS_BLACKFRAME,24,4,146,16
+    PUSHBUTTON      "OK",IDOK,24,104,40,14
+    PUSHBUTTON      "Cancel",IDCANCEL,130,104,40,14
+    LISTBOX         LBC_LISTBOX,24,30,146,58,LBS_SORT | WS_VSCROLL | 
+                    WS_TABSTOP
+    LTEXT           "Hide me!",LBC_BASECAT,78,104,36,8,NOT WS_VISIBLE | 
+                    WS_DISABLED
+END
+
+ABOUTBOX DIALOG DISCARDABLE  22, 17, 144, 95
+STYLE DS_MODALFRAME | WS_CAPTION | WS_SYSMENU
+CAPTION "About MgrTest"
+FONT 8, "MS Sans Serif"
+BEGIN
+    CTEXT           "Microsoft Windows",IDC_STATIC,0,5,144,8
+    CTEXT           "MgrTest Application",IDC_STATIC,0,14,144,8
+    CTEXT           "Version 3.01",IDC_STATIC,0,30,144,8
+    DEFPUSHBUTTON   "OK",IDOK,55,70,32,14,WS_GROUP
+    LTEXT           "Copyright 1998  LCS/Telegraphics",IDC_STATIC,17,48,110,
+                    10
+END
+
+IDD_BUTTONS DIALOG DISCARDABLE  105, 65528, 145, 205
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cursor/Button Settings"
+FONT 8, "Helv"
+BEGIN
+    LTEXT           "&Cursor",-1,12,9,22,8
+    COMBOBOX        IDC_CURSORS,12,18,120,53,CBS_DROPDOWNLIST | WS_VSCROLL | 
+                    WS_TABSTOP
+    LTEXT           "Physical &Buttons",-1,12,33,55,8
+    COMBOBOX        IDC_NAMES,12,42,120,53,CBS_DROPDOWNLIST | WS_VSCROLL | 
+                    WS_TABSTOP
+    LTEXT           "&Logical Buttons",-1,12,77,55,8
+    COMBOBOX        IDC_LOGICAL,12,86,120,53,CBS_DROPDOWNLIST | WS_VSCROLL | 
+                    WS_TABSTOP
+    LTEXT           "&Mouse Action",-1,12,123,55,8
+    COMBOBOX        IDC_MOUSE,12,132,120,53,CBS_DROPDOWNLIST | WS_VSCROLL | 
+                    WS_TABSTOP
+    LTEXT           "&Pen Action",-1,12,147,37,8
+    COMBOBOX        IDC_PEN,12,156,120,53,CBS_DROPDOWNLIST | WS_VSCROLL | 
+                    WS_TABSTOP
+    PUSHBUTTON      "OK",IDOK,6,185,40,14
+    PUSHBUTTON      "Cancel",IDCANCEL,52,185,40,14,WS_GROUP
+    PUSHBUTTON      "&Default",IDC_DEFAULT,98,185,40,14,WS_GROUP
+    CONTROL         "",107,"Static",SS_BLACKFRAME,6,6,132,55
+    CONTROL         "",108,"Static",SS_BLACKFRAME,6,74,132,32
+    CONTROL         "",109,"Static",SS_BLACKFRAME,6,120,132,56
+END
+
+IDD_BTNMASKS DIALOG DISCARDABLE  27, 41, 227, 317
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Button Packet Masks"
+FONT 8, "Helv"
+BEGIN
+    DEFPUSHBUTTON   "&OK",IDOK,175,10,40,14,WS_GROUP
+    PUSHBUTTON      "&Cancel",IDCANCEL,175,36,40,14
+    GROUPBOX        "xBtnMask Release Events",XBU_BOX,10,199,145,100,
+                    WS_GROUP
+    GROUPBOX        "xBtnMask Press Events",XBD_BOX,10,90,145,100,WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY1,20,105,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY2,20,115,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY3,20,125,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY4,20,135,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY5,20,145,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY6,20,155,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY7,20,165,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBD_DISPLAY8,20,175,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY1,20,215,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY2,20,224,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY3,20,233,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY4,20,242,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY5,20,251,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY6,20,260,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY7,20,269,
+                    130,8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",XBU_DISPLAY8,20,278,
+                    130,8,NOT WS_GROUP
+    GROUPBOX        "BtnMask Press Events",IDC_STATIC,10,10,145,30
+    LTEXT           "00000000000000000000000000000000",BND_DISPLAY,20,25,130,
+                    8,NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",BNU_DISPLAY,20,65,130,
+                    8,NOT WS_GROUP
+    GROUPBOX        "BtnMask Release Events",IDC_STATIC,10,50,145,30
+END
+
+IDD_CSRMASKS DIALOG DISCARDABLE  27, 41, 227, 201
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cursor Packet Mask"
+FONT 8, "Helv"
+BEGIN
+    DEFPUSHBUTTON   "&OK",IDOK,175,10,40,14,WS_GROUP
+    PUSHBUTTON      "&Cancel",IDCANCEL,175,36,40,14
+    GROUPBOX        "CsrMask",-1,10,10,150,175
+    LTEXT           "00000000000000000000000000000000",IDC_TEXT1,20,25,130,8,
+                    NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",IDC_TEXT2,20,33,130,8,
+                    NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",IDC_TEXT3,20,41,130,8,
+                    NOT WS_GROUP
+    LTEXT           "00000000000000000000000000000000",IDC_TEXT4,20,49,130,8,
+                    NOT WS_GROUP
+    LISTBOX         IDC_CSRLST,20,71,130,103,LBS_MULTIPLESEL | 
+                    LBS_NOINTEGRALHEIGHT | WS_VSCROLL
+END
+
+IDD_XBUTTONS DIALOG DISCARDABLE  0, 0, 275, 317
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Extended Button Map"
+FONT 9, "Fixedsys"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,218,8,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,218,24,50,14
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_1,17,18,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_2,17,26,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_3,17,34,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_4,17,42,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_5,17,50,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_6,17,58,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_7,17,66,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_8,17,74,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_9,17,82,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_10,17,90,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_11,17,98,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_12,17,106,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_13,17,114,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_14,17,122,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_15,17,130,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_SYS_16,17,138,189,8
+    GROUPBOX        "System Button Map",IDC_STATIC,7,8,206,146
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_1,17,176,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_2,17,184,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_3,17,192,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_4,17,200,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_5,17,208,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_6,17,216,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_7,17,224,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_8,17,232,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_9,17,240,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_10,17,248,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_11,17,256,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_12,17,264,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_13,17,272,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_14,17,280,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_15,17,288,189,8
+    LTEXT           "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f",
+                    IDC_LOG_16,17,296,189,8
+    GROUPBOX        "Logical Button Map",IDC_STATIC,7,166,206,144
+END
+
+IDD_VALUE DIALOG DISCARDABLE  0, 0, 186, 46
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Change Value"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,129,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,129,24,50,14
+    EDITTEXT        IDC_EDIT,74,16,30,12,ES_AUTOHSCROLL
+    LTEXT           "Enter value:",IDC_STATIC,19,17,39,8
+END
+
+IDD_CTXEDIT DIALOG DISCARDABLE  0, 0, 87, 66
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Edit Context"
+FONT 8, "MS Sans Serif"
+BEGIN
+    PUSHBUTTON      "WTConfig",IDC_WTCONFIG,10,10,65,15
+    PUSHBUTTON      "Edit Button Masks",IDC_BUTTONS,10,25,65,15
+    PUSHBUTTON      "Edit Move Mask",IDC_MOVEMASK,10,40,65,15
+END
+
+IDD_MOVEMASK DIALOG DISCARDABLE  27, 41, 227, 201
+STYLE DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Cursor Packet Mask"
+FONT 8, "Helv"
+BEGIN
+    DEFPUSHBUTTON   "&OK",IDOK,175,10,40,14,WS_GROUP
+    PUSHBUTTON      "&Cancel",IDCANCEL,175,36,40,14
+    GROUPBOX        "Move Mask",-1,10,10,150,150
+    LTEXT           "00000000000000000000000000000000",IDC_MMTEXT,20,25,130,
+                    8,NOT WS_GROUP
+    LISTBOX         IDC_LST,20,45,130,103,LBS_MULTIPLESEL | 
+                    LBS_NOINTEGRALHEIGHT | WS_VSCROLL
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Data
+//
+
+DLGINCLUDE RCDATA DISCARDABLE 
+BEGIN
+    "MGRDLG.H\0"
+END
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "#define APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "#include ""windows.h""\r\n"
+    "#undef APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "#include ""mgrtest.h""\r\n"
+    "#include ""mgrdlg.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO DISCARDABLE 
+BEGIN
+    IDD_BTNMASKS, DIALOG
+    BEGIN
+        BOTTOMMARGIN, 205
+    END
+
+    IDD_XBUTTONS, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 268
+        TOPMARGIN, 8
+        BOTTOMMARGIN, 310
+    END
+
+    IDD_VALUE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 179
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 39
+    END
+
+    IDD_CTXEDIT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 80
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 59
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

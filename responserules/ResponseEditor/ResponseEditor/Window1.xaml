@@ -1,0 +1,239 @@
+﻿<Window x:Class="ResponseEditor.Window1"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:tk="http://schemas.microsoft.com/wpf/2008/toolkit"
+    xmlns:local="clr-namespace:ResponseEditor"
+    xmlns:rr="clr-namespace:ResponseRulesCLI;assembly=responserules_cli"
+    xmlns:as="clr-namespace:ManagedAppSystem;assembly=responserules_cli"
+    
+    x:Name="MainAppWindow"
+    DataContext="{Binding ElementName=MainAppWindow}"
+    Title="Response Editor" Height="768" Width="1024">
+    <Window.Resources>
+
+        <local:ObservableCollectionOfRules x:Key="RulesMatchingDebuggerCriterion"/>
+    </Window.Resources>
+    
+    <!-- ***************************** WINDOW! ********************************* -->
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition  />
+            <RowDefinition Height="20" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition   />
+        </Grid.ColumnDefinitions>
+        <TabControl>
+            <TabItem Header="Criteria">
+                <!--
+                <ListBox Name="criteriaListBox" Grid.Column="0" Grid.Row="1" ItemsSource="{Binding Source={StaticResource ResponseSystem}, Path=CriteriaBinding}"
+                 ItemTemplate="{StaticResource CriteriaInListBoxTemplate}" />
+                -->
+                <tk:DataGrid x:Name="CriteriaGrid"  ItemsSource="{Binding Source={StaticResource ResponseSystem}, Path=CriteriaBinding, Mode=OneWay}" AutoGenerateColumns="False">
+                    <tk:DataGrid.Columns>
+                        <tk:DataGridTextColumn Binding="{Binding Path=Name, Mode=OneWay}" Header="Name" />
+                        <tk:DataGridTextColumn Binding="{Binding Path=Val.Key, Mode=OneWay}" Header="Key" />
+                        <tk:DataGridTextColumn Binding="{Binding Path=Val.Value, Mode=OneWay}" Header="Value" />
+                        <tk:DataGridCheckBoxColumn  Binding="{Binding Path=Val.Required, Mode=OneWay}" Header="Required?" />
+                        <!--
+                        <tk:DataGridTextColumn  Binding="{Binding Path=Val.Comparison.Description, Mode=OneWay}" Header="Comparison" />
+                        -->
+                        <tk:DataGridTextColumn  Binding="{Binding Path=Val.Weight, Mode=OneWay}" Header="Weight" />
+                    </tk:DataGrid.Columns>
+                </tk:DataGrid>
+            </TabItem>
+            <TabItem Header="Responses" DataContext="{Binding Source={StaticResource ResponseSystem}, Path=ResponseGroupBinding, Mode=OneWay}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition Height="4" />
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition   />
+                    </Grid.ColumnDefinitions>
+                    <tk:DataGrid x:Name="ResponseGroupsMaster" IsSynchronizedWithCurrentItem="True" Grid.Row="0"  Grid.Column="0" ItemsSource="{Binding Mode=OneWay}" AutoGenerateColumns="False">
+                        <tk:DataGrid.Columns>
+                            <tk:DataGridTextColumn Binding="{Binding Path=Name, Mode=OneWay}" Header="Name" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=Val.Count, Mode=OneWay}" Header="Count" />
+                        </tk:DataGrid.Columns>
+                    </tk:DataGrid>
+                    <GridSplitter Grid.Row="1" ResizeDirection="Rows" Width="Auto" Height="4" HorizontalAlignment="Stretch" Margin="0"   />
+                    <tk:DataGrid x:Name="ResponseGroupsDetail"   Grid.Row="2" ItemsSource="{Binding Path=Val.ResponsesList }" AutoGenerateColumns="False">
+                        <tk:DataGrid.Columns>
+                            <tk:DataGridTextColumn Binding="{Binding Path=type, Mode=OneWay}" Header="Type" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=value, Mode=OneWay}" Header="Name" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=weight, Mode=OneWay}" Header="Weight" />
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=DisplayFirst, Mode=OneWay}" Header="First" />
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=DisplayLast, Mode=OneWay}" Header="Last" />
+                            <!-- responseparams -->
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=params.IsSpeakOnce, Mode=OneWay}" Header="Last" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=params.delay, Mode=OneWay}" Header="Delay" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=params.respeakdelay, Mode=OneWay}" Header="RespkDelay" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=params.predelay, Mode=OneWay}" Header="PreDelay" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=params.odds, Mode=OneWay}" Header="Odds" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=params.soundlevel, Mode=OneWay}" Header="Sndlevel" />
+
+                            <!-- <tk:DataGridTextColumn Binding="{Binding Path=Val.Count, Mode=OneWay}" Header="Count" /> -->
+                        </tk:DataGrid.Columns>
+                    </tk:DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Rules" Loaded="OnRulesTabLoaded">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="16"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="4" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <!-- ROW 0 -->
+                    <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" FontSize="14">RULES</TextBlock>
+                    <!-- ROW 1 -->
+                    <tk:DataGrid x:Name="RulesGrid" Grid.Row="1"  
+                                 ItemsSource="{Binding Source={StaticResource ResponseSystem}, Path=RulesBinding, Mode=OneWay}" AutoGenerateColumns="False"  
+                                 SelectionChanged="RulesGrid_SelectionChanged" IsSynchronizedWithCurrentItem="True"
+                                 >
+                        <tk:DataGrid.Columns>
+                            <tk:DataGridTextColumn Binding="{Binding Path=Name, Mode=OneWay}" Header="Name" />
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=MatchOnce, Mode=OneWay}" Header="MatchOnce" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=NumResponses, Mode=OneWay}" Header="NumResponses" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=NumCriteria, Mode=OneWay}" Header="NumCriteria" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=Context, Mode=OneWay}" Header="Context" />
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=IsApplyContextToWorld, Mode=OneWay}" Header="Context Applies&#x0a;To World" />
+                        </tk:DataGrid.Columns>
+                    </tk:DataGrid>
+
+                    <GridSplitter Grid.Row="2" ResizeDirection="Rows" Width="Auto" Height="4" HorizontalAlignment="Stretch" Margin="0" />
+
+                    <Grid Grid.Row="3">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="16"/>
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition  Width="2*" />
+                            <ColumnDefinition Width="*"  />
+                        </Grid.ColumnDefinitions>
+                        <!-- COLUMN 0 -->
+                        <TextBlock Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" FontSize="14">CRITERIA</TextBlock>
+                        <tk:DataGrid x:Name="CriteriaGridInRulesPane" Grid.Row="1" Grid.Column="0"
+                                 AutoGenerateColumns="False" HorizontalAlignment="Stretch" ColumnWidth="Auto" >
+                            <tk:DataGrid.Columns>
+                                <tk:DataGridTextColumn Binding="{Binding Path=Name, Mode=OneWay}" Header="Name"   />
+                                <tk:DataGridTextColumn Binding="{Binding Path=Val.Key, Mode=OneWay}" Header="Key"   />
+                                <tk:DataGridTextColumn Binding="{Binding Path=Val.Value, Mode=OneWay}" Header="Value"  />
+                                <tk:DataGridCheckBoxColumn  Binding="{Binding Path=Val.Required, Mode=OneWay}" Header="Required?"  />
+                                <!--
+                        <tk:DataGridTextColumn  Binding="{Binding Path=Val.Comparison.Description, Mode=OneWay}" Header="Comparison" />
+                        -->
+                                <tk:DataGridTextColumn  Binding="{Binding Path=Val.Weight, Mode=OneWay}" Header="Weight" />
+                            </tk:DataGrid.Columns>
+                        </tk:DataGrid>
+                        <!-- COLUMN 1 -->
+                        <GridSplitter  Grid.RowSpan="2"   Width="4" />
+                        <!-- COLUMN 2 -->
+                        <TextBlock Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" FontSize="14">RESPONSES</TextBlock>
+                        <tk:DataGrid x:Name="ResponseGridInRulesPane" Grid.Row="1" Grid.Column="1"
+                                 
+                             AutoGenerateColumns="False">
+                            
+                            <tk:DataGrid.Columns>
+                                <tk:DataGridTextColumn Binding="{Binding Path=Name, Mode=OneWay}" Header="Name" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=Val.Count, Mode=OneWay}" Header="Count" />
+                            </tk:DataGrid.Columns>
+                        </tk:DataGrid>
+                    </Grid>
+
+                </Grid>
+            </TabItem>
+            <TabItem Header="Debugger"  Loaded="OnDebuggerTabLoaded">
+                <Grid FlowDirection="LeftToRight">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="52"/>
+                        <RowDefinition  />
+                        <RowDefinition Height="4" />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
+                    <!-- ROW 0 -->
+                    <StackPanel Orientation="Horizontal">
+                        <DockPanel Height="Auto"  Width="Auto" Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Top" >
+                            <TextBlock DockPanel.Dock="Top" Margin="5,5,0,0">
+                                CONCEPT
+                            </TextBlock>
+                            <ComboBox   Height="25" Margin="0,0,0,0"  Name="DebugTabConceptComboBox"  SelectionChanged="DebugTabConceptComboBox_SelectionChanged" 
+                                        ItemsSource="{Binding Source={StaticResource ResponseSystem}, Path=ConceptsShadow, Mode=OneWay}" 
+                                        HorizontalAlignment="Left" VerticalAlignment="Top" Width="200" DockPanel.Dock="Top" />
+
+                        </DockPanel>
+
+                        <DockPanel Height="Auto" Margin="15,0,0,0"  Width="Auto"  Grid.Row="0" HorizontalAlignment="Stretch" VerticalAlignment="Top" >
+                            <TextBlock DockPanel.Dock="Top"  Margin="5,5,0,0"  >
+                                FACTS (contexts)       key1:val1,key2:val2,...
+                            </TextBlock>
+                            <TextBox DockPanel.Dock="Top" Height="25" Name="DebugTabFactsTextBox" Width="340" LostFocus="DebugTabFactsTextBox_LostFocus" KeyDown="DebugTabFactsTextBox_KeyDown" />
+                        </DockPanel>
+                    </StackPanel>
+                    <!-- ROW 1 -->
+                    <tk:DataGrid x:Name="DebuggerRulesGrid" Grid.Row="1"  
+                                 ItemsSource="{Binding  Source={StaticResource RulesMatchingDebuggerCriterion}, Mode=OneWay}" AutoGenerateColumns="False"
+                                 SelectionChanged="DebuggerRuleGrid_SelectionChanged" >
+                        <tk:DataGrid.Columns>
+                            <tk:DataGridTextColumn Binding="{Binding Path=Key.Name, Mode=OneWay}" Header="Name" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=Value, Mode=OneWay}" Header="Score" />
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=Key.MatchOnce, Mode=OneWay}" Header="MatchOnce" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=Key.NumResponses, Mode=OneWay}" Header="NumResponses" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=Key.NumCriteria, Mode=OneWay}" Header="NumCriteria" />
+                            <tk:DataGridTextColumn Binding="{Binding Path=Key.Context, Mode=OneWay}" Header="Context" />
+                            <tk:DataGridCheckBoxColumn Binding="{Binding Path=Key.IsApplyContextToWorld, Mode=OneWay}" Header="Context Applies&#x0a;To World" />
+                        </tk:DataGrid.Columns>
+                    </tk:DataGrid>
+                    <!-- ROW 2 -->
+                    <GridSplitter Grid.Row="2" ResizeDirection="Rows" Width="Auto" Height="4" HorizontalAlignment="Stretch" Margin="0"   />
+                    <!-- ROW 3 -->
+                    <Grid Grid.Row="3" >
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="3*" />
+                        </Grid.ColumnDefinitions>
+                        <tk:DataGrid x:Name="ResponseGridInDebuggerPane" Grid.Row="0"  Grid.Column="0"   AutoGenerateColumns="False"
+                                     SelectionChanged="DebuggerResponseGroupGrid_SelectionChanged" >
+                            <tk:DataGrid.Columns>
+                                <tk:DataGridTextColumn Binding="{Binding Path=Name, Mode=OneWay}" Header="Name" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=Val.Count, Mode=OneWay}" Header="Count" />
+                                <!-- "<tk:DataGridTextColumn Binding="{Binding Path=Val.ResponsesList[0].value, Mode=OneWay}" Header="Example vcd" /> -->
+                            </tk:DataGrid.Columns>
+                        </tk:DataGrid>
+                        <GridSplitter  Grid.RowSpan="1"  Width="4" />
+
+                        <tk:DataGrid x:Name="DebuggerResponseGroupsDetail"   
+                                     Grid.Row="0"  Grid.Column="1"  AutoGenerateColumns="False">
+                            <tk:DataGrid.Columns>
+                                <tk:DataGridTextColumn Binding="{Binding Path=type, Mode=OneWay}" Header="Type" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=value, Mode=OneWay}" Header="Name" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=weight, Mode=OneWay}" Header="Weight" />
+                                <tk:DataGridCheckBoxColumn Binding="{Binding Path=DisplayFirst, Mode=OneWay}" Header="First" />
+                                <tk:DataGridCheckBoxColumn Binding="{Binding Path=DisplayLast, Mode=OneWay}" Header="Last" />
+                                <!-- responseparams -->
+                                <tk:DataGridCheckBoxColumn Binding="{Binding Path=params.IsSpeakOnce, Mode=OneWay}" Header="Last" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=params.delay, Mode=OneWay}" Header="Delay" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=params.respeakdelay, Mode=OneWay}" Header="RespkDelay" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=params.predelay, Mode=OneWay}" Header="PreDelay" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=params.odds, Mode=OneWay}" Header="Odds" />
+                                <tk:DataGridTextColumn Binding="{Binding Path=params.soundlevel, Mode=OneWay}" Header="Sndlevel" />
+
+                                <!-- <tk:DataGridTextColumn Binding="{Binding Path=Val.Count, Mode=OneWay}" Header="Count" /> -->
+                            </tk:DataGrid.Columns>
+                        </tk:DataGrid>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+        <Button Grid.Row="1" HorizontalAlignment="Right" Name="button1" Width="Auto" Click="button1_Click" Height="20" VerticalAlignment="Bottom">LOAD</Button>
+        
+    </Grid>
+</Window>

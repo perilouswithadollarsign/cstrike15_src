@@ -1,0 +1,716 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "BASETEXTURE"					"0..1"
+// STATIC: "MULTITEXTURE"					"0..1"
+// STATIC: "REFLECT"						"0..1"
+// STATIC: "REFRACT"						"0..1"
+// STATIC: "ABOVEWATER"						"0..1"
+// STATIC: "FLOWMAP"						"0..1"  [ps20b]
+// STATIC: "FLOWMAP"						"0..0"  [ps20] [ = 0; ]
+// STATIC: "FLOW_DEBUG"						"0..2"
+// STATIC: "FLASHLIGHT"                     "0..1"	[ps20b]
+// STATIC: "FLASHLIGHT"                     "0..0"  [ps20] [ = 0; ]
+// STATIC: "LIGHTMAPWATERFOG"               "0..1"  [ps20b]
+// STATIC: "LIGHTMAPWATERFOG"               "0..0"  [ps20] [ = 0; ]
+// STATIC: "FORCEFRESNEL"					"0..1"
+// STATIC: "SIMPLEOVERLAY"					"0..1"
+// DYNAMIC: "FLASHLIGHTSHADOWS"             "0..1"  [ps20b]
+// DYNAMIC: "FLASHLIGHTSHADOWS"             "0..0"  [ps20] [ = 0; ]
+// DYNAMIC: "BUILDWORLDIMPOSTER"			"0..1" [ = r_buildingmapforworld.GetBool() ? 1 : 0 ] 
+
+// Multitexture and basetexture are mutually exclusive.
+// SKIP: $MULTITEXTURE && $BASETEXTURE
+
+// SKIP: $SIMPLEOVERLAY && $BASETEXTURE
+// SKIP: $SIMPLEOVERLAY && !$FLOWMAP
+
+// flowmap doesn't play with multitexture
+// SKIP: $FLOWMAP && $MULTITEXTURE
+
+// Have to have the flashlight on to get flashlightshadows.
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )
+
+// basetexture doesn't work with flashlight or lightmapwaterfog.  multitexture doesn't either.  We don't use basetexture or multitexture in newer code and instead use flowmap and flashlight.
+// SKIP: ( $FLASHLIGHT || $LIGHTMAPWATERFOG ) && ( ( $BASETEXTURE && !$FLOWMAP ) || $MULTITEXTURE )
+
+#if defined( _PS3 ) || defined ( _X360 )
+	#define DEPTH_EDGE_FEATHERING 1
+#endif
+
+#ifdef _X360
+	#define SHADER_SRGB_READ 1
+#endif
+
+#include "common_ps_fxc.h"
+#include "common_fog_ps_fxc.h"
+
+#include "shader_constant_register_map.h"
+#include "common_flashlight_fxc.h"
+
+#if REFRACT
+	sampler RefractSampler			: register( s0 );
+#endif
+
+#if REFLECT
+	sampler ReflectSampler			: register( s1 );
+#else
+	sampler EnvSampler				: register( s1 );
+#endif
+
+sampler NormalSampler				: register( s2 );
+sampler LightmapSampler				: register( s3 );
+
+#if BASETEXTURE
+	sampler BaseTextureSampler		: register( s10 );
+#endif
+
+#if SIMPLEOVERLAY
+	sampler SimpleOverlaySampler	: register( s11 );
+#endif
+
+#if FLOWMAP
+	sampler FlowmapSampler			: register( s4 );
+	sampler FlowNoiseSampler		: register( s5 );
+#endif
+
+#if FLASHLIGHT
+	sampler FlashlightSampler		: register( s6 );
+	sampler ShadowDepthSampler      : register( s7 );
+	sampler RandRotSampler          : register( s8 );
+	
+#if defined(_PS3)
+	// Needed for optimal shadow filter code generation on PS3.
+	#pragma texformat ShadowDepthSampler DEPTH_COMPONENT24
+#endif
+
+#endif
+
+#if DEPTH_EDGE_FEATHERING
+sampler DepthSampler 				: register( s9 );
+#endif
+
+const float4 g_vRefractTint			: register( c1 );
+const float4 g_vReflectTint			: register( c4 );
+#define g_flWaterBlendFactor (g_vReflectTint.a)
+const float4 g_ReflectRefractScale	: register( c5 ); // xy - reflect scale, zw - refract scale
+const float4 g_WaterFogColor		: register( c6 );
+
+const float4 g_WaterFogParams		: register( c7 );
+#define g_WaterFogStart			g_WaterFogParams.x
+#define g_WaterFogEndMinusStart	g_WaterFogParams.y
+#define g_Reflect_OverBright	g_WaterFogParams.z
+
+const float g_flTime				: register( c8 );
+
+#if FLOWMAP
+	const float2 g_vFlowScrollRate	: register( c9 );
+#endif
+
+// The flashlight on the water surface is basically the diffuse flashlight * waterfogcolor * g_flFlashlightTint.
+// g_flFlashlightTint is tweakable in cases where the water fog color is really dark and the flashlight doesn't show up, etc.
+const float3	g_flFlashlightTint	: register( c10 );
+
+const float4 g_PixelFogParams		: register( PSREG_FOG_PARAMS ); // c12
+const float3 g_EyePos				: register( PSREG_EYEPOS_SPEC_EXPONENT ); // c11
+
+const float4 g_vFlowParams1			: register( c13 );
+#define g_flWorldUvScale		( g_vFlowParams1.x ) // 1.0f / 10.0f
+#define g_flNormalUvScale		( g_vFlowParams1.y ) // 1.0f / 1.15f
+#define g_flBumpStrength		( g_vFlowParams1.z ) // 3.0f
+#define g_flDisplaceStrength	( g_vFlowParams1.w ) // 0.025f // Amount to displace the color fetch based on the normals
+
+const float3 g_vFlowParams2			: register( c14 );
+#define g_flFlowTimeIntervalInSeconds ( g_vFlowParams2.x ) // 0.4f // Number of seconds to lerp from texture 1 to texture 2
+#define g_flFlowUvScrollDistance      ( g_vFlowParams2.y ) // 0.25f // Distance in uv space to fetch
+#define g_flNoiseScale                ( g_vFlowParams2.z )
+
+const float4 g_vColorFlowParams1			: register( c26 );
+#define g_flColorFlowUvScale				( g_vColorFlowParams1.x ) // 1.0f / 1.15f
+#define g_flColorFlowTimeIntervalInSeconds	( g_vColorFlowParams1.y ) // 0.4f // Number of seconds to lerp from texture 1 to texture 2
+#define g_flColorFlowUvScrollDistance		( g_vColorFlowParams1.z ) // 0.25f // Distance in uv space to fetch
+#define g_flColorFlowLerpExp				( g_vColorFlowParams1.w )
+
+const float4 g_FlashlightAttenuationFactors		: register( c15 );
+const float3 g_FlashlightPos					: register( c16 );
+const float4x4 g_FlashlightWorldToTexture       : register( c17 ); // through c20
+const float4 g_vShadowTweaks                    : register( c21 );
+
+// These constants are used to rotate the world space water normals around the up axis to align the
+// normal with the camera and then give us a 2D offset vector to use for reflection and refraction uv's
+const float3 g_vWorldToViewWater0 : register( c22 );
+const float3 g_vWorldToViewWater1 : register( c23 );
+
+float4	g_vInvViewportTransform			: register( c24 );
+const float	g_flForcedFresnelValue		: register( c25 );
+
+#if DEPTH_EDGE_FEATHERING
+const float4 g_ProjToWorldZW[2] 		 : register( c33 );
+const float4 g_DepthEdgeFeatheringParams : register( c35 );
+#endif
+
+struct PS_INPUT
+{
+	float2 vBumpTexCoord			: TEXCOORD0;
+	float3 vPositionToCameraRayWs	: TEXCOORD1;
+	float4 vReflectXY_vRefractYX	: TEXCOORD2;
+	float4 vProjPos					: TEXCOORD3;
+	float3 worldPos					: TEXCOORD4;
+#if FLASHLIGHT
+	float4 flashlightSpacePos       : TEXCOORD5;
+#endif
+#if MULTITEXTURE
+	float4 vExtraBumpTexCoord		: TEXCOORD5;
+#endif
+
+#if ( BASETEXTURE && !FLOWMAP )
+	float4 lightmapTexCoord1And2		: TEXCOORD5_centroid;
+	float2 lightmapTexCoord3			: TEXCOORD6_centroid;
+#endif
+
+#if LIGHTMAPWATERFOG
+	float2 lightmapTexCoord			: TEXCOORD7_centroid;
+#endif
+
+#if defined( _X360 )
+	 float2 vScreenPos : VPOS;
+#endif
+};
+
+float2 UnpackNormal2D( float2 vNormal )
+{
+	return ( ( vNormal.xy * 2.0 ) - 1.0 );
+}
+
+float3 UnpackNormal3D( float3 vNormal )
+{
+	return ( ( vNormal.xyz * 2.0 ) - 1.0 );
+}
+
+float3 ComputeNormalFromXY( float2 vXY )
+{
+	float3 vNormalTs;
+
+	vNormalTs.xy = vXY.xy;
+	vNormalTs.z = sqrt( saturate( 1.0 - dot( vNormalTs.xy, vNormalTs.xy ) ) );
+
+	return vNormalTs.xyz;
+}
+
+float3 ComputeNormalFromRGTexture( float2 vRGPixel )
+{
+	float3 vNormalTs;
+
+	vNormalTs.xy = UnpackNormal2D( vRGPixel.rg );
+	vNormalTs.z = sqrt( saturate( 1.0 - dot( vNormalTs.xy, vNormalTs.xy ) ) );
+
+	return vNormalTs.xyz;
+}
+
+// Turning off 32bit lightmaps on Portal 2 to save shader perf. --Thorsten
+//#define USE_32BIT_LIGHTMAPS_ON_360 //uncomment to use 32bit lightmaps, be sure to keep this in sync with the same #define in materialsystem/cmatlightmaps.cpp
+
+float3 LightMapSample( sampler LightmapSampler, float2 vTexCoord )
+{
+	#if ( !defined( _X360 ) || !defined( USE_32BIT_LIGHTMAPS_ON_360 ) )
+	{
+		float3 sample = tex2D( LightmapSampler, vTexCoord ).rgb;
+
+		return sample;
+	}
+	#else
+	{
+		#if 0 //1 for cheap sampling, 0 for accurate scaling from the individual samples
+		{
+			float4 sample = tex2D( LightmapSampler, vTexCoord );
+
+			return sample.rgb * sample.a;
+		}
+		#else
+		{
+			float4 Weights;
+			float4 samples_0; //no arrays allowed in inline assembly
+			float4 samples_1;
+			float4 samples_2;
+			float4 samples_3;
+
+			asm {
+				tfetch2D samples_0, vTexCoord.xy, LightmapSampler, OffsetX = -0.5, OffsetY = -0.5, MinFilter=point, MagFilter=point, MipFilter=keep, UseComputedLOD=false
+					tfetch2D samples_1, vTexCoord.xy, LightmapSampler, OffsetX =  0.5, OffsetY = -0.5, MinFilter=point, MagFilter=point, MipFilter=keep, UseComputedLOD=false
+					tfetch2D samples_2, vTexCoord.xy, LightmapSampler, OffsetX = -0.5, OffsetY =  0.5, MinFilter=point, MagFilter=point, MipFilter=keep, UseComputedLOD=false
+					tfetch2D samples_3, vTexCoord.xy, LightmapSampler, OffsetX =  0.5, OffsetY =  0.5, MinFilter=point, MagFilter=point, MipFilter=keep, UseComputedLOD=false
+
+					getWeights2D Weights, vTexCoord.xy, LightmapSampler
+			};
+
+			Weights = float4( (1-Weights.x)*(1-Weights.y), Weights.x*(1-Weights.y), (1-Weights.x)*Weights.y, Weights.x*Weights.y );
+
+			float3 result;
+			result.rgb  = samples_0.rgb * (samples_0.a * Weights.x);
+			result.rgb += samples_1.rgb * (samples_1.a * Weights.y);
+			result.rgb += samples_2.rgb * (samples_2.a * Weights.z);
+			result.rgb += samples_3.rgb * (samples_3.a * Weights.w);
+
+			return result;
+		}
+		#endif
+	}
+	#endif
+}
+
+float3 PosToColor( float3 vScenePositionWs )
+{
+	int ix = vScenePositionWs.x / 15.0f;
+	int iy = vScenePositionWs.y / 15.0f;
+	float3 cColor;
+
+	if ( frac( iy / 2.0f ) ) 
+	{
+		if ( frac( ix / 2.0f ) ) 
+		{
+			cColor = float3( 1.0f, 0.0f, 0.0f );
+		}
+		else
+		{
+			cColor = float3( 0.0f, 1.0f, 0.0f );
+		}
+	}
+	else
+	{
+		if ( frac( ix / 2.0f ) ) 
+		{
+			cColor = float3( 0.0f, 1.0f, 0.0f );
+		}
+		else
+		{
+			cColor = float3( 1.0f, 0.0f, 0.0f );
+		}
+	}
+	
+	return cColor;
+}
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 vResult;
+	float flFogFactor;
+
+	/* For debugging - Flash all water surfaces blue
+	vResult.rgba = float4( 0.25, 0.25, 1.0, 0 ) * ( ( floor( g_flTime * 2.0f ) % 2 ) * 0.9f + 0.1f );
+	flFogFactor = 0;
+	return FinalOutput( float4( vResult.rgb, 1.0f ), flFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE );
+	//*/
+
+	// Compute coordinates for sampling Reflection
+	float3 vPositionToCameraDirWs = normalize( i.vPositionToCameraRayWs.xyz );
+
+	float4 vNormalWs;
+	float4 vFlowColor = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+	#if ( FLOWMAP )
+	{
+		float flWorldUvScale				= g_flWorldUvScale;
+		float flNormalUvScale				= g_flNormalUvScale;
+		float flFlowTimeIntervalInSeconds	= g_flFlowTimeIntervalInSeconds;
+		float flFlowUvScrollDistance		= g_flFlowUvScrollDistance;
+		float flBumpStrength				= g_flBumpStrength;
+		float flNoiseScale					= g_flNoiseScale;
+
+		// Input uv
+		float2 vWorldUv = i.vBumpTexCoord.xy * flWorldUvScale;
+		float2 vUv1 = float2( i.worldPos.x, -i.worldPos.y ) * flNormalUvScale;
+		float2 vUv2 = vUv1.xy;
+
+		// Noise texture is used to offset the time interval different spatially so we don't see pulsing
+		float flNoise = tex2D( FlowNoiseSampler, float2( i.worldPos.x, -i.worldPos.y ) * flNoiseScale ).g;
+
+		// Flow texel has a 2D flow vector in the rg channels of the texture
+		float4 vFlowTexel = tex2D( FlowmapSampler, vWorldUv.xy );
+		#if ( FLOW_DEBUG == 1 ) // Flow vectors
+		{
+			vResult.rgba = float4( pow( vFlowTexel.rgb, 2.2f ), 0 );
+			flFogFactor = 0;
+			return FinalOutput( float4( vResult.rgb, 1.0f ), flFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE );
+		}
+		#elif ( FLOW_DEBUG == 2 ) // Noise
+		{
+			vResult.rgba = pow( flNoise, 2.2 );
+			flFogFactor = 0;
+			return FinalOutput( float4( vResult.rgb, 1.0f ), flFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE );
+		}
+		#endif
+
+		// Unpack world flow vector from texture
+		float2 vFlowVectorTs = ( vFlowTexel.rg * 2.0f ) - 1.0f;
+
+		float flTimeInIntervals = ( g_flTime / ( flFlowTimeIntervalInSeconds * 2.0f ) ) + flNoise;
+		float flScrollTime1 = frac( flTimeInIntervals );
+		float flScrollTime2 = frac( flTimeInIntervals + 0.5f ); // Half an interval off from texture 1
+
+		// Every interval has a unique offset so we don't see the same bump texels repeating continuously
+		float flOffset1 = floor( flTimeInIntervals ) * 0.311f;
+		float flOffset2 = floor( flTimeInIntervals + 0.5f ) * 0.311f + 0.5f; // The +0.5 is to match the phase offset
+
+		// Final flow uv is originalUv + interval offset + ( flowvector * scroll
+		float2 vFlowUv1 = vUv1.xy + flOffset1 + ( flScrollTime1 * ( flFlowUvScrollDistance * vFlowVectorTs.xy ) );
+		float2 vFlowUv2 = vUv2.xy + flOffset2 + ( flScrollTime2 * ( flFlowUvScrollDistance * vFlowVectorTs.xy ) );
+
+		// Lerp values to blend between the two layers of bump
+		float flWeight1 = abs( ( 2.0f * frac( flTimeInIntervals + 0.5f ) ) - 1.0f );
+		float flWeight2 = abs( ( 2.0f * frac( flTimeInIntervals ) ) - 1.0f );
+
+		float4 vNormalTexel1 = tex2D( NormalSampler, vFlowUv1.xy );
+		float4 vNormalTexel2 = tex2D( NormalSampler, vFlowUv2.xy );
+
+		float3 vNormal1 = ( vNormalTexel1.rgb );
+		float3 vNormal2 = ( vNormalTexel2.rgb );
+
+		// Combine both layers
+		vNormalWs.xy = UnpackNormal2D( lerp( vNormal1.xy, vNormal2.xy, flWeight2 ) );
+
+		// Change bump strength based on the length of the flow vector
+		//vNormalWs.xy *= ( length( vFlowVectorTs.xy ) + 0.05f ) * flBumpStrength;
+		vNormalWs.xy *= ( ( vFlowVectorTs.x * vFlowVectorTs.x + vFlowVectorTs.y * vFlowVectorTs.y ) + 0.1f ) * flBumpStrength;
+
+		// Generate normal from 2D scaled normal
+		vNormalWs.xyz = ComputeNormalFromXY( vNormalWs.xy );
+		//return pow( float4( vNormalWs.xy*0.5+0.5, 0, 0), 2.2);
+
+		//vResult.rgba = float4( SrgbGammaToLinear( vNormalWs.xyz * 0.5 + 0.5 ), 0 );
+		//flFogFactor = 0;
+		//return FinalOutput( float4( vResult.rgb, 1.0f ), flFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE );
+
+		vNormalWs.a = 1.0f;
+
+		//-------------------------------------------------------------//
+		// Specifying a base texture with flow gives us a sludge layer //
+		//-------------------------------------------------------------//
+		#if ( BASETEXTURE )
+		{
+			float flParallaxIntensity = lerp( vNormalTexel1.a, vNormalTexel2.a, flWeight2 );
+			flParallaxIntensity *= g_flDisplaceStrength;
+			float2 vParallaxDirWs = vPositionToCameraDirWs.xy - vNormalWs.xy;
+			float2 vColorUv = ( float2( i.worldPos.x, -i.worldPos.y ) )* g_flColorFlowUvScale + vParallaxDirWs * flParallaxIntensity;
+
+			float flTimeInIntervals = ( g_flTime / ( g_flColorFlowTimeIntervalInSeconds * 2.0f ) ) + flNoise;
+			float flScrollTime1 = frac( flTimeInIntervals ) - 0.5;
+			float flScrollTime2 = frac( flTimeInIntervals + 0.5f ) - 0.5; // Half an interval off from texture 1
+
+			float flOffset1 = floor( flTimeInIntervals ) * 0.311f;
+			float flOffset2 = floor( flTimeInIntervals + 0.5f ) * 0.311f + 0.5f; // The +0.5 is to match the phase offset
+
+			float2 vColorFlowUv1 = vColorUv.xy + flOffset1 + ( flScrollTime1 * ( g_flColorFlowUvScrollDistance * vFlowVectorTs.xy ) );
+			float2 vColorFlowUv2 = vColorUv.xy + flOffset2 + ( flScrollTime2 * ( g_flColorFlowUvScrollDistance * vFlowVectorTs.xy ) );
+
+			float flWeight1 = pow( abs( ( 2.0f * frac( flTimeInIntervals + 0.5f ) ) - 1.0f ), g_flColorFlowLerpExp );
+			float flWeight2 = pow( abs( ( 2.0f * frac( flTimeInIntervals ) ) - 1.0f ), g_flColorFlowLerpExp );
+
+			float4 vColorTexel1 = tex2Dsrgb( BaseTextureSampler, vColorFlowUv1.xy );
+			float4 vColorTexel2 = tex2Dsrgb( BaseTextureSampler, vColorFlowUv2.xy );
+
+			vFlowColor.rgba = vColorTexel1.rgba * flWeight1;
+			vFlowColor.rgba += vColorTexel2.rgba * flWeight2;
+			vFlowColor.rgba *= vFlowTexel.a; // Mask color flow by alpha of flowmap
+		}
+		#endif
+	}
+	#elif ( MULTITEXTURE )
+	{
+		vNormalWs.xyz     = tex2D( NormalSampler, i.vBumpTexCoord ).xyz;
+		float3 vNormalWs1 = tex2D( NormalSampler, i.vExtraBumpTexCoord.xy ).xyz;
+		float3 vNormalWs2 = tex2D( NormalSampler, i.vExtraBumpTexCoord.zw ).xyz;
+		vNormalWs.xyz = 0.33 * ( vNormalWs.xyz + vNormalWs1.xyz + vNormalWs2.xyz );
+
+		vNormalWs.xyz = 2.0 * vNormalWs.xyz - 1.0;
+
+		vNormalWs.a = 1.0f;
+	}
+	#else
+	{
+		vNormalWs.xyzw = DecompressNormal( NormalSampler, i.vBumpTexCoord, NORM_DECODE_NONE );
+	}
+	#endif
+
+	// Perform division by W only once
+	float flOoW = 1.0f / i.vProjPos.w;
+	float2 unwarpedRefractTexCoord = i.vReflectXY_vRefractYX.wz * flOoW;
+	// Deal with the viewport transform.  We don't do splitscreen on PC, so don't bother doing this with PS20.	
+	unwarpedRefractTexCoord = g_vInvViewportTransform.zw + unwarpedRefractTexCoord * g_vInvViewportTransform.xy;
+
+	#if ( ABOVEWATER && REFRACT )
+		float4 unwarpedSample = tex2Dsrgb( RefractSampler, unwarpedRefractTexCoord );
+		float waterFogDepthValue = unwarpedSample.a;
+	#else
+		// We don't actually have valid depth values in alpha when we are underwater looking out, so
+		// just set to farthest value.
+		float waterFogDepthValue = 1.0f;
+	#endif
+
+	float4 vReflectRefractScale = g_ReflectRefractScale;
+	#if !BASETEXTURE
+		vReflectRefractScale *= waterFogDepthValue;
+	#endif
+
+	// vectorize the dependent UV calculations (reflect = .xy, refract = .wz)
+	float4 vN;
+	vN.x = dot( g_vWorldToViewWater0.xyz, vNormalWs.xyz );
+	vN.y = dot( g_vWorldToViewWater1.xyz, vNormalWs.xyz );
+	vN.wz = vN.xy;
+
+	float4 vDependentTexCoords = vN.xyzw * vNormalWs.a * vReflectRefractScale;
+	vDependentTexCoords += i.vReflectXY_vRefractYX * flOoW;
+
+	float2 vReflectTexCoord = vDependentTexCoords.xy;
+	float2 vRefractTexCoord = vDependentTexCoords.wz;
+
+	float4 vReflectColor;
+	#if ( REFLECT )
+	{
+		vReflectColor.rgba = tex2Dsrgb( ReflectSampler, vReflectTexCoord );
+	}
+	#else
+	{
+		float3 vReflectWs = CalcReflectionVectorUnnormalized( vNormalWs.xyz, vPositionToCameraDirWs.xyz );
+		vReflectColor.rgba = ENV_MAP_SCALE * texCUBE( EnvSampler, vReflectWs.xyz );
+	}
+	#endif
+
+	vReflectColor *= g_vReflectTint;
+
+	float4 vRefractColor;
+	#if REFRACT
+		#if defined( _X360 )
+		{
+			// deal with the viewport transform for splitscreen
+			vRefractColor = tex2Dsrgb( RefractSampler, g_vInvViewportTransform.zw + vRefractTexCoord * g_vInvViewportTransform.xy );
+		}
+		#else
+		{
+			vRefractColor = tex2Dsrgb( RefractSampler, vRefractTexCoord );
+		}
+		#endif
+		float warpedAlpha = vRefractColor.a;
+		// get the depth value from the refracted sample to be used for fog.
+		#if ABOVEWATER
+			// Don't mess with this in the underwater case since we don't really have
+			// depth values there.
+			waterFogDepthValue = vRefractColor.a;
+		#endif
+	#endif
+
+	// Fresnel term
+	float fFresnel;
+	#if FORCEFRESNEL
+	{
+		fFresnel = g_flForcedFresnelValue;
+	}
+	#else
+	{
+		float flNdotV = saturate( dot( vPositionToCameraDirWs.xyz, vNormalWs.xyz ) );
+
+		float g_flReflectance = 0.2f;
+		fFresnel = g_flReflectance + ( ( 1.0f - g_flReflectance ) * pow( 1.0f - flNdotV, 5.0f ) );
+	}
+	#endif
+
+	// Light maps
+	float3 vLightmapColor = float3( 1.0f, 1.0f, 1.0f );
+	float4 vLightmappedWaterFogColor = g_WaterFogColor;
+	#if LIGHTMAPWATERFOG
+	{
+		float3 lightmapSample = LightMapSample( LightmapSampler, i.lightmapTexCoord.xy );
+		vLightmapColor.rgb = lightmapSample * LIGHT_MAP_SCALE * LINEAR_LIGHT_SCALE;
+		vLightmappedWaterFogColor.xyz *= vLightmapColor.rgb;
+	}
+	#endif
+
+	// blend between refraction and fog color.
+	#if ABOVEWATER
+		#if REFRACT 
+			// Avoid seeing things in front of the water warped in the water refraction by not warping when that case happens.
+			// Causes a bit of artifacting around foreground objects, but looks better than warping the foreground objects in the water surface.
+			if ( warpedAlpha < 0.05f )
+			{
+				vRefractColor.xyz = unwarpedSample.xyz;
+				waterFogDepthValue = unwarpedSample.w;
+			}
+		#endif
+		#if REFRACT
+			float edgeFadeFactor = saturate( 3.5 * waterFogDepthValue );
+			vRefractColor = lerp( vRefractColor, vRefractColor * g_vRefractTint, edgeFadeFactor );
+		#endif
+
+		#if ( !defined( SHADER_MODEL_PS_2_0 ) )
+		{
+			vReflectColor *= saturate( 2.0 * waterFogDepthValue );
+		}
+		#endif
+
+		#if REFRACT
+			vRefractColor = lerp( vRefractColor, vLightmappedWaterFogColor, waterFogDepthValue );
+		#endif
+	#endif
+
+	// Flashlight
+	float3 vDiffuseLight = vLightmapColor.rgb;
+    #if ( FLASHLIGHT )
+	{
+		float3 vFlashlightDiffuseLighting = DoFlashlight( g_FlashlightPos, i.worldPos.xyz, i.flashlightSpacePos.xyzw, vNormalWs.xyz,
+					g_FlashlightAttenuationFactors.xyz, g_FlashlightAttenuationFactors.w, FlashlightSampler, ShadowDepthSampler,
+					RandRotSampler, 0, FLASHLIGHTSHADOWS, i.vProjPos.xy / i.vProjPos.w, false, g_vShadowTweaks );
+
+		#if ( ABOVEWATER && REFRACT )
+		{
+			vFlashlightDiffuseLighting *= edgeFadeFactor;
+		}
+		#endif
+
+		vDiffuseLight.xyz += g_flFlashlightTint * vFlashlightDiffuseLighting.xyz * LINEAR_LIGHT_SCALE;
+	}
+  	#endif
+
+	#if !BASETEXTURE
+	{
+		// fFresnel == 1.0f means full reflection
+		#if ( REFRACT )
+		{
+			fFresnel *= saturate( ( waterFogDepthValue - 0.05f ) * 20.0f );
+		}
+		#endif
+	}
+	#endif
+
+	#if ( BASETEXTURE && !FLOWMAP )
+		float4 baseSample = tex2D( BaseTextureSampler, i.vBumpTexCoord.xy );
+
+		float2 bumpCoord1;
+		float2 bumpCoord2;
+		float2 bumpCoord3;
+		ComputeBumpedLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3.xy,
+			bumpCoord1, bumpCoord2, bumpCoord3 );
+
+		float4 lightmapSample1 = tex2D( LightmapSampler, bumpCoord1 );
+		float3 lightmapColor1 = lightmapSample1.rgb;
+		float3 lightmapColor2 = tex2D( LightmapSampler, bumpCoord2 ).rgb;
+		float3 lightmapColor3 = tex2D( LightmapSampler, bumpCoord3 ).rgb;
+
+		float3 dp;
+		dp.x = saturate( dot( vNormalWs.xyz, bumpBasis[0] ) );
+		dp.y = saturate( dot( vNormalWs.xyz, bumpBasis[1] ) );
+		dp.z = saturate( dot( vNormalWs.xyz, bumpBasis[2] ) );
+		dp *= dp;
+
+		float3 diffuseLighting = dp.x * lightmapColor1 +
+			dp.y * lightmapColor2 +
+			dp.z * lightmapColor3;
+		float sum = dot( dp, float3( 1.0f, 1.0f, 1.0f ) );
+		diffuseLighting *= LIGHT_MAP_SCALE / sum;
+		float3 diffuseComponent = baseSample.rgb * diffuseLighting;
+	#endif
+
+	// The underwater color will be reused for the flashlight
+	float3 vUnderWater = g_WaterFogColor.rgb; // Default to fog color, but may be overridden below
+
+	#if ( REFLECT && REFRACT )
+	{
+		#if ( BASETEXTURE && FLOWMAP )
+		{
+			float3 vLight = vDiffuseLight.rgb;
+
+			// The alpha of flow color represents translucency from 0.0-0.5. The range 0.5-1.0 allows pixels to float above the water
+			float3 vSludge = vFlowColor.rgb * vLight.rgb;
+			vUnderWater.rgb = lerp( vRefractColor.rgb, vSludge.rgb, saturate( vFlowColor.a * 2.0f ) );
+			float flSludgeAboveWater = smoothstep( 0.5f, 0.7f, vFlowColor.a );
+			vResult.rgb = lerp( vUnderWater.rgb, vReflectColor.rgb, saturate( fFresnel * ( 1.0f - flSludgeAboveWater ) ) );
+			//vUnderWater.rgb *= 1.0f - fFresnel; // I don't think this is necessary since the flashlight applies a cosine term
+		}
+		#else
+		{
+			vResult = vRefractColor + ( fFresnel * vReflectColor );
+		}
+		#endif
+	}
+	#elif ( REFRACT )
+	{
+		vResult = vRefractColor + ( fFresnel * vReflectColor );
+	}
+	#else
+	{
+		#if ( BASETEXTURE && FLOWMAP )
+		{
+			float3 vLight = vDiffuseLight.rgb;
+
+			// The alpha of flow color represents translucency from 0.0-0.5. The range 0.5-1.0 allows pixels to float above the water
+			float3 vSludge = vFlowColor.rgb * vLight.rgb;
+			vUnderWater.rgb = lerp( vLightmappedWaterFogColor.rgb, vSludge.rgb, saturate( vFlowColor.a * 2.0f ) );
+			float flSludgeAboveWater = smoothstep( 0.5f, 0.7f, vFlowColor.a );
+			vResult.rgb = lerp( vUnderWater.rgb, vReflectColor.rgb, saturate( fFresnel * ( 1.0f - flSludgeAboveWater ) ) );
+			#if ( BUILDWORLDIMPOSTER )
+			{
+				vResult.rgb = vUnderWater.rgb;
+			}
+			#endif
+			//vUnderWater.rgb *= 1.0f - fFresnel; // I don't think this is necessary since the flashlight applies a cosine term
+		}
+		#elif ( BASETEXTURE )
+		{
+			vResult = float4( diffuseComponent, 1.0f ) + vReflectColor * fFresnel * baseSample.a;
+		}
+		#else
+		{
+			vResult = lerp( vLightmappedWaterFogColor, vReflectColor, fFresnel );
+		}
+		#endif
+	}
+	#endif
+
+#if ( SIMPLEOVERLAY )
+	float4 simpleOverlayComponent = tex2D( SimpleOverlaySampler, i.vBumpTexCoord );
+	vResult.rgb = lerp( vResult.rgb, simpleOverlayComponent.rgb * vLightmapColor, simpleOverlayComponent.a * saturate( ( waterFogDepthValue - 0.01f ) * 5.0f ) );
+#endif
+
+	#if ( PIXELFOGTYPE == PIXEL_FOG_TYPE_RANGE )
+	{
+		flFogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_PixelFogParams, g_EyePos, i.worldPos, i.vProjPos.z );
+	}
+	#else
+	{
+		flFogFactor = 0;
+	}
+	#endif
+	
+	float flWaterBlendAlpha = 1.0f;
+	
+	#if ( DEPTH_EDGE_FEATHERING )
+	{
+		float2 vDepthSampleCoords = i.vReflectXY_vRefractYX.wz * flOoW;
+		float2 vViewportRelativeDepthSampleCoords = g_vInvViewportTransform.zw + vDepthSampleCoords * g_vInvViewportTransform.xy;
+		
+		// Sample the scene's depth at the current fragment.
+		float flSceneProjZ = SampleHardwareDepth( DepthSampler, vViewportRelativeDepthSampleCoords );
+
+		// Compute current fragment's projection/clip space coords.
+		float2 vClipUv = ( ( 2.0f * vDepthSampleCoords.xy ) - float2( 1.0f, 1.0f ) ) * float2( 1.0f, -1.0f );
+		float4 vProjPos = float4( vClipUv.x, vClipUv.y, flSceneProjZ, 1.0f );
+		// Recover worldspace Z and W.
+		float vSceneWorldZ = dot( vProjPos, g_ProjToWorldZW[0] );
+		float vSceneWorldW = dot( vProjPos, g_ProjToWorldZW[1] );
+		// Project to W=1.
+		vSceneWorldZ /= vSceneWorldW;
+		
+		// We now have the worldspace Z's of the current fragment and the surface below it.
+		// Subtract the current water surface's height from the computed worldspace Z (height) to compute edge feathing factor.
+		flWaterBlendAlpha = i.worldPos.z - vSceneWorldZ;
+		flWaterBlendAlpha = saturate( saturate( g_DepthEdgeFeatheringParams.x * flWaterBlendAlpha ) + g_DepthEdgeFeatheringParams.y );
+	}				
+	#endif	
+				
+	float4_color_return_type vOutput = FinalOutput( float4( vResult.rgb, g_flWaterBlendFactor * flWaterBlendAlpha ), flFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_NONE );
+	
+	#if ( defined( _X360 ) )
+	{
+		vOutput.rgb += ScreenSpaceOrderedDither( i.vScreenPos );
+		vOutput.rgb = LinearToGamma( vOutput.rgb ); // Simulate the sRGB write here since FinalOutupt() above skips this call with TONEMAP_SCALE_NONE
+	}
+	#endif
+	
+	return vOutput;
+}

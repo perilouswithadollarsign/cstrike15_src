@@ -1,0 +1,763 @@
+//===================== Copyright (c) Valve Corporation. All Rights Reserved. ======================
+
+// STATIC: "BUMPMAP"					"0..2"
+// STATIC: "BUMPMAP2"					"0..1"
+// STATIC: "CUBEMAP"					"0..2"
+// STATIC: "ENVMAPMASK"					"0..1"
+// STATIC: "BASEALPHAENVMAPMASK"		"0..1"
+// STATIC: "SELFILLUM"					"0..1"
+// STATIC: "SEAMLESS"					"0..1"
+// STATIC: "ENVMAPANISOTROPY"			"0..1"
+
+// STATIC: "TEXTURE3_BLENDMODE"			"0..1"
+// STATIC: "TEXTURE4_BLENDMODE"			"0..1"
+
+// diffuse bump map is always true when bumpmapping is enabled, so just set it to 1
+#define DIFFUSEBUMPMAP 1
+
+// STATIC: "DETAIL_BLEND_MODE"			"0..12"
+// STATIC: "FLASHLIGHT"					"0..1"	[ps20b] [CONSOLE]
+// STATIC: "SHADER_SRGB_READ"			"0..1"	[XBOX]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[PC]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[SONYPS3]
+// STATIC: "LIGHTING_PREVIEW"			"0..3"	[PC]
+// STATIC: "LIGHTING_PREVIEW"			"0..0"	[CONSOLE]
+
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[ = g_pHardwareConfig->SupportsCascadedShadowMapping() ] [CONSOLE]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..0"	[ = 0 ] [ps20] [PC]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[ = g_pHardwareConfig->SupportsCascadedShadowMapping() && !ToolsEnabled() ] [ps20b] [ps30] [PC]
+// STATIC: "CSM_MODE"					"0..0"	[ = 0 ] [CONSOLE]
+// STATIC: "CSM_MODE"					"0..0"	[ = 0 ] [ps20] [ps20b] [PC]
+// STATIC: "CSM_MODE"					"0..3"	[ps30] [PC]
+
+// STATIC: "CSM_BLENDING"				"0..1"  // 0 is old, 1 is for new/fixed blending of CSM and baked shadows
+
+// DYNAMIC: "FASTPATHENVMAPCONTRAST"	"0..1"
+// DYNAMIC: "FASTPATH"					"0..1"
+// DYNAMIC: "WRITEWATERFOGTODESTALPHA"	"0..1"
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"	[ps20b] [CONSOLE]
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..1"	[ps20b] [ps30] [PC]
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"	[ps20b] [CONSOLE]
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..0"	[ps20b] [ps30] [PC]
+
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[ = ( pShaderAPI->IsCascadedShadowMapping() ) ? 1 : 0 ] [CONSOLE]
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[ = ( pShaderAPI->IsCascadedShadowMapping() ) ? 1 : 0 ] [ps20b] [PC]
+// DYNAMIC: "CASCADE_SIZE"				"0..0"	[ = 0 ] [ps20] [ps30] [PC]
+
+// we only support detail blend modes 0, 7, 10, 11, and 12
+//  SKIP: ($DETAIL_BLEND_MODE == 1 )
+//  SKIP: ($DETAIL_BLEND_MODE == 2 )
+//  SKIP: ($DETAIL_BLEND_MODE == 3 )
+//  SKIP: ($DETAIL_BLEND_MODE == 4 )
+//  SKIP: ($DETAIL_BLEND_MODE == 5 )
+//  SKIP: ($DETAIL_BLEND_MODE == 6 )
+//  SKIP: ($DETAIL_BLEND_MODE == 8 )
+//  SKIP: ($DETAIL_BLEND_MODE == 9 )
+
+//  SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )
+
+// program too complex for ps20. Don't do darkened cubemaps and 2 bump maps at the same time. Fairly arbitrary pairing just to get the damn thing compiling
+//	SKIP: ( $CUBEMAP == 2 ) && ( $BUMPMAP2 ) [ps20]
+// program slightly more complex on 360 because of shader srgb read. Eliminate coexistance of srgb read, water fog, and darkened cubemaps
+//	SKIP: ( $CUBEMAP == 2 ) && ( $PIXELFOGTYPE == 1 ) && ( $SHADER_SRGB_READ == 1 ) [CONSOLE]
+
+//  SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CASCADE_SIZE != 0 ) 
+//  SKIP: ( $CASCADED_SHADOW_MAPPING != 0 ) && ( $SFM != 0 ) 
+//  SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CSM_MODE != 0 ) 
+
+//	SKIP: $ENVMAPMASK && $BUMPMAP
+//	SKIP: $BASEALPHAENVMAPMASK && $ENVMAPMASK
+//	SKIP: $BASEALPHAENVMAPMASK && $SELFILLUM
+//  SKIP: !$FASTPATH && $FASTPATHENVMAPCONTRAST
+//  SKIP: !$FASTPATH && $FASTPATHENVMAPTINT
+//	SKIP: !$BUMPMAP && $BUMPMAP2
+//	SKIP: $ENVMAPMASK && $BUMPMAP2
+//  SKIP: $SEAMLESS && ( $DETAIL_BLEND_MODE != 12 )
+//  SKIP: $ENVMAPANISOTROPY && !$ENVMAP && ( $BUMPMAP != 1 )
+//  SKIP: $ENVMAPANISOTROPY && $NORMALMAPALPHAENVMAPMASK
+
+// Turning off 32bit lightmaps on Portal 2 to save shader perf. --Thorsten
+//#define USE_32BIT_LIGHTMAPS_ON_360 //uncomment to use 32bit lightmaps, be sure to keep this in sync with the same #define in materialsystem/cmatlightmaps.cpp
+
+// NOTE: This has to be before inclusion of common_multiblend_fxc.h to get the vertex format right!
+#if ( DETAIL_BLEND_MODE == 12 )
+	#define DETAILTEXTURE 0
+#else
+	#define DETAILTEXTURE 1
+#endif
+
+#include "common_fog_ps_supportsvertexfog_fxc.h"
+#include "common_ps_fxc.h"
+#include "common_flashlight_fxc.h"
+#define PIXELSHADER
+#include "common_4wayblend_fxc.h"
+
+#if SEAMLESS
+	#define USE_FAST_PATH 1
+#else
+	#define USE_FAST_PATH FASTPATH
+#endif
+
+const float4 g_EnvmapTint						: register( c0 );
+
+// 4WayBlend specific constants
+const float3 g_BumpBlendFactors					: register( c1 );
+const float4 g_LumStartEnd12					: register( c5 );
+const float4 g_LumStartEnd34					: register( c28 );
+const float4 g_BlendStartEnd23					: register( c15 );
+const float4 g_uvScales23						: register( c16 );
+const float4 g_BlendStartEnd4_uvScales4			: register( c17 );
+const float3 g_LumBlends						: register( c18 );
+
+#if ( USE_FAST_PATH == 1 )
+
+	#if FASTPATHENVMAPCONTRAST == 0
+		static const float3 g_EnvmapContrast = { 0.0f, 0.0f, 0.0f };
+	#else
+		static const float3 g_EnvmapContrast = { 1.0f, 1.0f, 1.0f };
+	#endif
+	static const float3 g_EnvmapSaturation = { 1.0f, 1.0f, 1.0f };
+	static const float g_FresnelReflection = 1.0f;
+	static const float g_OneMinusFresnelReflection = 0.0f;
+	static const float4 g_SelfIllumTint = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+#else // ( USE_FAST_PATH == 0 )
+
+	const float3 g_EnvmapContrast				: register( c2 );
+	const float3 g_EnvmapSaturation				: register( c3 );
+	const float4 g_FresnelReflectionReg			: register( c4 );
+	#define g_FresnelReflection g_FresnelReflectionReg.a
+	#define g_OneMinusFresnelReflection g_FresnelReflectionReg.b
+	const float4 g_SelfIllumTint				: register( c7 );
+
+#endif
+
+const float3 g_DetailTint						: register( c8 );
+const float4 g_DetailBlendFactors				: register( c9 );
+
+const float3 g_EyePos							: register( c10 );
+const float4 g_FogParams						: register( c11 );
+const float4 g_TintValuesTimesLightmapScale		: register( c12 );
+
+const float4 g_FlashlightAttenuationFactors		: register( c13 );
+const float3 g_FlashlightPos					: register( c14 );
+
+const float4 g_ShadowTweaks						: register( c19 );
+
+#if !defined( SHADER_MODEL_PS_2_0 ) && ( FLASHLIGHT == 0 )
+	#define g_cAmbientColor cFlashlightScreenScale.rgb
+	//const float3 g_cAmbientColor				: register( c31 );
+#endif
+
+#if ( ( CUBEMAP == 2 ) || ( ENVMAPANISOTROPY ) )
+	const float4 g_envMapParams : register( c20 );
+#endif
+
+#if ( CUBEMAP == 2 )
+	#define g_DiffuseCubemapScale g_envMapParams.y
+	#define g_fvDiffuseCubemapMin float3( g_envMapParams.z, g_envMapParams.z, g_envMapParams.z )
+	#define g_fvDiffuseCubemapMax float3( g_envMapParams.w, g_envMapParams.w, g_envMapParams.w )
+#endif
+
+#if ( ENVMAPANISOTROPY )
+	#define g_EnvmapAnisotropyScale g_envMapParams.x
+#endif
+
+#if defined( SHADER_MODEL_PS_3_0 )
+const float3 g_TintValuesWithoutLightmapScale	: register( c21 );
+#else
+const float4 g_vCSMLightColor					: register( c21 );
+#endif
+
+// c22 - c27 available
+
+sampler BaseTextureSampler			: register( s0 );
+sampler LightmapSampler				: register( s1 );
+samplerCUBE EnvmapSampler			: register( s2 );
+
+#if DETAILTEXTURE
+	sampler DetailSampler			: register( s12 );
+#endif
+
+sampler BumpmapSampler				: register( s4 );
+
+#if (BUMPMAP == 1) && defined( _PS3 )
+// Causes the Cg compiler to automatically produce _bx2 modifier on the texture load instead of producing a MAD to range expand the vector, saving one instruction.
+#pragma texsign BumpmapSampler
+#pragma texformat BumpmapSampler RGBA8
+#endif
+
+#if BUMPMAP2 == 1
+	sampler BumpmapSampler2			: register( s5 );
+#else
+	sampler EnvmapMaskSampler		: register( s5 );
+#endif
+
+sampler BaseTextureSampler2			: register( s7 );
+sampler BaseTextureSampler3			: register( s8 );
+sampler BaseTextureSampler4			: register( s11 );
+
+#if ( defined( _X360 ) || defined( _PS3 ) ) && FLASHLIGHT
+	sampler FlashlightSampler		: register( s13 );
+	sampler ShadowDepthSampler		: register( s14 );
+	sampler RandRotSampler			: register( s15 );
+
+#if defined(_PS3)
+// Needed for optimal shadow filter code generation on PS3.
+#pragma texformat ShadowDepthSampler DEPTH_COMPONENT24
+#endif
+
+#endif
+
+//const float g_flTime : register( c27 );
+
+float Luminance( float3 cColor )
+{
+	// Formula for calculating luminance based on NTSC standard
+	return dot( cColor.rgb, float3( 0.2125, 0.7154, 0.0721 ) );
+}
+
+//-----------------------------------------------------------------------------------------------------------------------------
+
+#if ( CASCADED_SHADOW_MAPPING ) && !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+const bool g_bCSMEnabled : register(b0);
+#undef CASCADE_SIZE
+#define CASCADE_SIZE 1
+#endif
+
+#if ( CASCADE_SIZE > 0 )
+	#undef CASCADE_SIZE
+	#define CASCADE_SIZE 3
+#endif
+
+#if ( ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) )
+	sampler CSMDepthAtlasSampler : register( s15 );
+	
+	#if defined(_PS3)
+		// Needed for optimal shadow filter code generation on PS3.
+		#pragma texformat CSMDepthAtlasSampler DEPTH_COMPONENT24
+	#endif
+
+	#define CSM_LIGHTMAPPEDGENERIC
+
+	#include "csm_common_fxc.h"
+	#include "csm_blending_fxc.h"
+#endif
+
+//-----------------------------------------------------------------------------------------------------------------------------
+
+#if defined( _X360 )
+	// The compiler runs out of temp registers in certain combos, increase the maximum for now
+	#if ( (BUMPMAP == 2) && CUBEMAP && DIFFUSEBUMPMAP && FLASHLIGHT && SHADER_SRGB_READ )
+		[maxtempreg(44)]
+	#elif ( SHADER_SRGB_READ == 1 )
+		[maxtempreg(41)]
+	#else
+		[maxtempreg(36)]
+	#endif
+#endif
+
+#if LIGHTING_PREVIEW == 2
+LPREVIEW_PS_OUT main( PS_INPUT i )
+#else
+float4_color_return_type main( PS_INPUT i ) : COLOR
+#endif
+{
+	bool bDetailTexture = DETAILTEXTURE ? true : false;
+	bool bBumpmap = BUMPMAP ? true : false;
+	bool bDiffuseBumpmap = DIFFUSEBUMPMAP ? true : false;
+	bool bEnvmapMask = ENVMAPMASK ? true : false;
+	bool bBaseAlphaEnvmapMask = BASEALPHAENVMAPMASK ? true : false;
+	bool bSelfIllum = SELFILLUM ? true : false;
+
+	HALF4 baseColor = 0.0h;
+	HALF4 baseColor2 = 0.0h;
+	HALF4 baseColor3 = 0.0h;
+	HALF4 baseColor4 = 0.0h;
+
+	HALF4 vNormal = HALF4(0, 0, 1, 1);
+	float3 baseTexCoords = float3(0,0,0);
+	float3 worldPos = i.worldPos_projPosZ.xyz;
+	HALF3x3 tangenttranspose = (HALF3x3)i.tangentSpaceTranspose;
+
+	float3 worldVertToEyeVector = g_EyePos - worldPos;
+	#if SEAMLESS
+		baseTexCoords = i.SeamlessTexCoord_fogFactorW.xyz;
+	#else
+		baseTexCoords.xy = i.BASETEXCOORD.xy;
+	#endif
+
+	float3 coords = baseTexCoords;
+
+	float2 detailTexCoord = 0.0f;
+	float2 bumpmapTexCoord = 0.0f;
+	float2 bumpmap2TexCoord = 0.0f;
+
+	#if ( DETAILTEXTURE == 1 )
+		detailTexCoord = i.DETAILCOORDS;
+	#endif
+
+	#if BUMPMAP
+		bumpmapTexCoord = i.BUMPCOORDS;
+	#endif
+
+	GetBaseTextureAndNormal( BaseTextureSampler, BaseTextureSampler2, BaseTextureSampler3, BaseTextureSampler4, BumpmapSampler,
+							 bBumpmap, coords, bumpmapTexCoord, g_uvScales23, g_BlendStartEnd4_uvScales4.zw,
+							 (HALF3)i.vertexColor.rgb, baseColor, baseColor2, baseColor3, baseColor4, vNormal );
+	#if ( ENVMAPANISOTROPY )
+		HALF anisotropyFactor = g_EnvmapAnisotropyScale;
+	#endif
+	#if BUMPMAP == 1	// not ssbump
+		vNormal.xyz = vNormal.xyz * 2.0h - 1.0h;					// make signed if we're not ssbump
+		HALF3 vThisReallyIsANormal = vNormal.xyz;
+		#if ( ENVMAPANISOTROPY )
+			anisotropyFactor *= (HALF)vNormal.a;
+		#endif
+	#endif
+
+	HALF4 lightmapColor1 = HALF4( 1.0, 1.0, 1.0, 1.0 );
+	HALF4 lightmapColor2 = HALF4( 1.0, 1.0, 1.0, 1.0 );
+	HALF4 lightmapColor3 = HALF4( 1.0, 1.0, 1.0, 1.0 );
+
+	#if LIGHTING_PREVIEW == 0
+		if ( bBumpmap && bDiffuseBumpmap )
+		{
+			float2 bumpCoord1;
+			float2 bumpCoord2;
+			float2 bumpCoord3;
+			ComputeBumpedLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3.xy,
+				bumpCoord1, bumpCoord2, bumpCoord3 );
+
+			lightmapColor1 = LightMapSample( LightmapSampler, bumpCoord1 );
+			lightmapColor2 = LightMapSample( LightmapSampler, bumpCoord2 );
+			lightmapColor3 = LightMapSample( LightmapSampler, bumpCoord3 );
+		}
+		else
+		{
+			float2 bumpCoord1 = ComputeLightmapCoordinates( i.lightmapTexCoord1And2, i.lightmapTexCoord3.xy );
+			lightmapColor1 = LightMapSample( LightmapSampler, bumpCoord1 );
+		}
+	#endif
+
+	float2 envmapMaskTexCoord = i.ENVMAPMASKCOORDS;
+
+	HALF4 detailColor = HALF4( 1.0f, 1.0f, 1.0f, 1.0f );
+
+	#if DETAILTEXTURE
+		#if SHADER_MODEL_PS_2_0
+			detailColor = h4tex2D( DetailSampler, detailTexCoord );
+		#else
+			detailColor = HALF4( g_DetailTint, 1.0h ) * h4tex2D( DetailSampler, detailTexCoord );
+		#endif
+	#endif
+
+	float lum1 = smoothstep( g_LumStartEnd12.x, g_LumStartEnd12.y, Luminance( baseColor.rgb ) );
+	float lum2 = smoothstep( g_LumStartEnd12.z, g_LumStartEnd12.w, Luminance( baseColor2.rgb ) );
+	float lum3 = smoothstep( g_LumStartEnd34.x, g_LumStartEnd34.y, Luminance( baseColor3.rgb ) );
+	float lum4 = smoothstep( g_LumStartEnd34.z, g_LumStartEnd34.w, Luminance( baseColor4.rgb ) );
+
+	float lum = lerp( 1-lum1, lum2, g_LumBlends.x );
+	float blendfactor1 = i.vertexBlend.g * lum + i.vertexBlend.g;
+	blendfactor1 = smoothstep( g_BlendStartEnd23.x, g_BlendStartEnd23.y, blendfactor1 );
+
+	float lums = lerp( lum1, lum2, blendfactor1 );
+	lum = lerp( 1-lums, lum3, g_LumBlends.y );
+	float blendfactor2 = i.vertexBlend.b * lum + i.vertexBlend.b;
+	blendfactor2 = smoothstep( g_BlendStartEnd23.z, g_BlendStartEnd23.w, blendfactor2 );
+
+	lums = lerp( lums, lum3, blendfactor2 );
+	lum = lerp( 1-lums, lum4, g_LumBlends.z );
+	float blendfactor3 = i.vertexBlend.a * lum + i.vertexBlend.a;
+	blendfactor3 = smoothstep( g_BlendStartEnd4_uvScales4.x, g_BlendStartEnd4_uvScales4.y, blendfactor3 );
+
+//#if LIGHTING_PREVIEW == 0
+//	return float4(blendfactor3, blendfactor3, blendfactor3, 1.0f);
+//#endif
+
+	baseColor = lerp( baseColor, baseColor2, blendfactor1 );
+
+	#if ( TEXTURE3_BLENDMODE == 0 ) // blend
+		baseColor = lerp( baseColor, baseColor3, blendfactor2 );
+	#endif
+ 	#if ( TEXTURE3_BLENDMODE == 1 ) // multiply 2x
+ 		baseColor *= lerp( 1, baseColor3 + baseColor3, blendfactor2 );
+ 	#endif
+
+	#if ( TEXTURE4_BLENDMODE == 0 ) // blend
+		baseColor = lerp( baseColor, baseColor4, blendfactor3 );
+	#endif
+	#if ( TEXTURE4_BLENDMODE == 1 ) // multiply 2x
+		baseColor *= lerp( 1, baseColor4 + baseColor4, blendfactor3 );
+	#endif
+
+	HALF3 specularFactor = 1.0h;
+	if ( bBumpmap )
+	{
+		float fBumpBlendFactor = 1.0f;
+		#if ( BUMPMAP2 == 1 )
+		{
+			float2 b2TexCoord = bumpmapTexCoord * g_uvScales23.xy;
+
+			HALF4 vNormal2;
+			#if ( BUMPMAP == 2 ) // ssbump mode
+			{
+				vNormal2 = h4tex2D( BumpmapSampler2, b2TexCoord );
+				vNormal.xyz = lerp( vNormal.xyz, vNormal2.xyz, blendfactor1 );
+			}
+			#else
+			{
+				HALF4 normalTexel = h4tex2D( BumpmapSampler2, b2TexCoord );
+				vNormal2 = HALF4( normalTexel.xyz * 2.0h - 1.0h, normalTexel.a );
+				vNormal.xyz = normalize( lerp( vNormal.xyz, vNormal2.xyz, blendfactor1 ) );
+			}
+			#endif
+		}
+		#else
+			fBumpBlendFactor = lerp( fBumpBlendFactor, g_BumpBlendFactors.x, blendfactor1 );
+		#endif // BUMPMAP2 == 1
+
+		fBumpBlendFactor = lerp( fBumpBlendFactor, g_BumpBlendFactors.y, blendfactor2 );
+		fBumpBlendFactor = lerp( fBumpBlendFactor, g_BumpBlendFactors.z, blendfactor3 );
+
+		#if ( BUMPMAP == 2 ) // ssbump mode
+		{
+			vNormal.xyz = lerp( float3( 0, 0, 0 ), vNormal.xyz, fBumpBlendFactor );
+		}
+		#else
+		{
+			vNormal.xyz = normalize( lerp( float3( 0, 0, 1 ), vNormal.xyz, fBumpBlendFactor ) );
+		}
+		#endif
+	}
+
+	#if ( BUMPMAP2 == 0 )
+		if ( bEnvmapMask )
+		{
+			specularFactor *= h3tex2D( EnvmapMaskSampler, envmapMaskTexCoord ).xyz;	
+		}
+	#endif
+
+	if ( bBaseAlphaEnvmapMask )
+	{
+		specularFactor *= 1.0h - baseColor.a; // Reversing alpha blows!
+	}
+
+	HALF4 albedo = HALF4( 1.0f, 1.0f, 1.0f, 1.0f );
+	HALF alpha = 1.0h;
+	albedo *= baseColor;
+	if ( !bBaseAlphaEnvmapMask && !bSelfIllum )
+	{
+		alpha *= baseColor.a;
+	}
+
+	float detailBlendFactor = 0.0f;
+	if ( bDetailTexture )
+	{
+		float detailBlendFactor = g_DetailBlendFactors.x;
+		detailBlendFactor = lerp( detailBlendFactor, g_DetailBlendFactors.y, blendfactor1 );
+		detailBlendFactor = lerp( detailBlendFactor, g_DetailBlendFactors.z, blendfactor2 );
+		detailBlendFactor = lerp( detailBlendFactor, g_DetailBlendFactors.w, blendfactor3 );
+
+		albedo = TextureCombine( albedo, detailColor, DETAIL_BLEND_MODE, detailBlendFactor );
+		#if ( ( DETAIL_BLEND_MODE == TCOMBINE_MOD2X_SELECT_TWO_PATTERNS ) && !SELFILLUM )
+		{
+			// don't do this in the SELFILLUM case since we don't have enough instructions in ps20
+			specularFactor *= 2.0h * lerp( detailColor.g, detailColor.b, baseColor.a );
+		}
+		#endif
+	}
+
+	// The vertex color contains the modulation color + vertex color combined
+	#if ( SEAMLESS == 0 )
+		albedo.rgb *= i.vertexColor.rgb;
+	#endif
+
+	alpha *= i.vertexColor.a;
+
+	float flShadowScalar = 0.0;
+	float flShadow = 1.0;
+
+	// Save this off for single-pass flashlight, since we'll still need the SSBump vector, not a real normal
+	HALF3 vSSBumpVector = vNormal.xyz;
+
+	HALF3 diffuseLighting;
+	if ( bBumpmap && bDiffuseBumpmap )
+	{
+		// ssbump
+		#if ( BUMPMAP == 2 )
+			#if ( DETAIL_BLEND_MODE == TCOMBINE_SSBUMP_BUMP )
+				vNormal.xyz *= lerp( HALF3( 1, 1, 1 ), 2 * detailColor.xyz, alpha );
+				vSSBumpVector = vNormal.xyz;
+				alpha = 1;
+			#endif
+			diffuseLighting = vNormal.x * lightmapColor1.rgb +
+				 vNormal.y * lightmapColor2.rgb +
+				 vNormal.z * lightmapColor3.rgb;
+
+			#if ( ( CSM_BLENDING == 1 ) && ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) && !defined( SHADER_MODEL_PS_2_B ) )
+				// currently not supporting CSM's with 4wayblend in ps2b/OSX since out of instructions/consts
+				diffuseLighting = BlendBumpDiffuseLightmapWithCSM( diffuseLighting, lightmapColor1.a, lightmapColor2.a, lightmapColor3.a, vNormal.xyz, worldPos, flShadow, flShadowScalar );
+			#endif
+
+			// SSBump textures are created assuming the shader decodes lighting for each basis vector by taking dot( N, basis )*lightmap.
+			// But the lightmaps are created assuming that the 3 coeffs sum to 1.0 and are more like barycentric coords than visibility
+			// along the basis vector...so the lightmap math is really just a weighted average of the 3 directional light maps.  So a flat
+			// normal should have 3 weights each = 0.333.  But since ssbump textures are created assuming the other math, a flat normal
+			// converted into an ssbump texture generates 3 weights each = 0.578, so instead of all 3 weights summing to 1.0, they sum
+			// to 1.733.  To adjust for this, I'm scaling these coefficients by 1 / 1.733 = 0.578. NOTE: I'm not scaling vNormal directly
+			// since it is used elsewhere for flashlight computations and shouldn't be scaled for that code.
+			diffuseLighting *= 0.57735025882720947h;
+
+			diffuseLighting *= (HALF3)g_TintValuesTimesLightmapScale.rgb;
+			// now, calculate vNormal for reflection purposes. if vNormal isn't needed, hopefully
+			// the compiler will eliminate these calculations
+			vNormal.xyz = normalize( bumpBasis[0]*vNormal.x + bumpBasis[1]*vNormal.y + bumpBasis[2]*vNormal.z);
+		#else
+			HALF3 dp;
+			dp.x = saturate( dot( vNormal.xyz, bumpBasis[0] ) );
+			dp.y = saturate( dot( vNormal.xyz, bumpBasis[1] ) );
+			dp.z = saturate( dot( vNormal.xyz, bumpBasis[2] ) );
+			dp *= dp;
+
+			#if ( DETAIL_BLEND_MODE == TCOMBINE_SSBUMP_BUMP )
+				dp *= 2*detailColor.rgb;
+			#endif
+			diffuseLighting = dp.x * lightmapColor1.rgb +
+							  dp.y * lightmapColor2.rgb +
+							  dp.z * lightmapColor3.rgb;
+			HALF sum = dot( dp, HALF3( 1.0f, 1.0f, 1.0f ) );
+
+			#if ( ( CSM_BLENDING == 1 ) && ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) && !defined( SHADER_MODEL_PS_2_B ) )
+				// currently not supporting CSM's with 4wayblend in ps2b/OSX since out of instructions/consts
+				diffuseLighting = BlendBumpDiffuseLightmapWithCSM( diffuseLighting.rgb, lightmapColor1.a, lightmapColor2.a, lightmapColor3.a, dp, worldPos, flShadow, flShadowScalar );
+			#endif
+
+			diffuseLighting *= (HALF3)g_TintValuesTimesLightmapScale.rgb / sum;
+		#endif
+	}
+	else
+	{
+		diffuseLighting = lightmapColor1.rgb;
+
+		#if ( ( CSM_BLENDING == 1 ) && ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) && !defined( SHADER_MODEL_PS_2_B ) )
+			// currently not supporting CSM's with 4wayblend in ps2b/OSX since out of instructions/consts
+			diffuseLighting = BlendDiffuseLightmapWithCSM( diffuseLighting, lightmapColor1.a, worldPos, flShadow, flShadowScalar );
+		#endif
+
+		diffuseLighting.rgb *= (HALF3)g_TintValuesTimesLightmapScale.rgb;
+	}
+	
+	#if ( ( CSM_BLENDING == 0 ) && ( CASCADED_SHADOW_MAPPING ) && ( CASCADE_SIZE > 0 ) && !defined( SHADER_MODEL_PS_2_B ) )
+	{
+#if !defined( _X360 ) && !defined( _PS3 ) && !defined( SHADER_MODEL_PS_2_B )
+		if ( g_bCSMEnabled )
+		{
+#endif						
+		// Can't enable dynamic jumps around the Fetch4 shader, because it can't use tex2dlod()
+#if ( CSM_MODE != CSM_MODE_ATI_FETCH4 ) && !defined( SHADER_MODEL_PS_2_B )
+			[branch]
+#endif		
+			if ( lightmapColor1.a > 0.0f )
+			{
+				float flSunPercent;
+				if ( bBumpmap && bDiffuseBumpmap )
+				{
+					flSunPercent = lightmapColor1.a / ( Luminance( lightmapColor1.rgb + lightmapColor2.rgb + lightmapColor3.rgb ) * 0.3333 );
+				}
+				else
+				{
+					flSunPercent = lightmapColor1.a / Luminance( lightmapColor1.rgb );
+				}
+
+				flShadow = CSMComputeShadowing( worldPos );
+					
+				flShadowScalar = 1.0 - ( flSunPercent * ( 1.0 - flShadow ) );
+				
+				/* Debug - blink full shadows
+				if ( step( frac( g_flTime * 0.5 ), 0.5 ) )
+				{
+					flShadowScalar = 1.0 - lightmapColor1.a;
+				}
+				//*/
+
+				// Apply csm shadows
+				diffuseLighting.rgb *= flShadowScalar;
+
+				// Desaturate shadow color since we only have a grayscale dim factor
+				diffuseLighting.rgb = lerp( diffuseLighting.bgr, diffuseLighting.rgb, flShadowScalar * 0.5 + 0.5 );
+							
+	// debug visualization			
+	//			diffuseLighting.rgb = lerp( float3(1.0f-flShadowScalar,1.0f-flShadowScalar,1.0f-flShadowScalar), CSMVisualizeSplit( worldPos ), .3f );
+	//			return float4(diffuseLighting.rgb, 1.0f);
+			}			
+#if !defined( _X360 ) && !defined( _PS3 )
+		}
+#endif							
+		
+	}
+	#endif
+
+	HALF3 worldSpaceNormal = mul( vNormal.xyz, tangenttranspose );
+	#if !defined( SHADER_MODEL_PS_2_0 ) && ( FLASHLIGHT == 0 )
+		diffuseLighting += (HALF3)g_cAmbientColor;
+	#endif
+
+	HALF3 diffuseComponent = albedo.rgb * diffuseLighting;
+
+	#if ( defined( _X360 ) || defined( _PS3 ) ) && FLASHLIGHT
+		// ssbump doesn't pass a normal to the flashlight...it computes shadowing a different way
+		#if ( BUMPMAP == 2 )
+			bool bHasNormal = false;
+
+			float3 worldPosToLightVector = g_FlashlightPos - worldPos;
+
+			HALF3 tangentPosToLightVector;
+			tangentPosToLightVector.x = dot( worldPosToLightVector, tangenttranspose[0] );
+			tangentPosToLightVector.y = dot( worldPosToLightVector, tangenttranspose[1] );
+			tangentPosToLightVector.z = dot( worldPosToLightVector, tangenttranspose[2] );
+
+			tangentPosToLightVector = normalize( tangentPosToLightVector );
+			HALF nDotL = saturate( vSSBumpVector.x*dot( tangentPosToLightVector, bumpBasis[0]) +
+									vSSBumpVector.y*dot( tangentPosToLightVector, bumpBasis[1]) +
+									vSSBumpVector.z*dot( tangentPosToLightVector, bumpBasis[2]) );
+		#else
+			bool bHasNormal = true;
+			HALF nDotL = 1.0h;
+		#endif
+
+		bool bShadows = FLASHLIGHTSHADOWS ? true : false;
+	
+		HALF3 flashlightColor = DoFlashlight( g_FlashlightPos, worldPos, i.flashlightSpacePos,
+			worldSpaceNormal, g_FlashlightAttenuationFactors.xyz, 
+			g_FlashlightAttenuationFactors.w, FlashlightSampler, ShadowDepthSampler,
+			RandRotSampler, 0, bShadows, i.vProjPos.xy / i.vProjPos.w, false, g_ShadowTweaks, bHasNormal );
+
+		diffuseComponent = albedo.xyz * ( diffuseLighting + ( flashlightColor * nDotL * (HALF3)g_TintValuesWithoutLightmapScale.rgb ) );
+	#endif
+
+	if ( bSelfIllum )
+	{
+		HALF3 selfIllumComponent = (HALF3)g_SelfIllumTint.xyz * albedo.xyz;
+		diffuseComponent = lerp( diffuseComponent, selfIllumComponent, baseColor.a );
+	}
+
+	HALF3 specularLighting = HALF3( 0.0f, 0.0f, 0.0f );
+	#if ( CUBEMAP )
+	{
+		float3 reflectVect = CalcReflectionVectorUnnormalized( worldSpaceNormal, worldVertToEyeVector );
+
+		// Calc Fresnel factor
+		HALF3 eyeVect = normalize(worldVertToEyeVector);
+		HALF fresnel = 1.0h - dot( worldSpaceNormal, eyeVect );
+
+		#if ( ENVMAPANISOTROPY ) // For anisotropic reflections on macroscopically rough sufaces like asphalt
+			// Orthogonalize the view vector to the  surface normal, and use it as the anisotropy direction
+			reflectVect = normalize( reflectVect );
+			float3 rvec = cross( -eyeVect.xyz, worldSpaceNormal.xyz );
+			float3 tang = cross( rvec, worldSpaceNormal.xyz );
+				   rvec = cross( tang, reflectVect );
+			float3 reflectVectAniso = normalize( cross( rvec, worldSpaceNormal.xyz ) );
+			// Anisotropy amount is influenced by the view angle to the surface.  The more oblique the angle the more anisotropic the surface appears.
+			anisotropyFactor *= dot( reflectVectAniso, -eyeVect );
+			anisotropyFactor *= anisotropyFactor;
+			reflectVect = normalize( lerp( reflectVect, reflectVectAniso, anisotropyFactor ) );
+		#endif
+
+		fresnel = max( 0, fresnel ); // precision issues on RSX cause this value to occasionally go negative, which results in a NaN presumably because of the exp(log(n)) operation
+		fresnel = pow( fresnel, 4.0h ); //changing this to 4th power to save 2 cycles - visually it's very similar
+
+		fresnel = fresnel * (HALF)g_OneMinusFresnelReflection + (HALF)g_FresnelReflection;
+	
+		specularLighting = (HALF)ENV_MAP_SCALE * h3texCUBE( EnvmapSampler, reflectVect ).rgb;
+
+		#if (CUBEMAP == 2) //cubemap darkened by lightmap mode
+			float3 cubemapLight = saturate( ( diffuseLighting - g_fvDiffuseCubemapMin ) * g_fvDiffuseCubemapMax );
+			specularLighting = lerp( specularLighting, specularLighting * cubemapLight, (HALF)g_DiffuseCubemapScale ); //reduce the cubemap contribution when the pixel is in shadow
+		#endif
+
+		specularLighting *= specularFactor;
+		specularLighting *= (HALF3)g_EnvmapTint.rgb;
+
+		HALF3 specularLightingSquared = specularLighting * specularLighting;
+		specularLighting = lerp( specularLighting, specularLightingSquared, (HALF)g_EnvmapContrast );
+		HALF3 greyScale = dot( specularLighting, HALF3( 0.299f, 0.587f, 0.114f ) );
+		specularLighting = lerp( greyScale, specularLighting, (HALF)g_EnvmapSaturation );
+
+		specularLighting *= fresnel;
+	}
+	#endif
+
+	if ( bDetailTexture )
+	{
+		diffuseComponent = TextureCombinePostLighting( diffuseComponent, detailColor, DETAIL_BLEND_MODE, detailBlendFactor );
+	}
+
+	HALF3 result = diffuseComponent + specularLighting;
+	
+	#if ( LIGHTING_PREVIEW == 3 )
+	{
+		return float4( worldSpaceNormal, i.worldPos_projPosZ.w );
+	}
+	#endif
+
+	#if ( LIGHTING_PREVIEW == 1 )
+	{
+		float dotprod = 0.2 + abs( dot( normalize(worldSpaceNormal), normalize(worldVertToEyeVector) ) );
+		return FinalOutput( float4( dotprod * albedo.xyz, alpha ), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+	}
+	#endif
+
+	#if ( LIGHTING_PREVIEW == 2 )
+	{
+		LPREVIEW_PS_OUT ret;
+		ret.color = float4( albedo.xyz,alpha );
+		ret.normal = float4( worldSpaceNormal, i.worldPos_projPosZ.w );
+		ret.position = float4( worldPos, alpha );
+		ret.flags = float4( 1, 1, 1, alpha );
+		return FinalOutput( ret, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );	
+	}
+	#endif
+
+	#if ( LIGHTING_PREVIEW == 0 )
+	{
+		bool bWriteDepthToAlpha = false;
+
+		// ps_2_b and beyond
+		#if !(defined(SHADER_MODEL_PS_1_1) || defined(SHADER_MODEL_PS_1_4) || defined(SHADER_MODEL_PS_2_0))
+			bWriteDepthToAlpha = ( WRITE_DEPTH_TO_DESTALPHA != 0 ) && ( WRITEWATERFOGTODESTALPHA == 0 );
+		#endif
+
+		HALF flVertexFogFactor = 0.0h;
+		#if !HARDWAREFOGBLEND && !DOPIXELFOG
+		{
+			#if ( SEAMLESS )
+			{
+				flVertexFogFactor = i.SeamlessTexCoord_fogFactorW.w;
+			}
+			#else
+			{
+				flVertexFogFactor = i.baseTexCoord_fogFactorZ.z;
+			}
+			#endif
+		}
+		#endif
+
+		HALF fogFactor = CalcPixelFogFactorSupportsVertexFog( PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, worldPos, i.worldPos_projPosZ.w, flVertexFogFactor );
+		#if WRITEWATERFOGTODESTALPHA && (PIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT)
+			alpha = fogFactor;
+		#endif
+
+		float4_color_return_type vOutput = FinalOutputHalf( HALF4( result.rgb, alpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, bWriteDepthToAlpha, i.worldPos_projPosZ.w );
+
+		#if ( defined( _X360 ) )
+		{
+			vOutput.xyz += ScreenSpaceOrderedDither( i.vScreenPos );
+		}
+		#endif
+
+		return vOutput;
+	}
+	#endif
+}
+                                
+

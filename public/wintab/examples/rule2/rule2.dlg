@@ -1,0 +1,29 @@
+DLGINCLUDE RCDATA DISCARDABLE
+BEGIN
+    "RULE2.H\0"
+END
+
+Rule2 DIALOG 16, 65, 160, 100
+STYLE WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Rule2"
+CLASS "Rule2"
+FONT 8, "Helv"
+BEGIN
+    LTEXT           "Horizontal", 101, 5, 66, 44, 8
+    LTEXT           "Vertical", 102, 5, 74, 44, 8
+    LTEXT           "Diagonal", 103, 5, 82, 44, 8
+    LTEXT           "Inches", 104, 53, 54, 24, 8
+    LTEXT           "Centimeters", 105, 83, 54, 42, 8
+    LTEXT           "Click me to measure.", ID_CLICK, 8, 22, 138, 8
+    LTEXT           "Hold down a button to start.", ID_PRESS, 8, 30, 138, 8, 
+                    NOT WS_VISIBLE
+    LTEXT           "Release the button to finish.", ID_RELEASE, 8, 38, 138, 
+                    8, NOT WS_VISIBLE
+    LTEXT           "0", ID_HI, 53, 66, 24, 8
+    LTEXT           "0", ID_VI, 53, 74, 24, 8
+    LTEXT           "0", ID_DI, 53, 82, 24, 8
+    LTEXT           "0", ID_HC, 83, 66, 42, 8
+    LTEXT           "0", ID_VC, 83, 74, 42, 8
+    LTEXT           "0", ID_DC, 83, 82, 42, 8
+END
+

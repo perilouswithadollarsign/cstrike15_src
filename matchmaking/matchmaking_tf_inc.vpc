@@ -1,0 +1,29 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_tf_inc.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR	".."
+$Macro GAMENAME "tf"
+$Macro GAMESUBDIR "tf"
+
+$Macro OUTBINDIR	"$SRCDIR\..\game\$GAMENAME\bin"
+$Macro DEVKITBINDIR	"$GAMENAME\bin"							[$X360]
+
+$Include "$SRCDIR\vpc_scripts\source_dll_base.vpc" 
+$Include "matchmaking_inc.vpc"
+
+$Project
+{
+	$Folder "tf"
+	{
+		$File	"$GAMESUBDIR/mm_title.h"
+		$File	"$GAMESUBDIR/mm_title.cpp"
+		$File	"$GAMESUBDIR/mm_title_gamesettingsmgr.cpp"
+		$File	"$GAMESUBDIR/mm_title_main.cpp"
+		$File	"$GAMESUBDIR/mm_title_richpresence.h"
+		$File	"$GAMESUBDIR/mm_title_richpresence.cpp"
+		$File	"$GAMESUBDIR/mm_title_titledata.cpp"
+	}
+}

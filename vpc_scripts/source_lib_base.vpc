@@ -1,0 +1,20 @@
+$Include "$SRCDIR\vpc_scripts\platform_dirs.vpc"
+$Include "$SRCDIR\vpc_scripts\source_base.vpc"
+
+$MacroRequired OUTLIBDIR		"$SRCDIR\lib\public$PLATSUBDIR"
+$MacroRequired OUTLIBCOMMONDIR	"$SRCDIR\lib\common$PLATSUBDIR"
+
+$include "$SRCDIR\vpc_scripts\source_lib_posix_base.vpc"	[$POSIX]
+$include "$SRCDIR\vpc_scripts\source_lib_win32_base.vpc"	[$WINDOWS]
+$include "$SRCDIR\vpc_scripts\source_lib_x360_base.vpc"		[$X360]
+$include "$SRCDIR\vpc_scripts\source_ppu_lib_ps3_base.vpc"	[$PS3]
+
+$include "$SRCDIR\vpc_scripts\source_video_base.vpc"
+
+$Configuration
+{	
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;CSTRIKE15"
+	}
+}

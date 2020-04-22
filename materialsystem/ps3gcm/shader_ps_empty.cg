@@ -1,0 +1,7 @@
+void main
+(
+	out float4 c : COLOR
+)
+{
+	c.rgba = float4( 1, 0, 1, 1 );
+}

@@ -1,0 +1,70 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+sampler AlbedoSampler	: register( s0 );
+sampler NormalSampler   : register( s1 );
+sampler PositionSampler : register( s2 );
+
+
+struct PS_INPUT
+{
+	float2 texCoord				: TEXCOORD0;
+	float4 lightColor_InnerCos : TEXCOORD1;
+	float4 lightDir_OuterCos    : TEXCOORD2;
+	float3 lightOrigin          : TEXCOORD3;
+	float4 attnInfo             : TEXCOORD4;
+	float3 SampleXYW            : TEXCOORD5;
+	float3 col : TEXCOORD6;
+
+
+};
+
+#define INNER_COS (i.lightColor_InnerCos.w)
+#define OUTER_COS (i.lightDir_OuterCos.w)
+
+#define QUADRATIC_ATTN ( i.attnInfo.x )
+#define LINEAR_ATTN ( i.attnInfo.y )
+#define CONSTANT_ATTN ( i.attnInfo.z )
+#define SCALE_FACTOR ( i.attnInfo.w )
+
+
+float Lerp5( float f1, float f2, float i1, float i2, float x )
+{
+	return f1 + ( f2 - f1 ) * ( x - i1 ) / ( i2 - i1 );
+}
+
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	// figure out screen sample location
+	float ooW = 1.0 / i.SampleXYW.z;
+
+	float2 sampleUV = i.SampleXYW.xy * ooW;
+
+	float4 normal = tex2D( NormalSampler, sampleUV );
+	float4 albedo = tex2D( AlbedoSampler, sampleUV );
+	float4 pos = tex2D( PositionSampler, sampleUV );
+
+	float3 ldir = i.lightOrigin - pos.xyz;
+	float dist = sqrt( dot( ldir, ldir ) );
+	ldir = normalize( ldir );
+	float spot_dot = dot( ldir, -i.lightDir_OuterCos.xyz );
+	float3 ret = i.lightColor_InnerCos.xyz * 0.09 * albedo.xyz;	// ambient
+	float dist_falloff = ( SCALE_FACTOR / ( QUADRATIC_ATTN * dist * dist + LINEAR_ATTN * dist + CONSTANT_ATTN ) );
+ 	if ( spot_dot > OUTER_COS )
+ 	{
+		float falloff = 1;
+		if (spot_dot < INNER_COS)
+		{
+			falloff = Lerp5( 1, 0, INNER_COS, OUTER_COS, spot_dot);
+		}
+		float dotprod=max( 0, dot( ldir.xyz, normal.xyz ) );
+		ret += dotprod * falloff * ( i.lightColor_InnerCos.xyz * albedo.xyz );
+	}
+	else
+		dist_falloff = min( 1, dist_falloff );
+	ret *= dist_falloff;
+//	ret += 0.1 * i.col; 
+	return FinalOutput( float4( ret, 1 ), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

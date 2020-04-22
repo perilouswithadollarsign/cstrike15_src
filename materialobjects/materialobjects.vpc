@@ -1,0 +1,50 @@
+//-----------------------------------------------------------------------------
+//	MATERIALOBJECTS.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions			"$BASE;MATERIALOBJECTS_LIB"
+	}
+}
+
+$Project "Materialobjects"
+{
+	$Folder	"Header Files"
+	{		
+	}
+
+	$Folder	"Source Files"
+	{
+		$File	"dmeamalgtexture.cpp"
+		$File	"dmeimage.cpp"
+		$File	"dmeprecompiledtexture.cpp"
+		$File	"dmesheetsequence.cpp"
+		$File	"dmetexture.cpp"
+	}
+
+	$Folder	"Interface"
+	{
+		$File	"$SRCDIR\public\materialobjects\amalgtexturevars.h"
+		$File	"$SRCDIR\public\materialobjects\dmeamalgtexture.h"
+		$File	"$SRCDIR\public\materialobjects\dmeimage.h"
+		$File	"$SRCDIR\public\materialobjects\dmeprecompiledtexture.h"
+		$File	"$SRCDIR\public\materialobjects\dmesheetsequence.h"
+		$File	"$SRCDIR\public\materialobjects\dmetexture.h"
+		$File	"$SRCDIR\public\materialobjects\materialobjects.h"
+	}
+
+	$Folder	"external"
+	{
+		$File	"$SRCDIR\public\mathlib\mathlib.h"
+		$File	"$SRCDIR\public\studio.cpp"
+		$File	"$SRCDIR\public\mathlib\vector.h"
+	}
+}

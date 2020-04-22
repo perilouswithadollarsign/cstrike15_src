@@ -1,0 +1,209 @@
+//-----------------------------------------------------------------------------
+//	SCALEFORMUI.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+
+// @wge: Because vpc make file generator doesn't care about $AdditionalDependencies, we need to manually switch the lib for OSX.
+// NOTE: This can only be "Shipping" or "Debug" and the value of GFXBUILDSHIPPING_OSX must match or things will fail horribly.
+$Macro GFXCONFIG_OSX			"Shipping"
+$Conditional GFXBUILDSHIPPING_OSX		1
+
+$Macro GFXCONFIG_LINUX			"shipping"      // On linux we need to help with the path
+$Conditional GFXBUILDSHIPPING_LINUX	1				// 1 Turns off AMP and pix markers
+
+// Set the following to 1 to link including Scaleform AMP profiling tools (game must be launched with "-sfstats")
+// If 0 then in Release we define SF_BUILD_SHIPPING and link to the Shipping libs.
+// Set to 0 in pc-beta! It is set to 1 in trunk so that we can track SFVALUE still holding reference to AS object when releasing a movie
+$Conditional	ENABLE_AMP_SERVER		1	[$WINDOWS]
+$Conditional	ENABLE_AMP_SERVER		0	[!$WINDOWS]
+
+$Macro WINPLATDIR	win32	[$WIN32]
+$Macro WINPLATDIR	x64		[$WIN64]
+
+//-----------------------------------------------------------------------------
+// Scaleform defines
+$Macro GFXLIB		"$SRCDIR\thirdparty\scaleform\sdk42\Lib\$WINPLATDIR\msvc10"							[$WINDOWS]
+$Macro GFXLIB       "$SRCDIR\thirdparty\scaleform\sdk42\Lib\MacOS-i686"									[$OSX32]
+$Macro GFXLIB       "$SRCDIR\thirdparty\scaleform\sdk42\Lib\MacOS-x86_64"								[$OSX64]
+$Macro GFXLIB       "$SRCDIR\thirdparty\scaleform\sdk42\Lib\i386-linux"									[$LINUX32]
+$Macro GFXLIB       "$SRCDIR\thirdparty\scaleform\sdk42\Lib\x86_64-linux"								[$LINUX64]
+
+$Macro LIBJPEG		"$SRCDIR\thirdparty\scaleform\sdk42\3rdParty\jpeg-8d\lib\$WINPLATDIR\msvc10"		[$WINDOWS && !$VS2015]
+$Macro LIBJPEG		"$SRCDIR\thirdparty\scaleform\sdk42\3rdParty\jpeg-8d\lib\$WINPLATDIR\msvc15"		[$WINDOWS && $VS2015]
+$Macro LIBPNG		"$SRCDIR\thirdparty\scaleform\sdk42\3rdParty\libpng-1.5.13\Lib\$WINPLATDIR\msvc10"	[$WINDOWS && !$VS2015]
+$Macro LIBPNG		"$SRCDIR\thirdparty\scaleform\sdk42\3rdParty\libpng-1.5.13\Lib\$WINPLATDIR\msvc15"	[$WINDOWS && $VS2015]
+$Macro ZLIB			"$SRCDIR\thirdparty\scaleform\sdk42\3rdParty\zlib-1.2.7\Lib\$WINPLATDIR\msvc10"		[$WINDOWS]
+
+//-----------------------------------------------------------------------------
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\scaleformui;$SRCDIR\thirdparty\scaleform\sdk42\Include;$SRCDIR\thirdparty\scaleform\sdk42\Src;$SRCDIR\thirdparty"
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\dx9sdk\Include"			[$WINDOWS && !$GL]
+		$AdditionalIncludeDirectories    "$BASE;$SRCDIR\common\gl" [$GL]
+		$PreprocessorDefinitions		"$BASE;INCLUDE_SCALEFORM;ENABLE_AMP_SERVER=$ENABLE_AMP_SERVER"
+		$PreprocessorDefinitions		"$BASE;VERSION_SAFE_STEAM_API_INTERFACES"
+		$PreprocessorDefinitions		"$BASE;USE_ACTUAL_DX" [( $WINDOWS || $X360 ) && !$GL]
+		$PreprocessorDefinitions		"$BASE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead" [!$POSIX]
+		$PreprocessorDefinitions		"$BASE;GL_GLEXT_PROTOTYPES;DX_TO_GL_ABSTRACTION" [$GL]
+		$PreprocessorDefinitions		"$BASE;ALLOW_TEXT_MODE=1" [$CSTRIKE_TRUNK_BUILD||$CSTRIKE_STAGING_BUILD]
+
+
+		$EnableC++Exceptions			"Yes (/EHsc)"		
+	}
+
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE winmm.lib libgfx.lib libgfx_as2.lib libgfx_as3.lib libgfxexpat.lib libgfx_ime.lib libgfxvideo.lib libjpeg.lib zlib.lib libpng.lib Ws2_32.lib imm32.lib oleaut32.lib" [$WINDOWS]
+		$AdditionalDependencies			"$BASE libgfxplatform_d3d9.lib libgfxrender_d3d9.lib" [$WINDOWS && !$GL]
+		$AdditionalDependencies			"$BASE OpenGL32.lib libgfxplatform_GL.lib libgfxrender_GL.lib" [$GL]
+		$AdditionalDependencies			"$BASE legacy_stdio_definitions.lib" [$WINDOWS && $VS2015]
+
+		$AdditionalLibraryDirectories   "$BASE;$GFXLIB" [$PS3 || $OSXALL || $LINUX]
+		$SystemLibraries                "GL" [$LINUXALL]
+	}
+}
+
+$Configuration "Debug"
+{
+	$Compiler [($LINUX && $GFXBUILDSHIPPING_LINUX) || ($OSXALL && $GFXBUILDSHIPPING_OSX)]
+	{
+		$PreprocessorDefinitions		"$BASE;SF_BUILD_SHIPPING"
+	}
+
+	$Compiler [($LINUX && !$GFXBUILDSHIPPING_LINUX) || ($OSXALL && !$GFXBUILDSHIPPING_OSX)]
+	{
+		$PreprocessorDefinitions		"$BASE;SF_BUILD_DEBUG"
+	}
+
+	$Linker [$WINDOWS]
+	{
+		$AdditionalLibraryDirectories   "$BASE;$GFXLIB\debug;$LIBJPEG\debug;$LIBPNG\debug;$ZLIB\debug"	
+	}
+}
+
+$Configuration "Release"
+{
+	$Compiler [($LINUX && $GFXBUILDSHIPPING_LINUX) || ($OSXALL && $GFXBUILDSHIPPING_OSX)]
+	{
+		$PreprocessorDefinitions		"$BASE;SF_BUILD_SHIPPING"
+	}
+
+	$Compiler [($LINUX && !$GFXBUILDSHIPPING_LINUX) || ($OSXALL && !$GFXBUILDSHIPPING_OSX)]
+	{
+		$PreprocessorDefinitions		"$BASE;SF_BUILD_RELEASE"
+	}
+
+	$Compiler [$WINDOWS]
+	{
+		$PreprocessorDefinitions		"$BASE;SF_BUILD_SHIPPING"	[!$ENABLE_AMP_SERVER]
+	}
+	
+	$Linker [$WINDOWS]
+	{
+		$AdditionalLibraryDirectories   "$BASE;$GFXLIB\release"		[$ENABLE_AMP_SERVER]
+		$AdditionalLibraryDirectories   "$BASE;$GFXLIB\shipping"	[!$ENABLE_AMP_SERVER]
+		$AdditionalLibraryDirectories   "$BASE;$LIBJPEG\release;$LIBPNG\release;$ZLIB\release"	
+	}
+}
+
+$Configuration
+{
+	$Linker [$OSXALL]
+	{
+		$SystemFrameworks				"Carbon;OpenGL;Quartz;Cocoa;IOKit" 
+		$SystemLibraries				"iconv;z"
+		$AdditionalLibraryDirectories   "$BASE;$GFXLIB\$GFXCONFIG_OSX"
+   		$AdditionalDependencies			"$BASE $GFXLIB\$GFXCONFIG_OSX\libgfx.a $GFXLIB\libjpeg.a $GFXLIB\libpng.a"
+	}
+}
+
+$Project "ScaleformUI"
+{
+	$Folder	"Public Header Files"
+	{
+	}
+	
+	$Folder	"Scaleform" [!$DEDICATED]
+	{
+		$Folder	"Public Header Files"
+		{
+			$File	"$SRCDIR\public\scaleformui\scaleformui.h"
+			$File	"$SRCDIR\public\tier1\interface.h"
+		}
+
+		$Folder	"Precompiled Header Files"
+		{
+			$File	"stdafx.h"
+			$File	"stdafx.cpp"
+		}
+
+		$Folder "ScaleformUIImpl"
+		{
+			$File    "scaleformuiimpl\sfuimemoryfile.h"
+			$File    "scaleformuiimpl\movieslot.h"
+			$File    "scaleformuiimpl\movieslot.cpp"
+			$File    "scaleformuiimpl\scaleformuiimpl.h"
+			$File    "scaleformuiimpl\scaleformuicursorimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuihighlevelimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuiinitimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuimovieimpl.cpp"
+			$File	 "scaleformuiimpl\scaleformuimovieslotimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuiparamsimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuirendererimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuitranslationimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuivalueimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuiintegration.cpp"
+			$File    "scaleformuiimpl\scaleformuitextobjimpl.cpp"
+			$File    "scaleformuiimpl\scaleformuiintegration.h"
+			$File    "scaleformuiimpl\scaleformuiimage.cpp"
+			$File    "scaleformuiimpl\scaleformuiimage.h"
+			$File    "scaleformuiimpl\sfuiavatarimage.cpp"
+			$File    "scaleformuiimpl\sfuiavatarimage.h"
+			$File    "scaleformuiimpl\sfuichromehtmlimage.cpp"
+			$File    "scaleformuiimpl\sfuichromehtmlimage.h"
+			$File    "scaleformuiimpl\sfuiinventoryimage.cpp"
+			$File    "scaleformuiimpl\sfuiinventoryimage.h"
+			$File	"$SRCDIR\game\shared\cstrike15\dlchelper.h"
+		}
+	}
+	
+	$Folder	"Link Libraries"
+	{
+		$Lib			"mathlib"
+		$Lib			"bitmap"
+		$Lib			"tier2"
+		$Lib			"tier3"
+		$Lib			"vtf"
+		$LibExternal	"$GFXLIB\$GFXCONFIG_LINUX\libgfx"			[$LINUX && !$DEDICATED]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_LINUX\libgfxplatform"	[$LINUX && !$DEDICATED]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_LINUX\libgfx_as2"		[$LINUX && !$DEDICATED]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_LINUX\libgfxexpat"		[$LINUX && !$DEDICATED]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_LINUX\libgfxrender_gl" 	[$LINUX && !$DEDICATED]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_OSX\libgfx"				[$OSXALL]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_OSX\libgfxplatform" 	[$OSXALL]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_OSX\libgfx_as2" 		[$OSXALL]
+		$LibExternal	"$GFXLIB\$GFXCONFIG_OSX\libgfxrender_gl" 	[$OSXALL]
+		$LibExternal	"$GFXLIB\libjpeg"							[($OSXALL || $LINUX) && !$DEDICATED]
+		$LibExternal	"$GFXLIB\libpng"							[($OSXALL || $LINUX) && !$DEDICATED]
+		$LibExternal	"$GFXLIB\libz"								[$LINUX && !$DEDICATED]
+		$Lib			"videocfg"									[$OSXALL]
+		$ImplibExternal	steam_api									[ ( $WIN32 || $POSIX || $PS3 ) && !$NO_STEAM ]
+		$ImplibExternal	steam_api64									[ $WIN64 && !$NO_STEAM ]
+		$ImpLib			togl										[!$IS_LIB_PROJECT && $GL && !$DEDICATED]
+
+		$File			"$SRCDIR\dx9sdk\lib$PLATSUBDIR\d3d9.lib"	[$WINDOWS && !$GL]
+		$File			"$SRCDIR\dx9sdk\lib$PLATSUBDIR\d3dx9.lib"	[$WINDOWS && !$GL]
+		$File			"$SRCDIR\dx9sdk\lib$PLATSUBDIR\dxguid.lib"	[$WINDOWS && !$GL]
+	}
+}

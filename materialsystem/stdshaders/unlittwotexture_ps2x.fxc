@@ -1,0 +1,118 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "TRANSLUCENT"				"0..1"
+// STATIC: "LIGHTING_PREVIEW"			"0..3"	[PC]
+// STATIC: "LIGHTING_PREVIEW"			"0..0"	[CONSOLE]
+// STATIC: "CROSSHAIR_MODE"				"0..1"
+
+#include "common_fog_ps_fxc.h"
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..1"	[ps20b] [PC]
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"	[ps20b] [CONSOLE]
+
+// SKIP: ( CROSSHAIR_MODE == 1 ) && ( LIGHTING_PREVIEW > 0 )
+
+#if defined( SHADER_MODEL_PS_2_0 )
+	#define WRITE_DEPTH_TO_DESTALPHA 0
+#endif
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+const float4 g_DiffuseModulation	: register( c1 );
+#if !FLASHLIGHT
+		// we don't use these with HDR.
+		const float3 g_EnvmapContrast		: register( c2 );
+		const float3 g_EnvmapSaturation		: register( c3 );
+#endif
+
+#if CROSSHAIR_MODE == 1
+	const float4	g_fvConstRegister4		: register( c4 );
+	#define			g_flXHairColorTint		g_fvConstRegister4.xyz
+	#define			g_flXHairColorAdapt		g_fvConstRegister4.w
+#endif
+
+const float4 g_FogParams				: register( PSREG_FOG_PARAMS );
+const float4 g_EyePos_SpecExponent		: register( PSREG_EYEPOS_SPEC_EXPONENT );
+
+const float4 g_FlashlightAttenuationFactors	    : register( c22 );
+const float3 g_FlashlightPos						: register( c23 );
+const float4x4 g_FlashlightWorldToTexture		: register( c24 ); // through c27
+
+sampler BaseTextureSampler	   : register( s0 );
+sampler BaseTextureSampler2	   : register( s1 );
+
+struct PS_INPUT
+{
+    float4 projPos					: POSITION;			// Projection-space position	
+	float2 baseTexCoord				: TEXCOORD0;		// Base texture coordinate
+	float2 baseTexCoord2				: TEXCOORD1;		// Base texture coordinate
+	float4 worldPos_projPosZ		: TEXCOORD7;		// Necessary for water fog dest alpha
+	
+#if defined( _X360 ) //matching pixel shader inputs to vertex shader outputs to avoid shader patches	
+	float4 vColor	: COLOR0;
+#endif
+};
+
+#if LIGHTING_PREVIEW == 2
+LPREVIEW_PS_OUT main( PS_INPUT i ) : COLOR
+#else
+float4_color_return_type main( PS_INPUT i ) : COLOR
+#endif
+{
+
+#if CROSSHAIR_MODE == 1 && LIGHTING_PREVIEW == 0
+	
+	//crosshair mode samples the secondary texture (the power-of-two framebuffer is intended)
+	//and lerps the result based on a multi-tap average of the luminance
+
+	float flAverageLum = 0.0f;
+		
+	float2 offsets[5] = {
+		float2( 0.5f, 0.5f ),
+		float2( 0.51f, 0.51f ),
+		float2( 0.51f, 0.49f ),
+		float2( 0.49f, 0.51f ),
+		float2( 0.49f, 0.49f )
+	};
+		
+	for ( int k = 0; k < 5; k++ )
+	{
+		flAverageLum += dot( tex2D( BaseTextureSampler2, float2( 0.5f, 0.5f ) ).rgb, float3(0.299,0.587,0.114) );
+	}
+
+	flAverageLum *= 0.2f;
+	
+	float4 cOut = tex2D( BaseTextureSampler, i.baseTexCoord.xy );
+	cOut.rgb = lerp( cOut.rgb + g_flXHairColorTint, cOut.rgb * g_flXHairColorTint, flAverageLum * g_flXHairColorAdapt );
+
+	return FinalOutput( cOut * g_DiffuseModulation, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+#else
+
+#if LIGHTING_PREVIEW == 1
+	return FinalOutput( float4( 0.0f, 0.0f, 0.0f, 1.0f ), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR );
+#endif
+#if LIGHTING_PREVIEW == 2
+	LPREVIEW_PS_OUT ret;
+	ret.flags=float4(1,1,1,1);
+	ret.color=float4( 0.0f, 0.0f, 0.0f, 1.0f );
+	ret.normal=float4( 0.0f, 0.0f, 1.0f, 1.0f );
+	ret.position=float4( i.worldPos_projPosZ.xyz, 1.0f );
+	return FinalOutput( ret, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+#endif
+#if (LIGHTING_PREVIEW == 0) || ( LIGHTING_PREVIEW == 3 )
+	float4 baseColor = tex2D( BaseTextureSampler, i.baseTexCoord.xy );
+	float4 baseColor2 = tex2D( BaseTextureSampler2, i.baseTexCoord2.xy );
+	float4 result = baseColor * baseColor2 * g_DiffuseModulation;
+
+	// This material can only get a non-opaque alpha if the material is marked as translucent
+# if ( TRANSLUCENT == 0 )
+	result.a = 1.0f;
+# endif
+
+	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos_SpecExponent.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+	return FinalOutput( result, fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR, (WRITE_DEPTH_TO_DESTALPHA != 0), i.worldPos_projPosZ.w );
+#endif
+
+#endif
+}
+

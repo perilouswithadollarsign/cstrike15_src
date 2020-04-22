@@ -1,0 +1,141 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+// $SHADER_SPECIFIC_CONST_0	 = eyeball origin			
+// $SHADER_SPECIFIC_CONST_1	 = eyeball up * 0.5			
+// $SHADER_SPECIFIC_CONST_2	 = iris projection U		
+// $SHADER_SPECIFIC_CONST_3	 = iris projection V		
+// $SHADER_SPECIFIC_CONST_4	 = glint projection U		
+// $SHADER_SPECIFIC_CONST_5	 = glint projection V		
+//===========================================================================//
+
+// STATIC: "HALFLAMBERT"					"0..1"
+// STATIC: "FLATTEN_STATIC_CONTROL_FLOW"	"0..1" [vs20] [PC]
+// STATIC: "FLATTEN_STATIC_CONTROL_FLOW"	"0..0" [CONSOLE]
+
+// DYNAMIC: "COMPRESSED_VERTS"				"0..1"
+// DYNAMIC: "SKINNING"						"0..1"
+#include "common_fog_vs_fxc.h"
+// DYNAMIC: "DYNAMIC_LIGHT"					"0..1"
+// DYNAMIC: "STATIC_LIGHT"					"0..1"
+
+// DYNAMIC: "MORPHING"						"0..0" [ = false ]
+// DYNAMIC: "NUM_LIGHTS"					"0..2" [vs20] [PC]
+// DYNAMIC: "NUM_LIGHTS"					"0..0" [vs20] [CONSOLE]
+
+// If using static control flow on Direct3D, we should use the NUM_LIGHTS=0 combo
+//  SKIP: ( $FLATTEN_STATIC_CONTROL_FLOW == 0 )&& ( $NUM_LIGHTS > 0 ) [vs20] [PC]
+
+#include "vortwarp_vs20_helper.h"
+
+static const int  g_bSkinning		= SKINNING ? true : false;
+static const int  g_FogType			= DOWATERFOG;
+static const bool g_bHalfLambert	= HALFLAMBERT ? true : false;
+
+const float3 cEyeOrigin						:  register( SHADER_SPECIFIC_CONST_0 );
+const float3 cHalfEyeballUp					:  register( SHADER_SPECIFIC_CONST_1 );
+const float4 cIrisProjectionU				:  register( SHADER_SPECIFIC_CONST_2 );
+const float4 cIrisProjectionV				:  register( SHADER_SPECIFIC_CONST_3 );
+const float4 cGlintProjectionU				:  register( SHADER_SPECIFIC_CONST_4 );
+const float4 cGlintProjectionV				:  register( SHADER_SPECIFIC_CONST_5 );
+
+#ifdef SHADER_MODEL_VS_3_0
+// NOTE: cMorphTargetTextureDim.xy = target dimensions,
+//		 cMorphTargetTextureDim.z = 4tuples/morph
+const float3 cMorphTargetTextureDim			: register( SHADER_SPECIFIC_CONST_7 );
+const float4 cMorphSubrect					: register( SHADER_SPECIFIC_CONST_8 );
+
+sampler2D morphSampler						: register( s0 );
+#endif
+
+struct VS_INPUT
+{
+	float4 vPos					: POSITION;			// Position
+	float4 vBoneWeights			: BLENDWEIGHT;		// Skin weights
+	float4 vBoneIndices			: BLENDINDICES;		// Skin indices
+	float4 vTexCoord0			: TEXCOORD0;		// Base (sclera) texture coordinates
+
+	float3 vPosFlex				: POSITION1;		// Delta positions for flexing
+#ifdef SHADER_MODEL_VS_3_0
+	float vVertexID				: POSITION2;
+#endif
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos				: POSITION;			// Projection-space position
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	float  fog					: FOG;				// Fixed-function fog factor
+#endif
+	float2 baseTC				: TEXCOORD0;		// Base texture coordinate
+	float2 irisTC				: TEXCOORD1;		// Iris texture coordinates
+	float2 glintTC				: TEXCOORD2;		// Glint texture coordinates
+	float3 vColor				: TEXCOORD3;		// Vertex-lit color
+	
+	float4 worldPos_projPosZ	: TEXCOORD7;		// Necessary for pixel fog	
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = (VS_OUTPUT)0;
+
+	bool bDynamicLight = DYNAMIC_LIGHT ? true : false;
+	bool bStaticLight = STATIC_LIGHT ? true : false;
+
+	float4 vPosition = v.vPos;
+	float3 dummy = v.vPos.xyz;		// dummy values that can't be optimized out
+
+#if !defined( SHADER_MODEL_VS_3_0 ) || !MORPHING
+	ApplyMorph( v.vPosFlex, vPosition.xyz );
+#else
+	ApplyMorph( morphSampler, cMorphTargetTextureDim, cMorphSubrect, v.vVertexID, dummy, vPosition.xyz );
+#endif
+
+	// Transform the position and dummy normal (not doing the dummy normal causes invariance issues with the flashlight!)
+	float3 worldNormal, worldPos;
+	SkinPositionAndNormal( 
+		g_bSkinning, 
+		vPosition, dummy,
+		v.vBoneWeights, v.vBoneIndices,
+		worldPos, worldNormal );
+
+	// Transform into projection space
+	o.projPos = mul( float4( worldPos, 1 ), cViewProj );
+	
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	o.worldPos_projPosZ = float4( worldPos.xyz, o.projPos.z );
+
+#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	o.fog = CalcFixedFunctionFog( worldPos, g_FogType );
+#endif
+
+	// Normal = (Pos - Eye origin) - just step on dummy normal created above
+	worldNormal = worldPos - cEyeOrigin;
+
+	// Normal -= 0.5f * (Normal dot Eye Up) * Eye Up
+	float normalDotUp = -dot( worldNormal, cHalfEyeballUp) * 0.5f;
+	worldNormal = normalize(normalDotUp * cHalfEyeballUp + worldNormal);
+
+	// Vertex lighting
+#if ( ( FLATTEN_STATIC_CONTROL_FLOW == 0 ) || defined ( SHADER_MODEL_VS_3_0 ) )
+	o.vColor = DoLighting( worldPos, worldNormal, float3(0.0f, 0.0f, 0.0f), bStaticLight, bDynamicLight, g_bHalfLambert );
+#else
+	o.vColor = DoLightingUnrolled( worldPos, worldNormal, float3(0.0f, 0.0f, 0.0f), bStaticLight, bDynamicLight, g_bHalfLambert, NUM_LIGHTS );
+#endif
+
+	// Texture 0 is the base texture
+	// Texture 1 is a planar projection used for the iris
+	// Texture 2 is a planar projection used for the glint
+	o.baseTC    = v.vTexCoord0.xy;
+	o.irisTC.x  = dot( cIrisProjectionU,  float4(worldPos, 1) );
+	o.irisTC.y  = dot( cIrisProjectionV,  float4(worldPos, 1) );
+	o.glintTC.x = dot( cGlintProjectionU, float4(worldPos, 1) );
+	o.glintTC.y = dot( cGlintProjectionV, float4(worldPos, 1) );
+
+	return o;
+}
+
+

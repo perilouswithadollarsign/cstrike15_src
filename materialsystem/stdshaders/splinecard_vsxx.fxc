@@ -1,0 +1,130 @@
+#include "common_vs_fxc.h"
+#include "spline_fxc.h"
+
+// These are "0..0" for the splinecard case.  We only use these combos in the spritecard case.
+// STATIC: "ADDBASETEXTURE2"				"0..0"
+// STATIC: "EXTRACTGREENALPHA"				"0..0"
+// STATIC: "DUALSEQUENCE"					"0..0"
+// STATIC: "DEPTHBLEND"						"0..0"
+// STATIC: "PACKED_INTERPOLATOR"			"0..0"
+// These determine the format of VS_OUTPUT:
+// STATIC: "ANIMBLEND_OR_MAXLUMFRAMEBLEND1" "0..1"
+
+// DYNAMIC: "ORIENTATION"					"0..3"
+
+#define ANIMBLEND ANIMBLEND_OR_MAXLUMFRAMEBLEND1
+#define MAXLUMFRAMEBLEND1 ANIMBLEND_OR_MAXLUMFRAMEBLEND1
+
+const float4x3 cModelView			: register(SHADER_SPECIFIC_CONST_0);
+const float4x4 cProj				: register(SHADER_SPECIFIC_CONST_3);
+const float4 SizeParms              : register(SHADER_SPECIFIC_CONST_8);
+const float4 SizeParms2             : register(SHADER_SPECIFIC_CONST_9);
+
+#define MINIMUM_SIZE_FACTOR (SizeParms.x)
+#define MAXIMUM_SIZE_FACTOR (SizeParms.y)
+
+#define START_FADE_SIZE_FACTOR (SizeParms.z)
+#define END_FADE_SIZE_FACTOR (SizeParms.w)
+
+// alpha fade w/ distance
+#define START_FAR_FADE  ( SizeParms2.x )
+#define FAR_FADE_FACTOR ( SizeParms2.y )	   // alpha = 1-min(1,max(0, (dist-start_fade)*factor))
+
+
+#define ALPHATFADE ( SizeParms2.z )
+#define RADIUSTFADE ( SizeParms2.w )
+
+struct VS_INPUT
+{
+	// This is all of the stuff that we ever use.
+	float4 vTint            : COLOR;
+	float4 vParms           : POSITION;						// T V side_id
+	float4 vSplinePt0		: TEXCOORD0;					// x y z rad
+	float4 vSplinePt1		: TEXCOORD1;					// x y z rad
+	float4 vSplinePt2		: TEXCOORD2;					// x y z rad
+	float4 vSplinePt3		: TEXCOORD3;					// x y z rad
+	float4 vTexCoordRange   : TEXCOORD4;					// u0 v0 u1 v1
+	float4 vEndPointColor   : TEXCOORD5;					// r g b a at p1	
+#if ORIENTATION == 3
+	float3 vNormal0         : TEXCOORD6;					// normal at p0
+	float3 vNormal1         : TEXCOORD7;					// normal at p1
+#endif
+
+
+};
+
+// VS_OUTPUT in a common file.
+#include "common_spritecard_fxc.h"
+
+// #define P0 float4( 0,0,0,40)
+// #define P1 float4( 0,0,100,40)
+// #define P2 float4( 0,0,200,40)
+// #define P3 float4( 0,0,300,40)
+
+#define P0 (v.vSplinePt0)
+#define P1 (v.vSplinePt1)
+#define P2 (v.vSplinePt2)
+#define P3 (v.vSplinePt3)
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	o.vecOutlineTint = 1;
+
+	// posrad.xyz is worldspace position and posrad.w is worldspace diameter.
+	float4 posrad =
+		CatmullRomSpline( P0, P1, P2, P3, v.vParms.x );
+	posrad.w *= lerp( 1, RADIUSTFADE, v.vParms.x );
+	float3 v2p = float3( 0, 0, 1 );
+	if ( ORIENTATION == 0 )
+	{
+		v2p = posrad.xyz - cEyePos;							// screen aligned
+	}
+
+#if ( ORIENTATION == 3 )									// use normal
+	v2p = lerp( v.vNormal0, v.vNormal1, v.vParms.x );
+#endif
+
+	float3 tangent = DCatmullRomSpline3( P0, P1, P2, P3, v.vParms.x );
+	float3 ofs = normalize( cross( v2p, normalize( tangent ) ) );
+	posrad.xyz += ofs * ( posrad.w * ( v.vParms.z - .5 ) );
+	o.projPos  = mul( float4(posrad.xyz, 1.0f), cViewProj );
+	
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	o.texCoord0_1.wz = o.texCoord0_1.xy = float2( lerp( v.vTexCoordRange.z, v.vTexCoordRange.x, v.vParms.z ), lerp( v.vTexCoordRange.y, v.vTexCoordRange.w, v.vParms.y ) );
+
+	float4 color1 =  float4( GammaToLinear( v.vTint.rgb ), v.vTint.a );
+	float4 color2 =  float4( GammaToLinear( v.vEndPointColor.rgb ), v.vEndPointColor.a );
+	
+	o.argbcolor = lerp( color1, color2, v.vParms.x );			
+	o.argbcolor.a *= lerp( 1, ALPHATFADE, v.vParms.x );
+
+
+	// Don't really need these in the splinecard case, but since we aren't typically fillrate limited with 
+	// spline cards (are we?), then go ahead and send it through.
+#if HAS_BLENDFACTOR0
+	o.blendfactor0.xyzw = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+#endif
+#if DEPTHBLEND
+	#if defined( REVERSE_DEPTH_ON_X360 )
+		o.vScreenPos_ReverseZ.xyzw = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+	#else 
+		o.vScreenPos.xyzw = float4( 0.0f, 0.0f, 0.0f, 0.0f );
+	#endif
+#endif
+
+	#if !defined( _X360 ) && !defined( SHADER_MODEL_VS_3_0 )
+	{
+		o.fog = CalcFixedFunctionFog( posrad.xyz, 0 );
+	}
+	#endif
+
+	return o;
+
+}

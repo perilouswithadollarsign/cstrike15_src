@@ -1,0 +1,92 @@
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..3"	[ps20b] [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..2"	[ps30]  [PC]
+// STATIC: "FLASHLIGHTDEPTHFILTERMODE"	"0..1"	[ps20b] [CONSOLE]
+// DYNAMIC: "FLASHLIGHT"				"0..1"
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"
+
+// We don't care about flashlight depth unless the flashlight is on
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )	[ps20b]
+// SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )	[ps30]
+
+#include "common_ps_fxc.h"
+#include "common_fog_ps_forcevertexfog_fxc.h"
+#include "common_flashlight_fxc.h"
+
+sampler BaseTimesLightmapSampler	: register( s0 );
+sampler BaseTextureSampler			: register( s1 );
+sampler g_tShadowDepth				: register( s2 );	// Flashlight shadow depth map sampler
+sampler g_tNormalizeRandRot			: register( s3 );	// Normalization / RandomRotation samplers
+sampler g_tFlashlightSampler		: register( s4 );	// Flashlight cookie
+
+const float4 g_vFlashlightAttenuationFactors_FarZ	: register( c0 );
+#define g_vFlashlightAttenuationFactors g_vFlashlightAttenuationFactors_FarZ.xyz
+#define g_flFlashlightFarZ g_vFlashlightAttenuationFactors_FarZ.w
+
+const float4 g_vFlashlightPos_RimBoost				: register( c1 );
+#define g_vFlashlightPos g_vFlashlightPos_RimBoost.xyz
+
+const float4x4 g_mFlashlightWorldToTexture			: register( c2 );
+const float4 g_vShadowTweaks						: register( c6 );
+
+// THIS NEEDS TO BE THE SAME IN buildmodelforworld.cpp!!!!
+#define BASE_TIMES_LIGHTMAP_LINEAR_TONEMAP_SCALE 4.0f
+// THIS NEEDS TO BE THE SAME IN buildmodelforworld.cpp!!!!
+
+struct PS_INPUT
+{
+    float4 projPos						: POSITION;			// Projection-space position	
+	#if ( HARDWAREFOGBLEND )
+		float fog						: FOG;
+	#else
+		float fog						: TEXCOORD0;
+	#endif
+	float2 vBaseTexCoord				: TEXCOORD1;
+	#if ( FLASHLIGHT )
+		float3 worldPos					: TEXCOORD2;
+		float3 worldNormal				: TEXCOORD3;
+	#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float3 baseTimesLightmap = tex2D( BaseTimesLightmapSampler, i.vBaseTexCoord ).xyz;
+
+	#if defined( _X360 )
+	{
+		baseTimesLightmap = SrgbGammaToLinear( baseTimesLightmap );
+	}
+	#endif
+
+	baseTimesLightmap *= ( 1.0f / BASE_TIMES_LIGHTMAP_LINEAR_TONEMAP_SCALE );
+
+	float flVertexFogFactor = 0.0f;
+	#if ( !HARDWAREFOGBLEND )
+	{
+		flVertexFogFactor = i.fog;
+	}
+	#endif
+
+	float4 result;
+	result.a = 1.0f;
+
+	result.xyz = baseTimesLightmap;
+
+	#if ( FLASHLIGHT && ( defined( SHADER_MODEL_PS_2_B ) || defined( SHADER_MODEL_PS_3_0 ) ) )
+	{
+		float3 baseColor = tex2D( BaseTextureSampler, i.vBaseTexCoord ).xyz;
+		float4 flashlightSpacePosition = TransformFlashlightWorldToTexture( i.worldPos, g_mFlashlightWorldToTexture );
+		float2 vScreenPos = i.projPos.xy / i.projPos.w;
+
+		float3 flashlightDiffuseLighting = 
+			DoFlashlight( g_vFlashlightPos, i.worldPos, flashlightSpacePosition, i.worldNormal, 
+						g_vFlashlightAttenuationFactors, g_flFlashlightFarZ, g_tFlashlightSampler, g_tShadowDepth,
+						g_tNormalizeRandRot, ( int )FLASHLIGHTDEPTHFILTERMODE, FLASHLIGHTSHADOWS != 0,
+						vScreenPos, false /* bClip */, g_vShadowTweaks );
+
+		result.xyz += ( flashlightDiffuseLighting * baseColor );
+	}
+	#endif
+
+	return FinalOutput( result, flVertexFogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+}
+

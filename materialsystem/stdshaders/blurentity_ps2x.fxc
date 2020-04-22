@@ -1,0 +1,34 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+// blurs colors by averages
+// bleeds alpha by max of current vs averages
+
+sampler g_texSampler	: register( s0 );
+
+struct PS_INPUT
+{
+	float2 uv	: TEXCOORD0;
+};
+
+float2 g_vPsTapOffsets[2] : register( c0 );
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 cOut;
+
+	cOut  = tex2D( g_texSampler, float2( i.uv.x + g_vPsTapOffsets[0].x, i.uv.y + g_vPsTapOffsets[0].y ) );
+	cOut += tex2D( g_texSampler, float2( i.uv.x                       , i.uv.y + g_vPsTapOffsets[0].y ) );
+	cOut += tex2D( g_texSampler, float2( i.uv.x - g_vPsTapOffsets[0].x, i.uv.y + g_vPsTapOffsets[0].y ) );
+	
+	cOut += tex2D( g_texSampler, float2( i.uv.x + g_vPsTapOffsets[0].x, i.uv.y                        ) );
+	cOut += tex2D( g_texSampler, float2( i.uv.x                       , i.uv.y                        ) );
+	cOut += tex2D( g_texSampler, float2( i.uv.x - g_vPsTapOffsets[0].x, i.uv.y                        ) );
+	
+	cOut += tex2D( g_texSampler, float2( i.uv.x + g_vPsTapOffsets[0].x, i.uv.y - g_vPsTapOffsets[0].y ) );
+	cOut += tex2D( g_texSampler, float2( i.uv.x                       , i.uv.y - g_vPsTapOffsets[0].y ) );
+	cOut += tex2D( g_texSampler, float2( i.uv.x - g_vPsTapOffsets[0].x, i.uv.y - g_vPsTapOffsets[0].y ) );
+	
+	cOut *= (1.0f/9.0f);
+
+	cOut.a = max( cOut.a * 1.0f, tex2D( g_texSampler, i.uv ).a ); //never reduce alpha, only increase it
+	return saturate( cOut );
+}

@@ -1,0 +1,19 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+// this pixel shader compares the luminance against a conatnt value and retruns all 1s when
+// greater.
+
+struct PS_INPUT
+{
+	float2 coordTap0				: TEXCOORD0;
+};
+
+float4 Constant_color : register( c0 );
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	return FinalOutput( float4(0,1,0,1), 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE ); //Constant_color;
+}
+

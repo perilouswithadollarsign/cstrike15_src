@@ -1,0 +1,24 @@
+/*   SCE CONFIDENTIAL                                       */
+/*   PlayStation(R)3 Programmer Tool Runtime Library 350.001 */
+/*   Copyright (C) 2006 Sony Computer Entertainment Inc.    */
+/*   All Rights Reserved.                                   */
+
+
+void main
+(
+	float3 position	: POSITION,
+	float3 normal   : NORMAL,
+	float4 color	: COLOR,
+	
+
+    uniform float4x4 modelViewProj,
+
+	out float4 oPosition : POSITION0,
+	out float4 oNormal   : TEX0,
+	out float4 oColor    : COLOR
+)
+{
+	oPosition = mul(modelViewProj, float4( position, 1 ) );
+	oNormal = mul(modelViewProj, float4( normal, 0 ) );
+	oColor = color;
+}

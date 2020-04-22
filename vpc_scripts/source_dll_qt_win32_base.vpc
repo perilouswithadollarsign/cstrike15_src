@@ -1,0 +1,32 @@
+//===================== Copyright (c) Valve Corporation. All Rights Reserved. ======================
+//
+//==================================================================================================
+
+$Include "$SRCDIR\vpc_scripts\source_dll_win32_base.vpc"
+$Include "$SRCDIR\vpc_scripts\qt_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE;.\;$SRCDIR\game\shared;$QT_ROOT\include;.\$QT_TARGET_SUBDIR"
+		$PreprocessorDefinitions			"$BASE;QT_LARGEFILE_SUPPORT;QT_DLL;QT_GUI_LIB;QT_CORE_LIB;QT_THREAD_SUPPORT"
+		$PreprocessorDefinitions			"$BASE;QT_NO_DEBUG" [!$QTDEBUG]
+		$DisableSpecificWarnings			"4127;4512;$BASE"
+	}
+}
+
+$Project
+{
+	$Folder "Link Libraries" [$QTDEBUG]
+	{
+		$Lib								"$QT_ROOT\lib\qtcored4"
+		$Lib								"$QT_ROOT\lib\qtguid4"
+	}
+	
+	$Folder "Link Libraries" [!$QTDEBUG]
+	{
+		$Lib								"$QT_ROOT\lib\qtcore4"
+		$Lib								"$QT_ROOT\lib\qtgui4"
+	}
+}

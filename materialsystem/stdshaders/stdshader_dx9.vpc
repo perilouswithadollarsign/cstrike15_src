@@ -1,0 +1,100 @@
+//-----------------------------------------------------------------------------
+//	STDSHADER_DX9.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro STDSHADERSDIR "."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+// shader_dll_verify.cpp defines a function called _ftol3. This means that we can't
+// link with the bug-fixed ftol3.obj. It also means we can't convert float-to-unsigned.
+$Conditional DISABLE_FTOL3_OVERRIDE "1"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$OutputDirectory		"Debug_dx9$PLATSUBDIR"			[$WINDOWS]
+		$IntermediateDirectory	"Debug_dx9$PLATSUBDIR"			[$WINDOWS]
+		
+		$OutputDirectory		"Debug_dx9_360"					[$X360]
+		$IntermediateDirectory	"Debug_dx9_360"					[$X360]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$OutputDirectory		"Release_dx9$PLATSUBDIR"		[$WINDOWS]
+		$IntermediateDirectory	"Release_dx9$PLATSUBDIR"		[$WINDOWS]
+
+		$OutputDirectory		"Release_dx9_360"				[$X360]
+		$IntermediateDirectory	"Release_dx9_360"				[$X360]
+	}
+}
+
+// Common Configuration
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;fxctmp9;vshtmp9;"	[$WINDOWS||$POSIX]
+		$AdditionalIncludeDirectories	"$BASE;..\..\dx9sdk\include"	[$WINDOWS]
+		$AdditionalIncludeDirectories	"$BASE;fxctmp9_360;vshtmp9_360"					[$X360]
+		$AdditionalIncludeDirectories	"$BASE;fxctmp9_ps3"								[$PS3]
+		$AdditionalIncludeDirectories	"$BASE;.."
+		$PreprocessorDefinitions		"$BASE;STDSHADER_DX9_DLL_EXPORT;FAST_MATERIALVAR_ACCESS"
+		$PreprocessorDefinitions		"$BASE;USE_ACTUAL_DX" [ ( $WINDOWS||$X360 ) && !$GL ]
+	}
+
+	$Linker [!$PS3]
+	{
+		$AdditionalDependencies			"$BASE version.lib winmm.lib"	[$WINDOWS]
+		$ModuleDefinitionFile			"xbox\xbox_dx9.def"				[$X360]
+		$SystemLibraries                                                        "iconv" [$OSXALL]
+	}
+}
+
+$include "stdshader_dx9_inc.vpc"
+
+$Project "stdshader_dx9"
+{
+		
+	$Folder "Xbox"	[$X360]
+	{
+		$File	"xbox\xbox_dx9.def"
+	}
+
+	$Folder	"Link Libraries" 
+	{
+		$Lib mathlib
+		$Lib shaderlib
+		$File	"$SRCDIR\dx9sdk\lib\d3dx9.lib"	[$WINDOWS && !$GL]
+	}
+
+
+	$File	"$SRCDIR\devtools\bin\vsh_prep.pl"
+	$File	"$SRCDIR\devtools\bin\psh_prep.pl"
+	$File	"$SRCDIR\devtools\bin\fxc_prep.pl"
+	$File	"$SRCDIR\devtools\bin\updateshaders.pl"
+	$File	"$SRCDIR\devtools\bin\copyshaderincfiles.pl"
+	$File	"$SRCDIR\devtools\bin\copyshaders.pl"
+	$File	"$SRCDIR\devtools\bin\p4autocheckout.pl"
+	$File	"$SRCDIR\devtools\bin\p4revertshadertargets.pl"
+	$File	"$SRCDIR\devtools\bin\valve_perl_helpers.pl"
+	$File	"$SRCDIR\devtools\bin\checkshaderchecksums.pl"
+	$File	"buildallshaders.bat"
+	$File	"buildshaders.bat"
+	$File	"buildincs.bat"
+
+	$Shaders	"stdshader_dx9_20b.txt"			[!$PS3]
+	$Shaders	"stdshader_dx9_20b_new.txt"		[!$PS3]
+	$Shaders	"stdshader_dx9_30.txt"			[!$PS3]
+	$Shaders	"stdshader_ps3.txt"				[$PS3]
+	//$Shaders	"stdshader_dx10.txt"
+}

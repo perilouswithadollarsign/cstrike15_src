@@ -1,0 +1,297 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "MULTITEXTURE"			"0..1"
+// STATIC: "FRESNEL"				"0..1"
+// STATIC: "BLEND"					"0..1"
+// STATIC: "REFRACTALPHA"			"0..1"
+// STATIC: "HDRTYPE"				"0..2"
+// STATIC: "FLOWMAP"				"0..1"
+// STATIC: "FLOW_DEBUG"				"0..1"
+
+// DYNAMIC: "HDRENABLED"			"0..1"
+
+#include "common_fog_ps_fxc.h"
+
+#include "common_ps_fxc.h"
+#include "shader_constant_register_map.h"
+
+// Constants
+const float3 g_WaterFogColor		: register( c0 );
+
+const float4 g_CheapWaterParams		: register( c1 );
+#define g_CheapWaterStart			g_CheapWaterParams.x
+#define g_CheapWaterEnd				g_CheapWaterParams.y
+#define g_CheapWaterDeltaRecip		g_CheapWaterParams.z
+#define g_CheapWaterStartDivDelta	g_CheapWaterParams.w
+
+const float4 g_ReflectTint			: register( c2 );
+const float g_flTime				: register( c10 );
+
+const float4 g_EyePos				: register( PSREG_EYEPOS_SPEC_EXPONENT ); // c11
+const float4 g_PixelFogParams		: register( PSREG_FOG_PARAMS ); // c12
+
+const float4 g_vFlowParams1			: register( c13 );
+#define g_flWorldUvScale  ( g_vFlowParams1.x ) // 1.0f / 10.0f
+#define g_flNormalUvScale ( g_vFlowParams1.y ) // 1.0f / 1.15f
+#define g_flBumpStrength  ( g_vFlowParams1.z ) // 3.0f
+#define g_flTimeScale     ( g_vFlowParams1.w ) // 1.0f
+
+const float3 g_vFlowParams2			: register( c14 );
+#define g_flFlowTimeIntervalInSeconds ( g_vFlowParams2.x ) // 0.4f // Number of seconds to lerp from texture 1 to texture 2
+#define g_flFlowUvScrollDistance      ( g_vFlowParams2.y ) // 0.25f // Distance in uv space to fetch
+#define g_flNoiseScale                ( g_vFlowParams2.z )
+
+// Textures
+samplerCUBE EnvmapSampler	: register( s0 );
+sampler NormalMapSampler	: register( s1 );
+
+#if REFRACTALPHA
+	sampler RefractSampler	: register( s2 );
+#endif
+
+sampler FlowSampler			: register( s3 );
+
+sampler FlowNoiseSampler	: register( s4 );
+
+samplerCUBE NormalizeSampler	: register( s6 );
+
+struct PS_INPUT
+{
+	float4 worldSpaceEyeVect_normalMapX	: TEXCOORD1;
+	float3x3 tangentSpaceTranspose		: TEXCOORD2;
+	float4 vRefract_W_ProjZ				: TEXCOORD5;
+
+	#if MULTITEXTURE
+		float4 vExtraBumpTexCoord		: TEXCOORD6;
+	#endif
+
+	float4 worldPos_normalMapY			: TEXCOORD7;
+};
+
+float2 UnpackNormal2D( float2 vNormal )
+{
+	return ( ( vNormal.xy * 2.0 ) - 1.0 );
+}
+
+float3 UnpackNormal3D( float3 vNormal )
+{
+	return ( ( vNormal.xyz * 2.0 ) - 1.0 );
+}
+
+float3 ComputeNormalFromXY( float2 vXY )
+{
+	float3 vNormalTs;
+
+	vNormalTs.xy = vXY.xy;
+	vNormalTs.z = sqrt( saturate( 1.0 - dot( vNormalTs.xy, vNormalTs.xy ) ) );
+
+	return vNormalTs.xyz;
+}
+
+float3 ComputeNormalFromRGTexture( float2 vRGPixel )
+{
+	float3 vNormalTs;
+
+	vNormalTs.xy = UnpackNormal2D( vRGPixel.rg );
+	vNormalTs.z = sqrt( saturate( 1.0 - dot( vNormalTs.xy, vNormalTs.xy ) ) );
+
+	return vNormalTs.xyz;
+}
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float2 normalMapTexCoord = float2( i.worldSpaceEyeVect_normalMapX.w, i.worldPos_normalMapY.w );
+
+	float3 vNormal;
+	#if ( FLOWMAP )
+	{
+		//*
+		float flWorldUvScale				= g_flWorldUvScale;
+		float flNormalUvScale				= g_flNormalUvScale;
+		float flFlowTimeIntervalInSeconds	= g_flFlowTimeIntervalInSeconds;
+		float flFlowUvScrollDistance		= g_flFlowUvScrollDistance;
+		float flBumpStrength				= g_flBumpStrength;
+		float flTimeScale					= g_flTimeScale;
+		float flNoiseScale					= g_flNoiseScale;
+		//*/
+
+		/* River
+		float flWorldUvScale = 1.0f / 6.0f;
+		float flNormalUvScale = 1.0f / 0.5f;
+		float flFlowTimeIntervalInSeconds = 0.4f; // Number of seconds to lerp from texture 1 to texture 2
+		float flFlowUvScrollDistance = 0.2f; // Distance in uv space to fetch
+		float flBumpStrength = 1.0f;
+		float flTimeScale = 0.75f;
+		//*/
+
+		/* Swamp - Heavy churn
+		float flWorldUvScale = 1.0f / 10.0f;
+		float flNormalUvScale = 1.0f / 1.15f;
+		float flFlowTimeIntervalInSeconds = 0.4f; // Number of seconds to lerp from texture 1 to texture 2
+		float flFlowUvScrollDistance = 0.25f; // Distance in uv space to fetch
+		float flBumpStrength = 3.0f;
+		float flTimeScale = 1.0f;
+		//*/
+
+		/* Swamp - Calmer
+		float flWorldUvScale = 1.0f / 10.0f;
+		float flNormalUvScale = 1.0f / 1.15f;
+		float flFlowTimeIntervalInSeconds = 0.25f; // Number of seconds to lerp from texture 1 to texture 2
+		float flFlowUvScrollDistance = 0.15f; // Distance in uv space to fetch
+		float flBumpStrength = 1.05f;
+		float flTimeScale = 0.35f;
+		//*/
+
+		// Input uv
+		float2 vWorldUv = normalMapTexCoord.xy * flWorldUvScale;
+		float2 vUv1 = float2( i.worldPos_normalMapY.x, -i.worldPos_normalMapY.y ) * flNormalUvScale;
+		float2 vUv2 = vUv1.xy;
+
+		// Noise texture is used to offset the time interval different spatially so we don't see pulsing
+		float flNoise = tex2D( FlowNoiseSampler, float2( i.worldPos_normalMapY.x, -i.worldPos_normalMapY.y ) * flNoiseScale ).g;
+
+		// Flow texel has a 2D flow vector in the rg channels of the texture
+		float4 vFlowTexel = tex2D( FlowSampler, vWorldUv.xy );
+		#if FLOW_DEBUG
+		{
+			return float4( vFlowTexel.rgb, 0 );
+		}
+		#endif
+
+		// Unpack world flow vector from texture
+		float2 vFlowVectorTs = ( vFlowTexel.rg * 2.0f ) - 1.0f;
+
+		float flTimeInIntervals = ( ( g_flTime * flTimeScale ) + flNoise ) / ( flFlowTimeIntervalInSeconds * 2.0f );
+		float flScrollTime1 = frac( flTimeInIntervals );
+		float flScrollTime2 = frac( flTimeInIntervals + 0.5f ); // Half an interval off from texture 1
+
+		// Every interval has a unique offset so we don't see the same bump texels repeating continuously
+		float flOffset1 = floor( flTimeInIntervals ) * 0.311f;
+		float flOffset2 = floor( flTimeInIntervals + 0.5f ) * 0.311f + 0.5f; // The +0.5 is to match the phase offset
+
+		// Final flow uv is originalUv + interval offset + ( flowvector * scroll
+		float2 vFlowUv1 = vUv1.xy + flOffset1 + ( flScrollTime1 * ( flFlowUvScrollDistance * vFlowVectorTs.xy ) );
+		float2 vFlowUv2 = vUv2.xy + flOffset2 + ( flScrollTime2 * ( flFlowUvScrollDistance * vFlowVectorTs.xy ) );
+
+		// Lerp values to blend between the two layers of bump
+		float flWeight1 = abs( ( 2.0f * frac( flTimeInIntervals + 0.5f ) ) - 1.0f );
+		float flWeight2 = abs( ( 2.0f * frac( flTimeInIntervals ) ) - 1.0f );
+
+		float4 vNormalTexel1 = tex2D( NormalMapSampler, vFlowUv1.xy );
+		float4 vNormalTexel2 = tex2D( NormalMapSampler, vFlowUv2.xy );
+
+		float3 vNormal1 = ( vNormalTexel1.rgb );
+		float3 vNormal2 = ( vNormalTexel2.rgb );
+
+		// Combine both layers
+		vNormal.xy = UnpackNormal2D( lerp( vNormal1.xy, vNormal2.xy, flWeight2 ) );
+
+		// Change bump strength based on the length of the flow vector
+		//vNormal.xy *= ( length( vFlowVectorTs.xy ) + 0.05f ) * flBumpStrength;
+		vNormal.xy *= ( ( vFlowVectorTs.x * vFlowVectorTs.x + vFlowVectorTs.y * vFlowVectorTs.y ) + 0.05f ) * flBumpStrength;
+
+		// Generate normal from 2D scaled normal
+		vNormal.xyz = ComputeNormalFromXY( vNormal.xy );
+	}
+	#elif ( MULTITEXTURE )
+	{
+		vNormal.xyz     = tex2D( NormalMapSampler, normalMapTexCoord ).xyz;
+		float3 vNormal1 = tex2D( NormalMapSampler, i.vExtraBumpTexCoord.xy ).xyz;
+		float3 vNormal2 = tex2D( NormalMapSampler, i.vExtraBumpTexCoord.zw ).xyz;
+		vNormal = 0.33 * ( vNormal + vNormal1 + vNormal2 );
+	
+		vNormal = 2.0 * vNormal - 1.0;
+	}
+	#else
+	{
+		vNormal.xyz = DecompressNormal( NormalMapSampler, normalMapTexCoord, NORM_DECODE_NONE ).xyz;
+	}
+	#endif
+
+	float3 worldSpaceNormal = mul( vNormal, i.tangentSpaceTranspose );
+	float3 worldSpaceEye;
+	
+	float flWorldSpaceDist = 1.0f;	
+	
+	#ifdef NV3X
+		// for some reason, fxc doesn't convert length( half3 v ) into all _pp opcodes.
+		#if ( BLEND ) 
+		{
+			worldSpaceEye = i.worldSpaceEyeVect_normalMapX.xyz;
+			float  worldSpaceDistSqr = dot( worldSpaceEye, worldSpaceEye );
+			float  rcpWorldSpaceDist = rsqrt( worldSpaceDistSqr );
+			worldSpaceEye *= rcpWorldSpaceDist;
+			flWorldSpaceDist = worldSpaceDistSqr * rcpWorldSpaceDist;
+		}
+		#else
+		{
+			worldSpaceEye  = NormalizeWithCubemap( NormalizeSampler, i.worldSpaceEyeVect_normalMapX.xyz );
+		}
+		#endif
+	#else // !NV3X
+		#if ( BLEND ) 
+		{
+			worldSpaceEye = i.worldSpaceEyeVect_normalMapX.xyz;
+			flWorldSpaceDist = length( worldSpaceEye );
+			worldSpaceEye /= flWorldSpaceDist;
+		}
+		#else
+		{
+			worldSpaceEye  = NormalizeWithCubemap( NormalizeSampler, i.worldSpaceEyeVect_normalMapX.xyz );
+		}
+		#endif
+	#endif
+	
+	float3 reflectVect = CalcReflectionVectorUnnormalized( worldSpaceNormal, worldSpaceEye );
+	float3 specularLighting = ENV_MAP_SCALE * texCUBE( EnvmapSampler, reflectVect ).rgb;
+	specularLighting *= g_ReflectTint.rgb;
+	
+	#if FRESNEL
+		// FIXME: It's unclear that we want to do this for cheap water
+		// but the code did this previously and I didn't want to change it
+		float flDotResult = dot( worldSpaceEye, worldSpaceNormal ); 
+		flDotResult = 1.0f - max( 0.0f, flDotResult );
+	
+		float flFresnelFactor = flDotResult * flDotResult;
+		flFresnelFactor *= flFresnelFactor;
+		flFresnelFactor *= flDotResult;
+	#else
+		float flFresnelFactor = g_ReflectTint.a;
+	#endif
+	
+	float flAlpha;
+	#if ( BLEND )
+	{
+		float flReflectAmount = saturate( flWorldSpaceDist * g_CheapWaterDeltaRecip - g_CheapWaterStartDivDelta );
+		flAlpha = saturate( flFresnelFactor + flReflectAmount );
+
+		#if REFRACTALPHA
+			// Perform division by W only once
+			float ooW = 1.0f / i.vRefract_W_ProjZ.z;
+			float2 unwarpedRefractTexCoord = i.vRefract_W_ProjZ.xy * ooW;
+			float fogDepthValue = tex2D( RefractSampler, unwarpedRefractTexCoord ).a;
+			// Fade on the border between the water and land.
+			flAlpha *= saturate( ( fogDepthValue - .05f ) * 20.0f );
+		#endif
+	}
+	#else
+	{
+		flAlpha = 1.0f;
+		#if HDRTYPE == 0 || HDRENABLED == 0
+			specularLighting = lerp( g_WaterFogColor, specularLighting, flFresnelFactor );
+		#else
+			specularLighting = lerp( GammaToLinear( g_WaterFogColor ), specularLighting, flFresnelFactor );
+		#endif
+	}
+	#endif
+
+	// multiply the color by alpha.since we are using alpha blending to blend against dest alpha for borders.
+
+	#if (PIXELFOGTYPE == PIXEL_FOG_TYPE_RANGE)
+		float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_PixelFogParams, g_EyePos.xyz, i.worldPos_normalMapY.xyz, i.vRefract_W_ProjZ.w );
+	#else
+		float fogFactor = 0;
+	#endif
+
+	return FinalOutput( float4( specularLighting, flAlpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+}

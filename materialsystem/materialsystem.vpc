@@ -1,0 +1,328 @@
+//-----------------------------------------------------------------------------
+//	MATERIALSYSTEM.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro SHADERAPIDX9DIR "shaderapidx9"
+$Macro SHADERLIBDIR "shaderlib"
+$Macro STDSHADERSDIR "stdshaders"
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+
+//-----------------------------------------------------------------------------
+
+$CustomBuildStep "fp"  
+{
+	$CommandLine    "$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_fp_rsx -o &quot;$(InputName).fpo&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy -I binary -O elf64-powerpc-celloslv2 -B powerpc &quot;$(InputName).fpo&quot; &quot;$(IntDir)\$(InputName).fp.ppu.o&quot;"
+	$Description	"Fragment Program $(InputFileName) produces $(InputName).fpo produces $(InputName).fp.ppu.o"
+	$Outputs		"$(IntDir)\$(InputName).fp.ppu.o"
+}
+
+$CustomBuildStep "vp"  
+{
+	$CommandLine    "$(SCE_PS3_ROOT)\host-win32\Cg\bin\sce-cgc -quiet -profile sce_vp_rsx -o &quot;$(InputName).vpo&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;$(SCE_PS3_ROOT)\host-win32\ppu\bin\ppu-lv2-objcopy -I binary -O elf64-powerpc-celloslv2 -B powerpc &quot;$(InputName).vpo&quot; &quot;$(IntDir)\$(InputName).vp.ppu.o&quot;"
+	$Description	"Vertex Program $(InputFileName) produces $(InputName).vpo produces $(InputName).vp.ppu.o"
+	$Outputs		"$(IntDir)\$(InputName).vp.ppu.o"
+}
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\materialsystem"
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\dx9sdk\Include"			[$WINDOWS && !$GL]
+		$AdditionalIncludeDirectories	"$BASE;$(XEDK)\include\xbox"			[$X360]
+		$PreprocessorDefinitions		"$BASE;DEFINE_MATERIALSYSTEM_INTERFACE;MATERIALSYSTEM_EXPORTS;PROTECTED_THINGS_ENABLE;INCLUDE_SCALEFORM"
+		$PreprocessorDefinitions		"$BASE;VERSION_SAFE_STEAM_API_INTERFACES"
+		$PreprocessorDefinitions		"$BASE;USE_ACTUAL_DX" [ ( $WINDOWS || $X360 ) && !$GL ]
+		$PreprocessorDefinitions		"$BASE;GL_GLEXT_PROTOTYPES;DX_TO_GL_ABSTRACTION" [$GL]
+		$PreprocessorDefinitions		"$BASE;strncpy=use_Q_strncpy_instead;_snprintf=use_Q_snprintf_instead" [!$POSIX]
+		$PreprocessorDefinitions		"$BASE;ALLOW_TEXT_MODE=1" [$CSTRIKE_TRUNK_BUILD||$CSTRIKE_STAGING_BUILD]
+
+		$EnableC++Exceptions			"Yes (/EHsc)"
+		$Create/UsePCHThroughFile		"pch_materialsystem.h"
+	}
+
+	$Linker
+	{
+			$AdditionalLibraryDirectories   "$BASE;$SRCDIR\dx9sdk\lib" [$WINDOWS && !$GL]
+			$AdditionalDependencies			"$BASE winmm.lib Ws2_32.lib imm32.lib oleaut32.lib" [$WINDOWS]
+			$AdditionalDependencies			"$BASE dxguid.lib d3d9.lib" [$WINDOWS && !$GL]
+
+
+			$AdditionalLibraryDirectories   "$BASE;$(XEDK)\lib\xbox" [$X360]
+			$AdditionalDependencies			"$BASE libgfx.lib libjpeg.lib zlib.lib libpng.lib" [$X360]
+	}
+
+	$PreLinkEvent [$PS3]
+	{
+		$CommandLine		"call .\$(IntDir)\xy16icf32.vp.bat" "\n" \
+							"call .\$(IntDir)\cxformgauraud.fp.bat" "\n" \
+							"call .\$(IntDir)\cxformgauraudnoaddalpha.fp.bat" "\n" \
+							"call .\$(IntDir)\cxformgauraudtexture.fp.bat" "\n" \
+							"call .\$(IntDir)\glyph.vp.bat" "\n" \
+							"call .\$(IntDir)\noninteractiveshader.fp.bat" "\n" \
+							"call .\$(IntDir)\noninteractiveshader.vp.bat" "\n" \
+							"call .\$(IntDir)\noninteractiveshaderstartup.fp.bat" "\n" \
+							"call .\$(IntDir)\noninteractiveshaderstartuppass2.fp.bat" "\n" \
+							"call .\$(IntDir)\solidcolor.fp.bat" "\n" \
+							"call .\$(IntDir)\strip.vp.bat" "\n" \
+							"call .\$(IntDir)\texttexturealpha.fp.bat" "\n" \
+							"call .\$(IntDir)\xy16ic32.vp.bat"
+	}
+
+	// Since other shader modules are conglomerated here,
+	// need to set project settings for those modules too:
+	$Compiler [$PS3 || $OSXALL]
+	{
+		$AdditionalIncludeDirectories	"$BASE;..\"
+		// shaderapidx9
+		$PreprocessorDefinitions		"$BASE;SHADERAPIDX9;SHADER_DLL_EXPORT;"
+		// shaderlib
+		$PreprocessorDefinitions		"$BASE;FAST_MATERIALVAR_ACCESS;"
+		// stdshader
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\materialsystem\stdshaders\fxctmp9_ps3" [$PS3]
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\materialsystem\stdshaders\fxctmp9;$SRCDIR\materialsystem\stdshaders\vshtmp9" [$OSXALL]
+		$PreprocessorDefinitions		"$BASE;STDSHADER_DX9_DLL_EXPORT;FAST_MATERIALVAR_ACCESS"
+		// all internal headers access
+		$PreprocessorDefinitions		"$BASE;MATSYS_INTERNAL" [$PS3]
+		// platform override
+		$PreprocessorDefinitions		"$BASE;PLATFORM_OVERRIDE_MATERIALSYSTEM"
+	}
+
+	$SNCCompiler [$PS3]
+	{
+		$ForceIncludes					"platform_override.h"
+	}
+	
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE libgfx.a libjpeg.a libpng.a libz.a libnet_stub.a libnetctl_stub.a librtc_stub.a"
+		$AdditionalDependencies			"$BASE libfont_stub.a libfontFT_stub.a libfreetypeTT_stub.a"
+		$AdditionalDependencies			"$BASE libgcm_sys_stub.a libgcm_cmdasm.a libsysutil_stub.a libresc_stub.a libspurs_stub.a $SCE_PPU_LIBROOT\libio_stub.a libedgepost.a"
+		$AdditionalDependencies			"$BASE libgem_stub.a"
+	}
+}
+
+$Configuration "Debug"
+{
+	$Compiler [$PS3]
+	{
+//		$PreprocessorDefinitions		"$BASE;CELL_GCM_DEBUG"
+	}
+
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies			"$BASE"
+		$AdditionalDependencies			"$BASE d3dx9d.lib" [!$GL]
+	}
+
+	$Linker [$X360]
+	{
+		$AdditionalDependencies			"$BASE d3dx9d.lib xonlined.lib"
+	}
+
+	$Linker [$PS3]
+	{
+		// use libgcm_cmddbg.a to validate parameters
+		$AdditionalDependencies			"$BASE libgcm_cmd.a" 	
+	}
+}
+
+$Configuration "Release"
+{
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies			"$BASE"
+		$AdditionalDependencies			"$BASE d3dx9.lib"			[!$GL]
+	}
+
+	$Linker [$X360]
+	{
+		$AdditionalDependencies			"$BASE d3dx9.lib xonline.lib"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE libgcm_cmd.a"
+	}	
+}
+
+$Configuration
+{
+	$Linker [$OSXALL]
+	{
+		$SystemFrameworks				"Carbon;OpenGL;Quartz;Cocoa;IOKit" 
+		$SystemLibraries				"iconv;z"		
+	}
+}
+
+///////////////////////////////////////////////
+//
+// PS3 conglomerates all shader modules here
+//
+$include "shaderapidx9/shaderapidx9_inc.vpc" [$PS3 || $OSXALL]
+$include "shaderlib/shaderlib_inc.vpc" [$PS3 || $OSXALL]
+$include "stdshaders/stdshader_dx9_inc.vpc" [$PS3 || $OSXALL]
+//
+//
+///////////////////////////////////////////////
+
+$Project "materialsystem"
+{
+	$Folder	"Source Files"
+	{
+		$File	"CColorCorrection.cpp"
+		$File	"cmaterial.cpp"
+		$File	"cmaterial_queuefriendly.cpp"
+		$File	"CMaterialSubRect.cpp"
+		$File	"cmaterialvar.cpp"
+		$File	"cmatnullrendercontext.cpp"
+		$File	"colorspace.cpp"
+		$File	"ctexture.cpp"
+		$File	"$SRCDIR\public\filesystem_helpers.cpp"
+		$File	"imagepacker.cpp"
+		$File	"mat_stub.cpp"
+		$File	"materialsystem_global.cpp"
+		$File	"morph.cpp"
+		$File	"SubdMgr.cpp"				[ !$X360 && !$PS3 ]
+		$File	"occlusionquerymgr.cpp"
+		$File	"shadersystem.cpp"
+		$File	"texturemanager.cpp"
+		$File	"cmaterialsystem_ps3fonts.cpp" [$PS3]
+		$File	"composite_texture.cpp"
+		$File	"custom_material.cpp"
+		$File	"base_visuals_data_processor.cpp"
+
+		$File	"pch_materialsystem.cpp" [!$PS3]
+		{
+			$Configuration
+			{
+				$Compiler [!$LINUX && !$OSXALL]
+				{
+					$Create/UsePrecompiledHeader	"Create Precompiled Header (/Yc)"
+				}
+			}
+		}
+
+		$File	"cmaterialdict.cpp" \
+				"cmaterialsystem.cpp" \
+				"cmatlightmaps.cpp" \
+				"cmatpaintmaps.cpp" \
+				"cmatrendercontext.cpp" \
+				"cmatqueuedrendercontext.cpp" 
+	}
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\tier0\basetypes.h"
+		$File	"$SRCDIR\public\mathlib\bumpvects.h"
+		$File	"$SRCDIR\public\const.h"
+		$File	"$SRCDIR\public\tier1\convar.h"
+		$File	"$SRCDIR\public\crtmemdebug.h"
+		$File	"$SRCDIR\common\cstringhash.h"
+		$File	"$SRCDIR\public\filesystem.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\materialsystem\IColorCorrection.h"
+		$File	"$SRCDIR\public\materialsystem\imaterial.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialproxy.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialproxyfactory.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialsystem.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialsystemhardwareconfig.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialsystemstub.h"
+		$File	"$SRCDIR\public\materialsystem\imaterialvar.h"
+		$File	"$SRCDIR\public\materialsystem\imesh.h"
+		$File	"$SRCDIR\public\materialsystem\imorph.h"
+		$File	"$SRCDIR\public\materialsystem\ipaintmapdatamanager.h"
+		$File	"$SRCDIR\public\tier1\interface.h"
+		$File	"$SRCDIR\public\materialsystem\IShader.h"
+		$File	"$SRCDIR\public\materialsystem\ishaderapi.h"
+		$File	"$SRCDIR\public\materialsystem\itexture.h"
+		$File	"$SRCDIR\public\materialsystem\ivisualsdataprocessor.h"
+		$File	"$SRCDIR\public\materialsystem\icustommaterial.h"
+		$File	"$SRCDIR\public\materialsystem\custommaterialowner.h"
+		$File	"$SRCDIR\public\materialsystem\icompositetexture.h"
+		$File	"$SRCDIR\public\materialsystem\icustommaterialmanager.h"
+		$File	"$SRCDIR\public\materialsystem\icompositetexturegenerator.h"
+		$File	"$SRCDIR\public\tier1\keyvalues.h"
+		$File	"$SRCDIR\public\materialsystem\materialsystem_config.h"
+		$File	"$SRCDIR\public\mathlib\mathlib.h"
+		$File	"$SRCDIR\public\tier1\mempool.h"
+		$File	"$SRCDIR\public\pixelwriter.h"
+		$File	"$SRCDIR\public\tier0\platform_override.h"	[$PS3]
+		$File	"$SRCDIR\public\renderparm.h"
+		$File	"$SRCDIR\public\tier1\strtools.h"
+		$File	"$SRCDIR\public\tier1\utlbuffer.h"
+		$File	"$SRCDIR\public\tier1\utlmemory.h"
+		$File	"$SRCDIR\public\tier1\utlrbtree.h"
+		$File	"$SRCDIR\public\tier1\utlsymbol.h"
+		$File	"$SRCDIR\public\tier1\utlvector.h"
+		$File	"$SRCDIR\public\mathlib\vector.h"
+		$File	"$SRCDIR\public\mathlib\vector2d.h"
+		$File	"$SRCDIR\public\mathlib\vector4d.h"
+		$File	"$SRCDIR\public\mathlib\vmatrix.h"
+		$File	"$SRCDIR\public\mathlib\vplane.h"
+		$File	"$SRCDIR\public\vstdlib\vstdlib.h"
+		$File	"$SRCDIR\public\vtf\vtf.h"
+		$File	"$SRCDIR\public\materialsystem\base_visuals_data_processor.h"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"cmaterial_queuefriendly.h"
+		$File	"cmaterialdict.h"
+		$File	"cmaterialsystem.h"
+		$File	"cmatlightmaps.h"
+		$File	"cmatnullrendercontext.h"
+		$File	"cmatpaintmaps.h"
+		$File	"cmatqueuedrendercontext.h"
+		$File	"cmatrendercontext.h"
+		$File	"colorspace.h"
+		$File	"IHardwareConfigInternal.h"
+		$File	"imagepacker.h"
+		$File	"imaterialinternal.h"
+		$File	"imaterialsysteminternal.h"
+		$File	"imatrendercontextinternal.h"
+		$File	"imorphinternal.h"
+		$File	"isubdinternal.h"
+		$File	"itextureinternal.h"
+		$File	"materialsystem_global.h"
+		$File	"occlusionquerymgr.h"
+		$File	"shader_dll_verify.h"		[$WINDOWS]
+		$File	"shadersystem.h"
+		$File	"texturemanager.h"
+		$File	"shadersystem_ps3nonvirt.inl"  [$PS3]
+		$File	"shaderutil_ps3nonvirt.h"  [$PS3]
+		$File	"shaderutil_ps3nonvirt.inl"  [$PS3]		
+		$File	"composite_texture.h"
+		$File	"custom_material.h"
+	}
+
+	$Folder "Noninteractive Shaders" [$PS3]
+	{
+		$File	"$SHADERAPIDX9DIR\..\ps3gcm\noninteractiveshader.fp"
+		$File	"$SHADERAPIDX9DIR\..\ps3gcm\noninteractiveshader.vp"
+		$File	"$SHADERAPIDX9DIR\..\ps3gcm\noninteractiveshaderstartup.fp"
+		$File	"$SHADERAPIDX9DIR\..\ps3gcm\noninteractiveshaderstartuppass2.fp"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$Lib "bitmap"
+		$Lib "mathlib"
+		$Lib "shaderlib"[!$PS3 && !$OSXALL]
+		$Lib "tier2"
+		$Lib "tier3"
+		$Lib "vtf"
+		$Lib "videocfg" [$OSXALL]
+		$ImplibExternal	steam_api							[ ( $WIN32 || $POSIX || $PS3 ) && !$NO_STEAM ]
+		$ImplibExternal	steam_api64							[ $WIN64 && !$NO_STEAM ]
+
+		$Implib togl [!$IS_LIB_PROJECT && $GL && !$DEDICATED]
+	}
+}

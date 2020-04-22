@@ -1,0 +1,1692 @@
+//====== Copyright 1996-2010, Valve Corporation, All rights reserved. =======
+//
+// Purpose: The file defines our Google Protocol Buffers which are used in over 
+// the wire messages between servers as well as between the CS:GO and CS:GO gameservers
+// and clients.
+//
+//=============================================================================
+
+// We care more about speed than code size
+option optimize_for = SPEED;
+
+// We don't use the service generation functionality
+option cc_generic_services = false;
+
+
+// 
+// STYLE NOTES:
+//
+// Use CamelCase CMsgMyMessageName style names for messages.
+// 
+// Use lowercase _ delimited names like my_steam_id for field names, this is non-standard for Steam,
+// but plays nice with the Google formatted code generation.  
+// 
+// Try not to use required fields ever. Only do so if you are really really sure you'll never want them removed. 
+// Optional should be preffered as it will make versioning easier and cleaner in the future if someone refactors
+// your message and wants to remove or rename fields.
+//
+// Use fixed64 for JobId_t, GID_t, or SteamID.  This is appropriate for any field that is normally
+// going to be larger than 2^56.  Otherwise use int64 for 64 bit values that are frequently smaller
+// than 2^56 as it will safe space on the wire in those cases.
+//
+// Similar to fixed64, use fixed32 for RTime32 or other 32 bit values that are frequently larger than
+// 2^28.  It will safe space in those cases, otherwise use int32 which will safe space for smaller values.
+// An exception to this rule for RTime32 is if the value will frequently be zero rather than set to an actual 
+// time.
+//
+ 
+import "steammessages.proto";
+import "engine_gcmessages.proto";
+
+
+
+enum ECsgoGCMsg
+{
+	k_EMsgGCCStrike15_v2_Base =								9100;
+	k_EMsgGCCStrike15_v2_MatchmakingStart =					9101;
+	k_EMsgGCCStrike15_v2_MatchmakingStop =					9102;
+	k_EMsgGCCStrike15_v2_MatchmakingClient2ServerPing =		9103;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate =		9104;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ServerReserve =		9105;
+	k_EMsgGCCStrike15_v2_MatchmakingServerReservationResponse =	9106;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ClientReserve =		9107;
+	k_EMsgGCCStrike15_v2_MatchmakingServerRoundStats =		9108;
+	k_EMsgGCCStrike15_v2_MatchmakingClient2GCHello =		9109;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ClientHello =		9110;
+	k_EMsgGCCStrike15_v2_MatchmakingServerMatchEnd =		9111;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ClientAbandon =		9112;
+	k_EMsgGCCStrike15_v2_MatchmakingServer2GCKick =			9113;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ServerConfirm =		9114;
+	k_EMsgGCCStrike15_v2_MatchmakingGCOperationalStats =	9115;
+	k_EMsgGCCStrike15_v2_MatchmakingGC2ServerRankUpdate =	9116;
+	k_EMsgGCCStrike15_v2_MatchmakingOperator2GCBlogUpdate =	9117;
+	k_EMsgGCCStrike15_v2_ServerNotificationForUserPenalty =	9118;
+	k_EMsgGCCStrike15_v2_ClientReportPlayer =				9119;
+	k_EMsgGCCStrike15_v2_ClientReportServer =				9120;
+	k_EMsgGCCStrike15_v2_ClientCommendPlayer =				9121;
+	k_EMsgGCCStrike15_v2_ClientReportResponse =				9122;
+	k_EMsgGCCStrike15_v2_ClientCommendPlayerQuery =			9123;
+	k_EMsgGCCStrike15_v2_ClientCommendPlayerQueryResponse =	9124;
+	// k_EMsgGCCStrike15_v2_ClientRequestWatchInfoFriends_Obsolete =	9125; // OBSOLETE: September 2013
+	k_EMsgGCCStrike15_v2_WatchInfoUsers =					9126;
+	k_EMsgGCCStrike15_v2_ClientRequestPlayersProfile =		9127;
+	k_EMsgGCCStrike15_v2_PlayersProfile =					9128;
+	k_EMsgGCCStrike15_v2_SetMyMedalsInfo =					9129;
+	// k_EMsgGCCStrike15_v2_PlayerEarnedRewardNotification_Obsolete =	9130; // OBSOLETE: May 2015
+	k_EMsgGCCStrike15_v2_PlayerOverwatchCaseUpdate =		9131;
+	k_EMsgGCCStrike15_v2_PlayerOverwatchCaseAssignment =	9132;
+	k_EMsgGCCStrike15_v2_PlayerOverwatchCaseStatus =		9133;
+	k_EMsgGCCStrike15_v2_GC2ClientTextMsg =					9134;
+	k_EMsgGCCStrike15_v2_Client2GCTextMsg =					9135;
+	k_EMsgGCCStrike15_v2_MatchEndRunRewardDrops =			9136;
+	k_EMsgGCCStrike15_v2_MatchEndRewardDropsNotification =	9137;
+	k_EMsgGCCStrike15_v2_ClientRequestWatchInfoFriends2 =	9138; // new revision of msg#9125
+	k_EMsgGCCStrike15_v2_MatchList =						9139;
+	k_EMsgGCCStrike15_v2_MatchListRequestCurrentLiveGames =	9140;
+	k_EMsgGCCStrike15_v2_MatchListRequestRecentUserGames =	9141;
+	k_EMsgGCCStrike15_v2_GC2ServerReservationUpdate =		9142;
+	k_EMsgGCCStrike15_v2_ClientVarValueNotificationInfo =	9144; // client reports variable values
+	k_EMsgGCCStrike15_v2_TournamentMatchRewardDropsNotification = 9145;
+	k_EMsgGCCStrike15_v2_MatchListRequestTournamentGames =	9146;
+	k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo =		9147;
+	k_EMsgGCCStrike15_v2_GiftsLeaderboardRequest =			9148;
+	k_EMsgGCCStrike15_v2_GiftsLeaderboardResponse =			9149;
+	k_EMsgGCCStrike15_v2_ServerVarValueNotificationInfo =	9150; // server reports variable values for clients
+	k_EMsgGCToGCReloadVersions =							9151;	// called when the server or client versions change and other GC's should reload
+	k_EMsgGCCStrike15_v2_ClientSubmitSurveyVote =			9152;	// client submits a survey vote
+	k_EMsgGCCStrike15_v2_Server2GCClientValidate =			9153;	// server requests GC to validate connecting client
+	k_EMsgGCCStrike15_v2_MatchListRequestLiveGameForUser =	9154; // client requests live match scoreboard for another client's match
+	k_EMsgGCCStrike15_v2_Server2GCPureServerValidationFailure =	9155;	// server reports to GC pure client validation
+	k_EMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockRequest = 9156;	// client requests econ preview data block
+	k_EMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockResponse = 9157;	// client requests econ preview data block
+	k_EMsgGCCStrike15_v2_AccountPrivacySettings				= 9158;		// client requests his own account privacy settings, or GC responds with account privacy settings
+	k_EMsgGCCStrike15_v2_SetMyActivityInfo					= 9159;		// client reports his own activity
+	k_EMsgGCCStrike15_v2_MatchListRequestTournamentPredictions = 9160;	// client requests his own tournament predictions
+	k_EMsgGCCStrike15_v2_MatchListUploadTournamentPredictions = 9161;	// client uploads his own tournament predictions
+	k_EMsgGCCStrike15_v2_DraftSummary =						9162;		// client gets or uploads draft selection
+	k_EMsgGCCStrike15_v2_ClientRequestJoinFriendData =		9163;	// Client requests data required to join a friend
+	k_EMsgGCCStrike15_v2_ClientRequestJoinServerData =		9164;	// Client requests data required to join a game server
+	k_EMsgGCCStrike15_v2_ClientRequestNewMission	 =		9165;	// Client requests a new mission for their current campaign
+	k_EMsgGCCStrike15_v2_GC2ServerNotifyXPRewarded	=		9166;	// GC informs server of xp rewards this match 
+	k_EMsgGCCStrike15_v2_GC2ClientTournamentInfo	=		9167;	// GC informs client of tournament match starting
+	k_EMsgGC_GlobalGame_Subscribe =							9168;	// Client subscribes to global game on the GC
+	k_EMsgGC_GlobalGame_Unsubscribe =						9169;	// Client unsubscribes to global game on the GC
+	k_EMsgGC_GlobalGame_Play =								9170;	// Client takes action in the global game on the GC
+	k_EMsgGCCStrike15_v2_AcknowledgePenalty =				9171;	// User acknowledge he/she had a cooldown in the past
+	k_EMsgGCCStrike15_v2_Client2GCRequestPrestigeCoin =		9172;	// Client wants to trade max level status for current prestige coin
+	k_EMsgGCCStrike15_v2_GC2ClientGlobalStats =				9173;	// GC informs client about updated global stats, only deltas are included
+	k_EMsgGCCStrike15_v2_Client2GCStreamUnlock =			9174;	// Client requests GC to unlock streaming codec that is currently unavailable
+	k_EMsgGCCStrike15_v2_FantasyRequestClientData =			9175;	// Client requests his fantasy data
+	k_EMsgGCCStrike15_v2_FantasyUpdateClientData =			9176;	// Client uploads his own tournament predictions
+	k_EMsgGCCStrike15_v2_GCToClientSteamdatagramTicket =	9177;	// GC -> client, here's your ticket to talk via SDR to a gameserver
+	k_EMsgGCCStrike15_v2_ClientToGCRequestTicket =			9178;	// client -> GC, could I have a ticket please?
+	k_EMsgGCCStrike15_v2_ClientToGCRequestElevate =			9179;	// client -> GC, request elevated status
+	k_EMsgGCCStrike15_v2_GlobalChat =						9180;	// client <-> GC, chat message
+	k_EMsgGCCStrike15_v2_GlobalChat_Subscribe =				9181;	// client <-> GC, chat message
+	k_EMsgGCCStrike15_v2_GlobalChat_Unsubscribe =			9182;	// client <-> GC, chat message
+	k_EMsgGCCStrike15_v2_ClientAuthKeyCode =				9183;	// client <-> GC, authkey sharing code exchange
+	k_EMsgGCCStrike15_v2_GotvSyncPacket =					9184;	// server>GC: update sync tick; client>GC: asking for sync tick; GC>client: responding with sync tick
+	k_EMsgGCCStrike15_v2_ClientPlayerDecalSign =			9185;	// client <-> GC, client requesting spray decal charge to be consumed
+	k_EMsgGCCStrike15_v2_ClientLogonFatalError =			9187;	// GC -> client, banned from logging in, no need to retry
+	k_EMsgGCCStrike15_v2_ClientPollState =					9188;	// GC <-> client: poll state, or results of the poll
+	k_EMsgGCCStrike15_v2_Party_Register =					9189;	// GC <-> client: register the party metadata
+	k_EMsgGCCStrike15_v2_Party_Unregister =					9190;	// GC <-> client: unregister the party metadata
+	k_EMsgGCCStrike15_v2_Party_Search =						9191;	// GC <-> client: search the party metadata
+	k_EMsgGCCStrike15_v2_Party_Invite =						9192;	// GC -> client: you have been invited to this party
+	k_EMsgGCCStrike15_v2_Account_RequestCoPlays =			9193;	// client <-> GC: download recent co players
+};
+
+
+/////////////////////////////////////////////////////////////////////////
+//
+// v2 messages
+//
+
+message GameServerPing
+{
+	//optional uint64 gameserver_id = 1;			// SteamID of the game server with which the client could establish a connection
+	optional int32 ping = 2;					// ping to this game server, negative value would mean that the server is unreachable for the client
+	optional uint32 ip = 3;						// Server IP address
+	//optional uint32 port = 4;					// Server port
+	optional uint32 instances = 5;				// Number of server intances on the same address
+};
+
+message DataCenterPing
+{
+	optional fixed32 data_center_id = 1;		// Data center code.  (Usually 3 character ID)
+	optional sint32 ping = 2;					// Ping to this data center.  Negative value would mean we weern't able to communicate with this data center
+};
+
+message DetailedSearchStatistic
+{
+	optional uint32 game_type = 1;				// Type of the game searched
+	optional uint32 search_time_avg = 2;		// Average time a game is found with these settings
+	optional uint32 players_searching = 4;		// Players including this type in their search
+};
+
+message TournamentPlayer
+{
+	optional uint32 account_id = 1;				// Account ID registered
+	optional string player_nick = 2;			// Player nick
+	optional string player_name = 3;			// Player name
+	optional uint32 player_dob = 4;				// Player DOB timestamp
+	optional string player_flag = 5;			// Player flag
+	optional string player_location = 6;		// Player location
+	optional string player_desc = 7;			// Player bio
+};
+
+message TournamentTeam
+{
+	optional int32 team_id = 1;					// Team ID in the database
+	optional string team_tag = 2;				// Team tag
+	optional string team_flag = 3;				// Team flag
+	optional string team_name = 4;				// Team name
+	repeated TournamentPlayer players = 5;		// Team players
+};
+
+message TournamentEvent
+{
+	optional int32 event_id = 1;				// Event ID in the database
+	optional string event_tag = 2;				// Event tag
+	optional string event_name = 3;				// Event name
+	optional uint32 event_time_start = 4;		// Event time start
+	optional uint32 event_time_end = 5;			// Event time end
+	optional int32 event_public = 6;			// Event public flag
+	optional int32 event_stage_id = 7;			// Event stage ID in the database
+	optional string event_stage_name = 8;		// Event stage name
+	optional uint32 active_section_id = 9;		// Which section is currently active
+};
+
+message GlobalStatistics
+{
+	optional uint32 players_online = 1;			// Total number of players online
+	optional uint32 servers_online = 2;			// Total number of game servers online
+	optional uint32 players_searching = 3;		// Total number of players searching
+	optional uint32 servers_available = 4;		// Total number of game servers available for reservation
+	optional uint32 ongoing_matches = 5;		// Total number of currently ongoing matches
+	optional uint32 search_time_avg = 6;		// Average search time in milliseconds
+	repeated DetailedSearchStatistic search_statistics = 7; // Detailed search statistics
+	optional string main_post_url = 8;			// URL for the main menu post
+	optional uint32 required_appid_version = 9;	// Required appid version
+	optional uint32 pricesheet_version = 10;	// Pricesheet version
+	optional uint32 twitch_streams_version = 11;// Force Twitch.tv streams version number, 0 to disable the feature on the client
+	optional uint32 active_tournament_eventid = 12;	// Currently active tournament EventID
+	optional uint32 active_survey_id = 13;		// Currently active SurveyID
+};
+
+message OperationalStatisticDescription
+{
+	optional string name = 1;					// Name of the statistic
+	optional uint32 idkey = 2;					// ID key of the statistic
+};
+
+message OperationalStatisticElement
+{
+	optional uint32 idkey = 1;					// ID key of the operational statistic
+	repeated int32 values = 2;					// Values of the operational statistic
+};
+
+message OperationalStatisticsPacket
+{
+	optional int32 packetid = 1;				// Packet index
+	optional int32 mstimestamp = 2;				// Timestamp in milliseconds
+	repeated OperationalStatisticElement values = 3;		// Actual values of the statistics
+};
+
+message PlayerRankingInfo
+{
+	optional uint32 account_id = 1;				// Player account id
+	optional uint32 rank_id = 2;				// Player rank id
+	optional uint32 wins = 3;					// Number of won matches
+	optional float rank_change = 4;				// How did the player rank change if the rank changed
+};
+
+message PlayerCommendationInfo
+{
+	optional uint32 cmd_friendly = 1;			// Friendly
+	optional uint32 cmd_teaching = 2;			// Teaching
+	optional uint32 cmd_leader = 4;				// Leader
+};
+
+// Also payload for: k_EMsgGCCStrike15_v2_SetMyMedalsInfo
+message PlayerMedalsInfo
+{
+	optional uint32 medal_team = 1;				// Team achievements
+	optional uint32 medal_combat = 2;			// Combat achievements
+	optional uint32 medal_weapon = 3;			// Weapon achievements
+	optional uint32 medal_global = 4;			// Global achievements
+	optional uint32 medal_arms = 5;				// Arms Race achievements
+	// optional uint32 legacy__coin_op_payback = 6;// LEGACY: pre-economy update -- Challenge Coin for 'Operation: Payback'
+	repeated uint32 display_items_defidx = 7;	// Array of display items
+	optional uint32 featured_display_item_defidx = 8;	// Featured flair item
+};
+
+// Also payload for: k_EMsgGCCStrike15_v2_SetMyActivityInfo
+message AccountActivity
+{
+	optional uint32 activity = 1;				// What is the account currently doing
+	optional uint32 mode = 2;					// Which mode the account has loaded
+	optional uint32 map = 3;					// Which map the account has loaded
+};
+
+message TournamentMatchSetup
+{
+	optional int32 event_id = 1;				// Event ID of the match
+	optional int32 team_id_ct = 2;				// Team that is starting CT
+	optional int32 team_id_t = 3;				// Team that is starting T
+	optional int32 event_stage_id = 4;			// Event stage ID (group stage, semi-finals, etc.)
+};
+
+message ServerHltvInfo
+{
+	optional uint32 tv_udp_port = 1;			// GOTV UDP port
+	optional uint64 tv_watch_key = 2;			// GOTV watch key
+	optional uint32 tv_slots = 3;				// GOTV global slots
+	optional uint32 tv_clients = 4;				// GOTV clients including proxies+spectators
+	optional uint32 tv_proxies = 5;				// Number of GOTV proxies
+	optional uint32 tv_time = 6;				// How long has the match been going on
+	optional uint32 game_type = 8;				// Game mode
+	optional string game_mapgroup = 9;			// Game mapgroup
+	optional string game_map = 10;				// Game map
+	optional uint64 tv_master_steamid = 11;		// When relaying GOTV broadcast this is the SteamID of master server
+	optional uint32 tv_local_slots = 12;		// GOTV local slots
+	optional uint32 tv_local_clients = 13;		// GOTV local clients including proxies+spectators
+	optional uint32 tv_local_proxies = 14;		// Number of local GOTV proxies
+	optional uint32 tv_relay_slots = 15;		// GOTV relay slots
+	optional uint32 tv_relay_clients = 16;		// GOTV relay clients including proxies+spectators
+	optional uint32 tv_relay_proxies = 17;		// Number of relay GOTV proxies
+	optional uint32 tv_relay_address = 18;		// Relay connection address
+	optional uint32 tv_relay_port = 19;			// Relay connection port
+	optional uint64 tv_relay_steamid = 20;		// When relaying GOTV broadcast this is the SteamID of relay connection server which is not necessarily the master
+};
+
+// IP Address mask (e.g. 192.69.96.0/22 -> a=192, b=69, c=96, d=0, bits=22), token represents datacenter id when multiple masks apply
+message IpAddressMask
+{
+	optional uint32 a = 1;
+	optional uint32 b = 2;
+	optional uint32 c = 3;
+	optional uint32 d = 4;
+	optional uint32 bits = 5;
+	optional uint32 token = 6;
+};
+
+// Used by both ServerQuestUpdateData and k_EMsgGCCStrike15_v2_GC2ServerNotifyXPRewarded	
+message XpProgressData
+{
+	optional uint32 xp_points = 1;		// Points earned towards next level
+	optional int32 xp_category = 2;		// Cause of this set of points
+};
+
+// Update any econ items based on match completion
+message MatchEndItemUpdates
+{
+	optional uint64		item_id				= 1;		// item to be updated
+	optional uint32		item_attr_defidx	= 2;		// attribute to be updated
+	optional uint32		item_attr_delta_value = 3;		// delta of attribute  
+};
+
+// Leaderboard scoreboard entry data
+message ScoreLeaderboardData
+{
+	optional uint64 quest_id = 1;
+	optional uint32 score = 2;
+
+	message Entry
+	{
+		optional uint32 tag = 1;
+		optional uint32 val = 2;
+	};
+	message AccountEntries
+	{
+		optional uint32 accountid = 1;
+		repeated Entry entries = 2;
+	};
+	repeated AccountEntries accountentries = 3;
+	repeated Entry matchentries = 5;
+};
+
+
+message PlayerQuestData
+{
+	message QuestItemData
+	{
+		optional uint64 quest_id = 1;
+		optional int32 quest_normal_points_earned = 2;
+		optional int32 quest_bonus_points_earned = 3;
+	};
+
+	optional uint32 quester_account_id = 1;
+	repeated QuestItemData quest_item_data = 2;
+	repeated XpProgressData xp_progress_data = 3;
+	optional uint32 time_played = 4;
+	optional uint32 mm_game_mode = 5;					// game mode of the match this progress happened in. Number is a EMsgGCCStrike15_v2_MatchmakingGame_t enum
+	repeated MatchEndItemUpdates item_updates = 6;		// list of items which need attribute updates based on match completion
+};
+
+//
+// Helper structure to communicate player quest progress
+//
+message CMsgGC_ServerQuestUpdateData
+{
+	repeated PlayerQuestData player_quest_data = 1; // per-player quest progress data
+	optional bytes binary_data = 2;					// serialized binary data about the match
+	optional uint32 mm_game_mode = 3;				// game mode of the match this progress happened in. Number is a EMsgGCCStrike15_v2_MatchmakingGame_t enum
+	optional ScoreLeaderboardData missionlbsdata = 4; // data to be placed for participating accounts into the leaderboards
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGCOperationalStats
+//
+// GC operational statistics
+//
+message CMsgGCCStrike15_v2_MatchmakingGCOperationalStats
+{
+	optional int32 packetid = 1;				// Packet index of the last received packet (or not set for initial request)
+	repeated OperationalStatisticDescription namekeys = 2;	// Name keys of the statistics
+	repeated OperationalStatisticsPacket packets = 3;		// Packets with statistics
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ServerConfirm
+//
+// GC confirmation to official dedicated server for server reliable message
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ServerConfirm
+{
+	optional uint32 token = 1;		// Confirmation token
+	optional uint32 stamp = 2;		// Confirmation stamp
+	optional uint64 exchange = 3;	// Exchange value between client and server
+};
+
+//
+// k_EMsgGCCStrike15_v2_GC2ServerReservationUpdate
+//
+// GC is updating reservation information on the game server
+//
+message CMsgGCCStrike15_v2_GC2ServerReservationUpdate
+{
+	optional uint32 viewers_external_total = 1;	// Number of total external viewers
+	optional uint32 viewers_external_steam = 2;	// Number of total external viewers with Steam account linked
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingStart
+//
+// Places the party into matchmaking pool
+//
+message CMsgGCCStrike15_v2_MatchmakingStart
+{
+	repeated uint32 account_ids = 1;		// List of party members who will play together, first one is the party leader (sender of the message)
+	optional uint32 game_type = 2;			// Arms Race, Classic
+	optional string ticket_data = 3;		// Matchmaking ticket data
+	optional uint32 client_version = 4;		// Client version
+	optional TournamentMatchSetup tournament_match = 5; // Tournament match configuration
+	optional bool prime_only = 6;			// Party only wants to match against other prime users
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingStop
+//
+// Takes the party containing sender out of matchmaking pool
+//
+message CMsgGCCStrike15_v2_MatchmakingStop
+{
+	optional int32 abandon = 1;				// Flag indicating that user wants to abandon the ongoing match
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingClient2ServerPing
+//
+// Client reports information about their ping to a game server
+//
+message CMsgGCCStrike15_v2_MatchmakingClient2ServerPing
+{
+	//
+	// Either a list of gameservers we have pinged
+	//
+	repeated GameServerPing gameserverpings = 1;	// Pings information to game servers
+	optional int32 offset_index = 2;				// How many game servers have been submitted by client so far
+	optional int32 final_batch = 3;					// Whether the batch reported is final
+
+	//
+	// Or ping measurements to data centers based on Steam Datagram
+	//
+	repeated DataCenterPing data_center_pings = 4;
+	optional uint32 max_ping = 5;				// User preference indicating how much max acceptable ping is allowed
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate
+//
+// GC reports to the client the state of matchmaking
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate
+{
+	optional int32 matchmaking = 1;						// Matchmaking stage
+	repeated uint32 waiting_account_id_sessions = 2;	// Waiting for these accounts to login to GC
+	optional string error = 3;							// Error message information
+	repeated uint32 ongoingmatch_account_id_sessions = 6;	// Waiting for these accounts to finish their ongoing match
+	optional GlobalStatistics global_stats = 7;			// Global statistics about the game
+	repeated uint32 failping_account_id_sessions = 8;	// These accounts failed to ping any servers
+	repeated uint32 penalty_account_id_sessions = 9;	// These accounts have penalty from matchmaking
+	repeated uint32 failready_account_id_sessions = 10;	// These accounts failed to ready up
+	repeated uint32 vacbanned_account_id_sessions = 11; // These accounts have VAC ban
+	optional IpAddressMask server_ipaddress_mask = 12;	// When match must be restricted to a specific game server this will be the mask
+	
+	message Note
+	{
+		optional int32 type = 1;				// Type of the note for the user
+		optional int32 region_id = 2;			// Region in which the note applies
+		optional float region_r = 3;			// Radius of the region, km
+		optional float distance = 4;			// Distance from the region, km
+	};
+	repeated Note notes = 13;							// Notes to display to the user during matchmaking
+
+	repeated uint32 penalty_account_id_sessions_green = 14;	// These accounts have green penalty from matchmaking
+	repeated uint32 insufficientlevel_sessions = 15;	// These accounts have insufficient level
+	repeated uint32 vsncheck_account_id_sessions = 16;	// These accounts are not VAC verified
+	repeated uint32 launcher_mismatch_sessions = 17;	// These accounts are not VAC verified
+};
+
+// k_EMsgGCCStrike15_v2_DraftSummary
+message CDataGCCStrike15_v2_TournamentMatchDraft
+{
+	optional int32 event_id = 1;
+	optional int32 event_stage_id = 2;
+	optional int32 team_id_0 = 3;
+	optional int32 team_id_1 = 4;
+	optional int32 maps_count = 5;			// Number of maps in the series
+	optional int32 maps_current = 6;		// Current index of the map in the series (0-2)
+	optional int32 team_id_start = 7;		// Team ID who has the starting turn
+	optional int32 team_id_veto1 = 8;		// Which team does the veto first
+	optional int32 team_id_pickn = 9;		// Which team does the side pick in the last draft entry
+	message Entry
+	{
+		optional int32 mapid = 1;			// map id selected
+		optional int32 team_id_ct = 2;		// which team starts CT
+	};
+	repeated Entry drafts = 10;				// Draft selections
+};
+
+message CPreMatchInfoData
+{
+	optional int32 predictions_pct = 1;					// When tournament predictions were placed for teams involved in the match this will be the percentage in favor of team0, valid values between [1..99], 0 means undefined
+	optional CDataGCCStrike15_v2_TournamentMatchDraft draft = 4;	// Draft of the match series
+
+	message TeamStats
+	{
+		optional int32 match_info_idxtxt = 1;				// Reference to another match info txt
+		optional string match_info_txt = 2;					// Match info txt
+		repeated string match_info_teams = 3;				// Match info values per team
+	};
+	repeated TeamStats stats = 5;							// A bundle of different stats
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ServerReserve
+//
+// GC reports to server matchmaking reservation
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ServerReserve
+{
+	repeated uint32 account_ids = 1;					// Acccount IDs for the reservation
+	optional uint32 game_type = 2;						// Game for the reservation
+	optional uint64 match_id = 3;						// If this match proceeds and happens this will be the match id
+	optional uint32 server_version = 4;					// Server version required for this match to proceed
+	// --- next section of the reservation doesn't have to be filled out by the server.dll when communicating with GC ---
+	repeated PlayerRankingInfo rankings = 5;			// Player rankings for the match
+	optional uint64 encryption_key = 6;					// Encryption key unique per match
+	optional uint64 encryption_key_pub = 7;				// Encryption key for public streamable data
+	repeated uint32 party_ids = 8;						// Party identifier of the players
+	repeated IpAddressMask whitelist = 9;				// GC whitelist of IP address masks for relays
+	optional uint64 tv_master_steamid = 10;				// For server reservations of official GOTV relay proxies this is SteamID of master
+	optional TournamentEvent tournament_event = 11;		// Tournament event reservation
+	repeated TournamentTeam tournament_teams = 12;		// Tournament teams for the reservation
+	repeated uint32 tournament_casters_account_ids = 13;	// Tournament caster account IDs that will be allowed to connect to the game server directly
+	optional uint64 tv_relay_steamid = 14;				// For server reservations of official GOTV relay proxies this is SteamID of upstream relay connection proxy which can be different from master
+	optional CPreMatchInfoData pre_match_data = 15;		// When tournament predictions were placed for teams involved in the match this will be the percentage in favor of team0, valid values between [1..99], 0 means undefined
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingServerReservationResponse
+//
+// Server reports its state to GC
+//
+message CMsgGCCStrike15_v2_MatchmakingServerReservationResponse
+{
+	optional uint64 reservationid = 1;					// Reservation id for connecting to the server
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ServerReserve reservation = 2;	// Current matchmaking reservation of the server
+	optional string map = 3;							// Map that the server rolled for the teams
+	optional uint64 gc_reservation_sent = 4;			// GC reservation
+	optional uint32 server_version = 5;					// Server protocol version
+	optional ServerHltvInfo tv_info = 6;				// Server TV info if TV is active
+	repeated uint32 reward_player_accounts = 7;			// Player accounts to be rewarded
+	repeated uint32 idle_player_accounts = 8;			// Player accounts who are idle and should not be rewarded
+	optional uint32 reward_item_attr_def_idx = 9;		// Player accounts must own this attribute
+	optional uint32 reward_item_attr_value = 10;		// That attribute must have this value
+	optional uint32 reward_item_attr_reward_idx = 11;	// Index of tha attribute to modify
+	optional uint32 reward_drop_list = 12;		// Series of weapon case to (sometimes?) reward in this map
+	optional string tournament_tag = 13;				// Tournament tag setting of the game server
+	optional uint32 steamdatagram_port = 14;			// If we can be proxied by steam datagram, what port are we listening on?
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ClientReserve
+//
+// GC reports to clients matchmaking reservation
+// GC can also request another game server to become GOTV relay with the same message (game server replies with CMsgGCCStrike15_v2_MatchmakingServerReservationResponse)
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ClientReserve
+{
+	optional uint64 serverid = 1;						// Game server SteamID
+	optional uint32 direct_udp_ip = 2;					// Game server IP
+	optional uint32 direct_udp_port = 3;				// Game server port
+	optional uint64 reservationid = 4;					// Server reservation id
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ServerReserve reservation = 5;	// Current matchmaking reservation of the server
+	optional string map = 6;							// Map that the server rolled for the teams
+	optional string server_address = 7;					// Game server connect address.  This indicates the GC's prefered method of connecting to the server.  (Either Steam datagram or direct UDP connect.)
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingServerRoundStats
+//
+// Server reports its round stats to GC
+//
+message CMsgGCCStrike15_v2_MatchmakingServerRoundStats
+{
+	optional uint64 reservationid = 1;					// Reservation id for connecting to the server
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ServerReserve reservation = 2;	// Current matchmaking reservation of the server
+	optional string map = 3;		// Map
+	optional int32 round = 4;		// Round
+	repeated int32 kills = 5;		// Kills
+	repeated int32 assists = 6;		// Assists
+	repeated int32 deaths = 7;		// Deaths
+	repeated int32 scores = 8;		// Scores
+	repeated int32 pings = 9;		// Pings (-1 would mean unconnected)
+	optional int32 round_result = 10;	// Round result (0 = tie, 1 = 1st team win, 2 = 2nd team win)
+	optional int32 match_result = 11;	// End of match result that will override team scores if present (0 = tie, 1 = 1st team win, 2 = 2nd team win, 3 = game failed to continue due to abandon, 4 (bitmask'ed) = game network conditions have been detected)
+	repeated int32 team_scores = 12; // Scores of each team, at 0th index is the team containing 0th reservation player
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ServerConfirm confirm = 13;	// Confirmation to deliver
+	optional int32 reservation_stage = 14; // Reservation stage (1 = connection probing, 2 = ready-up)
+	optional int32 match_duration = 15;	// How many seconds has the match been going on
+	repeated int32 enemy_kills = 16;	// How many enemies were killed
+	repeated int32 enemy_headshots = 17;// How many enemies were killed with a headshot
+	repeated int32 enemy_3ks = 18;		// 3K rounds
+	repeated int32 enemy_4ks = 19;		// 4K rounds
+	repeated int32 enemy_5ks = 20;		// 5K rounds
+	repeated int32 mvps = 21;			// MVP stars
+	optional uint32 spectators_count = 22;	// Max number of spectators observed during the match
+	optional uint32 spectators_count_tv = 23;	// Max number of spectators connected via GOTV during the match
+	optional uint32 spectators_count_lnk = 24;	// Max number of spectators connected via twitch.tv account linking during the match
+	repeated int32 enemy_kills_agg = 25; // How many enemies were killed by this player on aggregate
+
+	message DropInfo
+	{
+		optional uint32 account_mvp = 1;	// AccountID of the MVP of this round
+	};
+	optional DropInfo drop_info = 26;		// Drop info for the tournament
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingServerMatchEnd
+//
+// Server reports its match end stats to GC
+//
+message CMsgGCCStrike15_v2_MatchmakingServerMatchEnd
+{
+	optional CMsgGCCStrike15_v2_MatchmakingServerRoundStats stats = 1;		// Results of the match
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ServerConfirm confirm = 3;	// Confirmation to deliver
+	optional uint64 rematch = 4;											// When set to non-zero then rematch is requested, last confirmed exchange round id must be provided
+	optional uint32 replay_token = 5;										// Token for the replay ID
+	optional uint32 replay_cluster_id = 6;									// Replay cluster ID
+	optional bool aborted_match = 7;										// This match is void.
+	optional CMsgGC_ServerQuestUpdateData match_end_quest_data = 8;			// Quest update data for players
+	optional uint32 server_version = 9;										// Version of the server submitting match outcome
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingClient2GCHello
+//
+// Client is at the main menu, GC has an opportunity to
+// provide some useful information to the client
+//
+message CMsgGCCStrike15_v2_MatchmakingClient2GCHello
+{
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ClientHello
+//
+// GC is providing session information to the client
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ClientHello
+{
+	optional uint32 account_id = 1;						// Client account id
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ClientReserve ongoingmatch = 2;		// Match that the client should be participating in
+	optional GlobalStatistics global_stats = 3;			// Global statistics about the game
+	optional uint32 penalty_seconds = 4;				// How many penalty seconds remaining for the player
+	optional uint32 penalty_reason = 5;					// What is the reason for player being penalized
+	optional int32 vac_banned = 6;						// When non-zero means the account has been VAC banned
+	optional PlayerRankingInfo ranking = 7;				// Account ranking information
+	optional PlayerCommendationInfo commendation = 8;	// Commendation information
+	optional PlayerMedalsInfo medals = 9;				// Medals that GC has cached for the client
+	optional TournamentEvent my_current_event = 10;		// Event that the user is currently participating in
+	repeated TournamentTeam my_current_event_teams = 11; // Teams that are currently participating in the event
+	optional TournamentTeam my_current_team = 12;		// Team that the user is playing on
+	repeated TournamentEvent my_current_event_stages = 13; // Stages remaining in the event
+	optional uint32 survey_vote = 14;					// What is the current player vote on the active survey
+	optional AccountActivity activity = 15;				// What GC has cached for the client
+	// optional int32 seconds_until_next_mission_deprecated = 16;		// Number of seconds until we've earned our next mission
+	optional int32 player_level = 17;					// Player's level based on xp earned in matches
+	optional int32 player_cur_xp = 18;					// Player's xp earned towards next level 
+	optional int32 player_xp_bonus_flags = 19;			// Flags marking which perodic bonuses the player has available
+};
+
+//
+// k_EMsgGCCStrike15_v2_AccountPrivacySettings
+//
+// Client is requesting or modifying his own privacy settings or GC is replying with client privacy settings
+//
+message CMsgGCCStrike15_v2_AccountPrivacySettings
+{
+	message Setting
+	{
+		optional uint32 setting_type = 1;	// Setting type
+		optional uint32 setting_value = 2;	// Setting value
+	};
+	repeated Setting settings = 1;	// A pool of settings
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ClientAbandon
+//
+// Notifies the user about clients abandoning the match
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ClientAbandon
+{
+	optional uint32 account_id = 1;			// Another client who is abandoning the match
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ClientReserve abandoned_match = 2; // Match that the mentioned client is abandoning
+	optional uint32 penalty_seconds = 3;	// How many seconds of penalty was assigned to the abandoning player
+	optional uint32 penalty_reason = 4;		// What is the reason for player being penalized
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingServer2GCKick
+//
+// Server notifies the GC that a client has been kicked from the game
+//
+message CMsgGCCStrike15_v2_MatchmakingServer2GCKick
+{
+	optional uint32 account_id = 1;			// Account id of the client being kicked
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ServerReserve reservation = 2;	// Current matchmaking reservation of the server
+	optional uint32 reason = 3;				// Reason for kicking and banning the client
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingGC2ServerRankUpdate
+//
+// GC reports players rank updates to the game server
+//
+message CMsgGCCStrike15_v2_MatchmakingGC2ServerRankUpdate
+{
+	repeated PlayerRankingInfo rankings = 1;	// Updated rankings
+	optional uint64 match_id = 2;				// Match ID
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchmakingOperator2GCBlogUpdate
+//
+// Operator instruction for GC to set blog URL
+//
+message CMsgGCCStrike15_v2_MatchmakingOperator2GCBlogUpdate
+{
+	optional string main_post_url = 1;			// URL for the main menu post
+};
+
+//
+// k_EMsgGCCStrike15_v2_ServerNotificationForUserPenalty
+//
+// GC notifies the server that a user has a penalty
+//
+message CMsgGCCStrike15_v2_ServerNotificationForUserPenalty
+{
+	optional uint32 account_id = 1;				// Account id of the client
+	optional uint32 reason = 2;					// Reason for client having the penalty
+	optional uint32 seconds = 3;				// How many seconds remaining
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientReportPlayer
+//
+// Client submitted a player report
+//
+message CMsgGCCStrike15_v2_ClientReportPlayer
+{
+	optional uint32 account_id = 1;				// Reporting this player
+	optional uint32 rpt_aimbot = 2;				// Aimbot
+	optional uint32 rpt_wallhack = 3;			// Wallhack
+	optional uint32 rpt_speedhack = 4;			// Speedhack
+	optional uint32 rpt_teamharm = 5;			// Team harm
+	optional uint32 rpt_textabuse = 6;			// Text abuse
+	optional uint32 rpt_voiceabuse = 7;			// Voice abuse
+	optional uint64 match_id = 8;				// Match ID
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientCommendPlayer
+// k_EMsgGCCStrike15_v2_ClientCommendPlayerQuery
+// k_EMsgGCCStrike15_v2_ClientCommendPlayerQueryResponse
+//
+// Client submitted a player commendation, queried commendation or query response
+//
+message CMsgGCCStrike15_v2_ClientCommendPlayer
+{
+	optional uint32 account_id = 1;						// Commending this player
+	optional uint64 match_id = 8;						// Match ID
+	optional PlayerCommendationInfo commendation = 9;	// Commendation information
+	optional uint32 tokens = 10;						// Number of commendation tokens
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientReportServer
+//
+// Client submitted a server report
+//
+message CMsgGCCStrike15_v2_ClientReportServer
+{
+	optional uint32 rpt_poorperf = 1;			// Poor performance
+	optional uint32 rpt_abusivemodels = 2;		// Abusive models
+	optional uint32 rpt_badmotd = 3;			// Bad message of the day content
+	optional uint32 rpt_listingabuse = 4;		// Listing abuse
+	optional uint32 rpt_inventoryabuse = 5;		// Misrepresenting players' inventory
+	optional uint64 match_id = 8;				// Match ID
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientReportResponse
+//
+// GC responds to client report message
+//
+message CMsgGCCStrike15_v2_ClientReportResponse
+{
+	optional uint64 confirmation_id = 1;		// Confirmation id for the report
+	optional uint32 account_id = 2;				// Accound id that was reported
+	optional uint32 server_ip = 3;				// Server IP that was used in the report
+	optional uint32 response_type = 4;			// Response to message type
+	optional uint32 response_result = 5;		// Response result
+	optional uint32 tokens = 6;					// Number of commendation tokens
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientRequestWatchInfoFriends2
+//
+// Client requests information about watching friends games
+//
+message CMsgGCCStrike15_v2_ClientRequestWatchInfoFriends
+{
+	optional uint32 request_id = 1;				// Request id
+	repeated uint32 account_ids = 2;			// Friends account ids
+	optional uint64 serverid = 3;				// Server SteamID
+	optional uint64 matchid = 4;				// Server MatchID
+};
+
+message WatchableMatchInfo
+{
+	optional uint32 server_ip = 1;				// Server IP (or replay cluster ID)
+	optional uint32 tv_port = 2;				// Server TV port (or replay token)
+	optional uint32 tv_spectators = 3;			// Number of GOTV spectators
+	optional uint32 tv_time = 4;				// GOTV match time in seconds
+	optional bytes tv_watch_password = 5;		// GOTV watch password
+	optional uint64 cl_decryptdata_key = 6;		// cl_decryptdata_key
+	optional uint64 cl_decryptdata_key_pub = 7;	// cl_decryptdata_key_pub
+	optional uint32 game_type = 8;				// Game mode
+	optional string game_mapgroup = 9;			// Game mapgroup
+	optional string game_map = 10;				// Game map
+	optional uint64 server_id = 11;				// Server SteamID
+	optional uint64 match_id = 12;				// Match ID
+	optional uint64 reservation_id = 13;		// Reservation ID
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientRequestJoinFriendData
+//
+message CMsgGCCStrike15_v2_ClientRequestJoinFriendData
+{
+	optional uint32 version = 1;				// version
+	optional uint32 account_id = 2;				// friend account id
+	optional uint32 join_token = 3;				// join token
+	optional uint32 join_ipp = 4;				// join ipp
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ClientReserve res = 5;		// reservation data
+	optional string errormsg = 6;				// error message to display
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientRequestJoinServerData
+//
+message CMsgGCCStrike15_v2_ClientRequestJoinServerData
+{
+	optional uint32 version = 1;				// version
+	optional uint32 account_id = 2;				// user account id
+	optional uint64 serverid = 3;				// friend account id
+	optional uint32 server_ip = 4;				// friend account id
+	optional uint32 server_port = 5;			// server port
+	optional CMsgGCCStrike15_v2_MatchmakingGC2ClientReserve res = 6;		// reservation data
+	optional string errormsg = 7;				// error message to display
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_ClientRequestNewMission	 
+//
+message CMsgGCCstrike15_v2_ClientRequestNewMission
+{
+	// optional uint64 campaign_item_id_deprecated = 1;		// full item id of the campaign we're trying to advance	// DEPRECATED
+	optional uint32	mission_id = 2;				// id of the mission we want to begin
+	optional uint32 campaign_id = 3;			// campaign id of the campaign we're trying to advance
+};
+
+//
+// k_EMsgGCCStrike15_v2_GC2ServerNotifyXPRewarded	
+//
+message CMsgGCCstrike15_v2_GC2ServerNotifyXPRewarded
+{
+	repeated XpProgressData xp_progress_data = 1;		// xp chunks and reasons for receiving them
+	optional uint32 account_id = 2;
+	optional uint32 current_xp = 3;						// xp before the current progress is applied
+	optional uint32 current_level = 4;					// player level before current xp is applied
+	optional uint32 upgraded_defidx = 5;				// upgraded item that player acquired
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_WatchInfoUsers
+//
+// GC response about user matches
+//
+message CMsgGCCStrike15_v2_WatchInfoUsers
+{
+	optional uint32 request_id = 1;				// Request id
+	repeated uint32 account_ids = 2;			// Users account ids with which the watchable match info is associated
+	repeated WatchableMatchInfo watchable_match_infos = 3;	// Watchable match info
+	// obsolete field = 4
+	optional uint32 extended_timeout = 5;		// GC server requests the client to additionally wait for so many more seconds and retry
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientRequestPlayersProfile
+//
+// Client requests player profile details
+//
+message CMsgGCCStrike15_v2_ClientRequestPlayersProfile
+{
+	optional uint32 request_id__deprecated = 1;		// Request id
+	repeated uint32 account_ids__deprecated = 2;	// Friends account ids
+	optional uint32 account_id = 3;					// Account id requested
+	optional uint32 request_level = 4;				// How much data is being requested (EMsgGCAccountPrivacyRequestLevel_t)
+};
+
+//
+// k_EMsgGCCStrike15_v2_PlayersProfile
+//
+// GC responds with friends profile details
+//
+message CMsgGCCStrike15_v2_PlayersProfile
+{
+	optional uint32 request_id = 1;				// Request id
+	repeated CMsgGCCStrike15_v2_MatchmakingGC2ClientHello account_profiles = 2; // Available profiles
+};
+
+//
+// k_EMsgGCCStrike15_v2_PlayerOverwatchCaseUpdate
+//
+// Client requests overwatch case update or assignment
+//
+message CMsgGCCStrike15_v2_PlayerOverwatchCaseUpdate
+{
+	optional uint64 caseid = 1;					// Case ID in the overwatch
+	// optional uint32 verdict_legacy = 2;				// Verdict on the case [LEGACY: June 11 2013 -- Handler will be removed]
+	optional uint32 suspectid = 3;				// Suspect ID
+	optional uint32 fractionid = 4;				// Evidence fraction
+	// [NEW: June 11 2013 -- this is the new fields to submit verdict on the case]
+	optional uint32 rpt_aimbot = 5;				// Aimbot
+	optional uint32 rpt_wallhack = 6;			// Wallhack
+	optional uint32 rpt_speedhack = 7;			// Speedhack
+	optional uint32 rpt_teamharm = 8;			// Team harm
+	optional uint32 reason = 9;					// Overwatch case update reason [check? assign? verdict?]
+};
+
+//
+// k_EMsgGCCStrike15_v2_PlayerOverwatchCaseAssignment
+//
+// Client requests overwatch case assignment
+//
+message CMsgGCCStrike15_v2_PlayerOverwatchCaseAssignment
+{
+	optional uint64 caseid = 1;					// Case ID in the overwatch
+	optional string caseurl = 2;				// Case evidence available for download
+	optional uint32 verdict = 3;				// Verdict on the case
+	optional uint32 timestamp = 4;				// Server timestamp of case assignment
+	optional uint32 throttleseconds = 5;		// How many seconds client has to wait before requesting again
+	optional uint32 suspectid = 6;				// Suspect ID
+	optional uint32 fractionid = 7;				// Evidence fraction
+	optional uint32 numrounds = 8;				// Total evidence number of rounds
+	optional uint32 fractionrounds = 9;			// How many rounds in the fraction
+	optional int32 streakconvictions = 10;		// What is the convictions streak of this player
+	optional uint32 reason = 11;				// Description of the overwatch case assignment (assign would indicate that there's a case pending)
+};
+
+//
+// k_EMsgGCCStrike15_v2_PlayerOverwatchCaseStatus
+//
+// Client reports case status when dealing with overwatch case
+//
+message CMsgGCCStrike15_v2_PlayerOverwatchCaseStatus
+{
+	optional uint64 caseid = 1;					// Case ID that the client encountered error with
+	optional uint32 statusid = 2;				// Type of status that client encountered
+};
+
+//
+// Client header for a overwatch demo
+//
+message CClientHeaderOverwatchEvidence
+{
+	optional uint32 accountid = 1;				// Account ID that received the case
+	optional uint64 caseid = 2;					// Case ID in the overwatch
+};
+
+//
+// k_EMsgGCCStrike15_v2_GC2ClientTextMsg
+//
+// GC requests to print a message on the client
+//
+message CMsgGCCStrike15_v2_GC2ClientTextMsg
+{
+	optional uint32 id = 1;						// Original request id if applicable
+	optional uint32 type = 2;					// What is in the payload?
+	optional bytes payload = 3;					// Message text for the client
+};
+
+//
+// k_EMsgGCCStrike15_v2_Client2GCTextMsg
+//
+// Client forwards a text message to GC
+//
+message CMsgGCCStrike15_v2_Client2GCTextMsg
+{
+	optional uint32 id = 1;						// request id for tracking purposes
+	repeated bytes args = 2;					// arguments of the client text message
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchEndRunRewardDrops
+//
+// Server match finished and GC should drop items for players
+//
+message CMsgGCCStrike15_v2_MatchEndRunRewardDrops
+{
+	optional CMsgGCCStrike15_v2_MatchmakingServerReservationResponse serverinfo = 3; // Full server state that would have been reported in periodic reservation updates, but expedited due to match end
+	optional CMsgGC_ServerQuestUpdateData match_end_quest_data = 4;				// quest update data for players
+};
+
+//
+// Data structure holding information for item preview
+//
+message CEconItemPreviewDataBlock
+{
+	message Sticker
+	{
+		optional uint32 slot = 1;			// Slot where the sticker is applied
+		optional uint32 sticker_id = 2;		// Sticker ID
+		optional float wear = 3;			// Sticker wear
+		optional float scale = 4;			// Sticker scale
+		optional float rotation = 5;		// Sticker rotation
+		optional uint32 tint_id = 6;		// Tint ID
+	};
+
+	optional uint32 accountid = 1;			// Account ID that owns the item
+	optional uint64 itemid = 2;				// Item ID
+	optional uint32 defindex = 3;			// Item definition index
+	optional uint32 paintindex = 4;			// Paint index
+	optional uint32 rarity = 5;				// Item rarity
+	optional uint32 quality = 6;			// Item quality
+	optional uint32 paintwear = 7;			// Paint wear
+	optional uint32 paintseed = 8;			// Paint seed
+	optional uint32 killeaterscoretype = 9;	// Kill eater score type
+	optional uint32 killeatervalue = 10;	// Kill eater value
+	optional string customname = 11;		// Custom name
+	repeated Sticker stickers = 12;			// Stickers applied to the weapon
+	optional uint32 inventory = 13;			// Inventory position index or flags
+	optional uint32 origin = 14;			// Origin if it is applicable for the message
+	optional uint32 questid = 15;			// Quest ID that was completed for this item
+	optional uint32 dropreason = 16;		// Reason user got this drop (used to show display icon in drop list)
+	optional uint32 musicindex = 17;		// Music kit id in schema
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_MatchEndRewardDropsNotification
+//
+// GC dropped items for client and committed transactions successfully
+// notification is for the server to display item drops in end match UI
+//
+message CMsgGCCStrike15_v2_MatchEndRewardDropsNotification
+{
+	optional CEconItemPreviewDataBlock iteminfo = 6;	// Item that got dropped
+};
+
+//
+// k_EMsgGCItemAcknowledged
+//
+message CMsgItemAcknowledged
+{
+	optional CEconItemPreviewDataBlock iteminfo = 1;	// Item that got acknowledged
+};
+
+//
+// k_EMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockRequest
+//
+message CMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockRequest
+{
+	// econ item asset preview integration with Steam Community params
+	optional uint64 param_s = 1;
+	optional uint64 param_a = 2;
+	optional uint64 param_d = 3;
+	optional uint64 param_m = 4;
+};
+
+//
+// k_EMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockResponse
+//
+message CMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockResponse
+{
+	optional CEconItemPreviewDataBlock iteminfo = 1;
+};
+
+//
+// k_EMsgGCCStrike15_v2_TournamentMatchRewardDropsNotification
+//
+// GC dropped tournament items for clients and committed transactions
+// notification informs the game server about it
+//
+message CMsgGCCStrike15_v2_TournamentMatchRewardDropsNotification
+{
+	optional uint64 match_id = 1;			// tournament match id
+	optional uint32 defindex = 2;			// Item definition index
+	repeated uint32 accountids = 3;			// Account IDs that received the reward
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchListRequestCurrentLiveGames
+//
+// Request current live games
+//
+message CMsgGCCStrike15_v2_MatchListRequestCurrentLiveGames
+{
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchListRequestLiveGameForUser
+//
+// Client requests live match data from another user's match
+//
+message CMsgGCCStrike15_v2_MatchListRequestLiveGameForUser
+{
+	optional uint32 accountid = 1;			// AccountID of the other user who is in competitive match
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchListRequestRecentUserGames
+//
+// Request recent user games for a given user
+//
+message CMsgGCCStrike15_v2_MatchListRequestRecentUserGames
+{
+	optional uint32 accountid = 1;			// Account ID for whom the recent user games list is requested
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchListRequestTournamentGames
+//
+// Request for tournament games
+//
+message CMsgGCCStrike15_v2_MatchListRequestTournamentGames
+{
+	optional int32 eventid = 1;				// Event ID for which the games list is being requested
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo
+//
+// Request a specific match by match identifier
+//
+message CMsgGCCStrike15_v2_MatchListRequestFullGameInfo
+{
+	optional uint64 matchid = 1;			// Unique Match ID
+	optional uint64 outcomeid = 2;			// Unique Outcome ID
+	optional uint32 token = 3;				// 16-bit validation token
+};
+
+
+message CDataGCCStrike15_v2_MatchInfo
+{
+	optional uint64 matchid = 1;												// Match ID
+	optional uint32 matchtime = 2;												// Match RTime32 timestamp
+	optional WatchableMatchInfo watchablematchinfo = 3;							// Live matches can be watched using this watchable match info
+	optional CMsgGCCStrike15_v2_MatchmakingServerRoundStats roundstats_legacy = 4;	// Latest round stats
+	repeated CMsgGCCStrike15_v2_MatchmakingServerRoundStats roundstatsall = 5;		// History of round stats
+};
+
+message CDataGCCStrike15_v2_TournamentGroupTeam
+{
+	optional int32 team_id = 1;				// Team ID of the team
+	optional int32 score = 2;				// Score this team accumulated in the group
+	optional bool correctpick = 3;			// Whether this team was the correct pick
+};
+
+message CDataGCCStrike15_v2_TournamentGroup
+{
+	optional uint32 groupid = 1;			// Group or matchup UID
+	optional string name = 2;				// Name of the group "Group A"
+	optional string desc = 3;				// Description of the group "Group A"
+	optional uint32 picks__deprecated = 4;	// Number of picks allowed in this group [deprecated in favor of repeated picks field#10 Aug 2015]
+	repeated CDataGCCStrike15_v2_TournamentGroupTeam teams = 5;	// Teams in the group or matchup
+	repeated int32 stage_ids = 6;			// Matches that are tagged with stage_id in this list belong to this group
+	optional uint32 picklockuntiltime = 7;	// When picks get placed they will be locked until this time (and the field indicates that picks can be placed)
+	optional uint32 pickableteams = 8;		// Number of teams from the team list that are allowed for picks (team list can include eliminated teams)
+	optional uint32 points_per_pick = 9;	// Number of points that players can earn per correct picks
+
+	message Picks
+	{
+		repeated int32 pickids = 1;			// Correct picks
+	};
+	repeated Picks picks = 10;				// Correct picks for the group
+};
+
+message CDataGCCStrike15_v2_TournamentSection
+{
+	optional uint32 sectionid = 1;			// Section UID
+	optional string name = 2;				// Name of the section "Group Stage | A and B"
+	optional string desc = 3;				// Description of the section "Aug 17th"
+	repeated CDataGCCStrike15_v2_TournamentGroup groups = 4; // Groups info here
+};
+
+message CDataGCCStrike15_v2_TournamentInfo
+{
+	repeated CDataGCCStrike15_v2_TournamentSection sections = 1;// Sections and matchup groups/brackets of the tournament
+	optional TournamentEvent tournament_event = 2;				// Tournament event information
+	repeated TournamentTeam tournament_teams = 3;				// Tournament teams registered
+};
+
+//
+// k_EMsgGCCStrike15_v2_MatchList
+//
+// Match list returned upon client request
+//
+message CMsgGCCStrike15_v2_MatchList
+{
+	optional uint32 msgrequestid = 1;		// Which message the client sent to trigger the match list response
+	optional uint32 accountid = 2;			// Which account id the match list belongs to
+	optional uint32 servertime = 3;			// Server RTime32 stamp of the match list
+	repeated CDataGCCStrike15_v2_MatchInfo matches = 4;	// List of matches
+	repeated TournamentTeam streams = 5;	// Streams of the container
+	optional CDataGCCStrike15_v2_TournamentInfo tournamentinfo = 6;	// Tournament information
+};
+
+//
+// k_EMsgGCCStrike15_v2_Predictions
+//
+// Match list predictions upon client request
+//
+message CMsgGCCStrike15_v2_Predictions
+{
+	optional uint32 event_id = 1;		// Event of the predictions data
+	
+	message GroupMatchTeamPick
+	{
+		optional int32 sectionid = 1;		// Section id
+		optional int32 groupid = 2;			// Group id
+		optional int32 index = 3;			// Index in the group
+		optional int32 teamid = 4;			// Team id
+		optional uint64 itemid = 5;			// Item ID used to place the prediction
+	};
+	repeated GroupMatchTeamPick group_match_team_picks = 2;	// List of team picks
+};
+
+//
+//	k_EMsgGCCStrike15_v2_FantasyRequestClientData
+//	k_EMsgGCCStrike15_v2_FantasyUpdateClientData
+//
+// Fantasy data request and update
+//
+message CMsgGCCStrike15_v2_Fantasy
+{
+	optional uint32 event_id = 1;		// Event of the fantasy data
+
+	message FantasySlot
+	{
+		optional int32 type = 1;		// What type of slot is being used
+		optional int32 pick = 2;		// What is the pick in this slot
+		optional uint64 itemid = 3;		// What itemid is used to make the pick
+	};
+	message FantasyTeam
+	{
+		optional int32 sectionid = 1;	// Section id
+		repeated FantasySlot slots = 2;	// Slots on this team
+	};
+	repeated FantasyTeam teams = 2;		// Fantasy teams list
+};
+
+message CAttribute_String
+{
+	optional string value = 1;
+};
+
+// k_EMsgGCToGCReloadVersions
+message CMsgGCToGCReloadVersions
+{
+};
+
+message CMsgCStrike15Welcome
+{
+//	optional bool spectator_only = 1;
+//	optional bool allow_team_creation = 2;
+//	optional bool tournament_admin = 3;
+//	optional bool tournament_broadcaster = 4;
+	optional uint32 store_item_hash = 5;
+	optional uint32 timeplayedconsecutively = 6;
+//	optional bool allow_3rd_party_match_history = 7;
+//	optional DOTA_PartnerAccountType partner_account_type = 8;
+//	optional uint32 banned_word_list_word_id = 9;
+	optional uint32 time_first_played = 10;
+//	optional uint32 partner_account_state = 11;
+	optional uint32 last_time_played = 12;
+	optional uint32 last_ip_address = 13;
+//	optional uint32	notify_successful_report = 14;
+//	optional uint32	shutdownlawterminatetime = 15;	
+//	optional uint32 banned_word_list_version = 16;
+//	optional bool profile_private = 17;
+	optional uint64 gscookieid = 18;
+	optional uint64 uniqueid = 19;
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_ClientVarValueNotificationInfo
+//
+// Client message reporting variable value information
+//
+message CMsgGCCStrike15_v2_ClientVarValueNotificationInfo
+{
+	optional string value_name = 1;			// Name of the value reported
+	optional int32 value_int = 2;			// Integer value reported
+	optional uint32 server_addr = 3;		// Server address where the client is playing
+	optional uint32 server_port = 4;		// Server port where the client is playing
+	repeated string choked_blocks = 5;		// Choked blocks
+};
+
+//
+// k_EMsgGCCStrike15_v2_ServerVarValueNotificationInfo
+//
+// Server message reporting client variable value information
+//
+message CMsgGCCStrike15_v2_ServerVarValueNotificationInfo
+{
+	optional uint32 accountid = 1;			// AccountID reported
+	repeated uint32 viewangles = 2;			// Viewangles observed by server (3 values = viewangles only, 6 values = viewangles + move forward/side/up)
+	optional uint32 type = 3;
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_GiftsLeaderboardRequest
+//
+// Game server is requesting gifts leaderboard
+//
+message CMsgGCCStrike15_v2_GiftsLeaderboardRequest
+{
+};
+
+//
+// k_EMsgGCCStrike15_v2_GiftsLeaderboardResponse
+//
+// GC is sending gifts leaderboard to game server
+//
+message CMsgGCCStrike15_v2_GiftsLeaderboardResponse
+{
+	optional uint32 servertime = 1;				// Timestamp when leaderboard response was generated
+	optional uint32 time_period_seconds = 2;	// Time period coverd by leaderboard response
+	optional uint32 total_gifts_given = 3;		// Total number of gifts given in that time period
+	optional uint32 total_givers = 4;			// Total number of accounts who gave gifts
+	
+	message GiftLeaderboardEntry
+	{
+		optional uint32 accountid = 1;	// Gifter accountid
+		optional uint32 gifts = 2;		// Number of gifts gifted
+	};
+	repeated GiftLeaderboardEntry entries = 5;	// Featured leaderboard entries
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientSubmitSurveyVote
+//
+// Client is submitting vote on an active survey
+//
+message CMsgGCCStrike15_v2_ClientSubmitSurveyVote
+{
+	optional uint32 survey_id = 1;		// Survey ID that the vote is submitted for
+	optional uint32 vote = 2;			// Vote that is submitted by the client
+};
+
+//
+// k_EMsgGCCStrike15_v2_Server2GCClientValidate
+//
+// Server requests GC to validate connecting client
+//
+message CMsgGCCStrike15_v2_Server2GCClientValidate
+{
+	optional uint32 accountid = 1;		// Client account id
+};
+
+//
+// k_EMsgGCCStrike15_v2_Server2GCPureServerValidationFailure
+//
+// Server reports to GC failure to validate pure files of the client
+//
+message CMsgGCCStrike15_v2_Server2GCPureServerValidationFailure
+{
+	optional uint32 accountid = 1;		// AccountID
+	optional string path = 2;			// File path
+	optional string file = 3;			// File name
+	optional uint32 crc = 4;			// File crc
+	optional int32 hash = 5;			// Hash type
+	optional int32 len = 6;				// Length
+	optional int32 pack_number = 7;		// Pack number
+	optional int32 pack_file_id = 8;	// Pack file ID
+};
+
+//
+// k_EMsgGCCStrike15_v2_GC2ClientTournamentInfo
+//
+// GC informs the client about a tournament match starting
+//
+message CMsgGCCStrike15_v2_GC2ClientTournamentInfo
+{
+	optional uint32 eventid = 1;		// Tournament event ID
+	optional uint32 stageid = 2;		// Stage of the event for the match
+	optional uint32 game_type = 3;		// Game type for the match that is played
+	repeated uint32 teamids = 4;		// Teams playing the match
+};
+
+// 
+// Shared Object for Coupons
+//
+message CSOEconCoupon
+{
+	optional uint32		entryid = 1 [ (key_field) = true ];
+	optional uint32		defidx = 2;	
+	optional fixed32	expiration_date = 3;
+};
+
+// 
+// Shared Object for Quests
+//
+message CSOQuestProgress
+{
+	optional uint32		questid = 1 [ (key_field) = true ];
+	optional uint32		points_remaining = 2;
+	optional uint32		bonus_points = 3;
+};
+
+//
+// Shared Object for Persona
+//
+message CSOPersonaDataPublic
+{
+	optional int32 player_level = 1;					// Player's level based on xp earned in matches
+	optional PlayerCommendationInfo commendation = 2;	// Commendation information
+	optional bool elevated_state = 3;					// Whether the user has elevated state (true IFF k_EGameAccountElevatedState_Elevated)
+};
+
+//
+// k_EMsgGC_GlobalGame_Subscribe
+//
+message CMsgGC_GlobalGame_Subscribe
+{
+	// Client > GC: request to subscribe to global game and get a ticket to play
+	// GC > Client: informs the client of the ticket that will be used to play
+	optional uint64		ticket = 1;
+};
+
+//
+// k_EMsgGC_GlobalGame_Unsubscribe
+//
+message CMsgGC_GlobalGame_Unsubscribe
+{
+	// Client > GC: unsubscribe from global game
+	// GC > Client: unsubscribe, and if seconds remaining is set then client has to wait
+	optional int32		timeleft = 1;
+};
+
+//
+// k_EMsgGC_GlobalGame_Play
+//
+message CMsgGC_GlobalGame_Play
+{
+	// Client > GC: take an action in the global game
+	// GC > Client: informs the client that the action was registered
+	optional uint64		ticket = 1;
+	optional uint32		gametimems = 2;		// how much game time milliseconds elapsed since rollover
+	optional uint32		msperpoint = 3;		// how many milliseconds each point is worth
+};
+
+//
+// k_EMsgGCCStrike15_v2_AcknowledgePenalty
+//
+// Acknowledges that the user had a cooldown penalty in the past.
+//
+message CMsgGCCStrike15_v2_AcknowledgePenalty
+{
+	optional int32 acknowledged = 1;				// Flag indicating user acknowledges penalty
+};
+
+//
+// k_EMsgGCCStrike15_v2_Client2GCRequestPrestigeCoin 
+//
+// Client wants to trade max level status for current prestige coin
+//
+message CMsgGCCStrike15_v2_Client2GCRequestPrestigeCoin 
+{
+};
+
+//
+// k_EMsgGCCStrike15_v2_Client2GCStreamUnlock
+//
+// Client requests GC to unlock streaming codec that is currently unavailable
+//
+message CMsgGCCStrike15_v2_Client2GCStreamUnlock
+{
+	optional uint64		ticket = 1;		// client ticket to prevent accidental streaming unlock
+	optional int32		os = 2;			// OS type of the client
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientToGCRequestElevate 
+//
+// Client wants to request premium matchmaking status
+//
+message CMsgGCCStrike15_v2_ClientToGCRequestElevate
+{
+	optional uint32 stage = 1;
+};
+
+//
+// k_EMsgGCCStrike15_v2_GlobalChat
+// k_EMsgGCCStrike15_v2_GlobalChat_Subscribe
+// k_EMsgGCCStrike15_v2_GlobalChat_Unsubscribe
+//
+// Client informs the GC about valid matchid and chat fragments
+//
+message CMsgGCCStrike15_v2_ClientToGCChat
+{
+	optional uint64 match_id = 1;		// Match ID that client is spectating or zero to unsubscribe
+	optional string text = 2;			// Client's text if they want to say something
+};
+
+//
+// k_EMsgGCCStrike15_v2_GlobalChat
+//
+// Client informs the GC about valid matchid and chat fragments
+//
+message CMsgGCCStrike15_v2_GCToClientChat
+{
+	optional uint32 account_id = 1;		// Account ID of the sender
+	optional string text = 2;			// Client's text if they want to say something
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientAuthKeyCode
+//
+// Client requests GC to generate a 
+//
+message CMsgGCCStrike15_v2_ClientAuthKeyCode
+{
+	optional uint32 eventid = 1;		// Which event category auth key code is being generated for (0 for all)
+	optional string code = 2;			// Actual code or a special character: '?' = query, '-' = remove, '+' = create
+};
+
+//
+// k_EMsgGCCStrike15_v2_GotvSyncPacket
+//
+// server>GC: update sync tick;
+// client>GC: asking for sync tick;
+// GC>client: responding with sync tick
+//
+message CMsgGCCStrike15_GotvSyncPacket
+{
+	optional CEngineGotvSyncPacket data = 1;		// Data
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_ClientPlayerDecalSign
+//
+// Client requests GC to generate a digital signature for their spray decal charge
+//
+message PlayerDecalDigitalSignature
+{
+	optional bytes signature = 1;
+	optional uint32 accountid = 2;
+	optional uint32 rtime = 3;
+	repeated float endpos = 4;
+	repeated float startpos = 5;
+	repeated float right = 6;
+	optional uint32 tx_defidx = 7;
+	optional int32 entindex = 8;
+	optional uint32 hitbox = 9;
+	optional float creationtime = 10;
+	optional uint32 equipslot = 11;
+	optional uint32 trace_id = 12;
+	repeated float normal = 13;
+	optional uint32 tint_id = 14;
+};
+
+message CMsgGCCStrike15_v2_ClientPlayerDecalSign
+{
+	optional PlayerDecalDigitalSignature data = 1;
+	optional uint64 itemid = 2;
+};
+
+
+//
+// k_EMsgGCCStrike15_v2_ClientLogonFatalError
+//
+message CMsgGCCStrike15_v2_ClientLogonFatalError
+{
+	optional uint32 errorcode = 1; // error code
+	optional string message = 2; // message
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientPollState
+//
+message CMsgGCCStrike15_v2_ClientPollState
+{
+	optional uint32 pollid = 1; // poll id
+	repeated string names = 2; // poll names for cvars
+	repeated int32 values = 3; // poll scale (when 0 is int value, otherwise factor for bucketing floats, e.g. 1000 will multiply client float value by 1000 and return it as int for bucketing)
+};
+
+//
+//	k_EMsgGCCStrike15_v2_Party_Register =					9189;	// GC <-> client: register the party metadata
+//	k_EMsgGCCStrike15_v2_Party_Unregister =					9190;	// GC <-> client: unregister the party metadata
+//
+message CMsgGCCStrike15_v2_Party_Register
+{
+	optional uint32 id = 1;		// SteamID of the Lobby
+	optional uint32 ver = 2;	// Version of the game
+	optional uint32 apr = 3;	// Prime setting
+	optional uint32 ark = 4;	// Rank setting
+	optional uint32 nby = 5;	// Nearby advertisement
+	optional uint32 grp = 6;	// AccountID_t of Steam Group advertisement
+	optional uint32 slots = 7;	// Number of available slots
+	optional uint32 launcher = 8;	// Launcher used by the party
+};
+
+//
+//	k_EMsgGCCStrike15_v2_Party_Search =						9191;	// GC <-> client: search the party metadata
+//
+message CMsgGCCStrike15_v2_Party_Search
+{
+	optional uint32 ver = 1;	// Version of the game
+	optional uint32 apr = 2;	// Prime setting
+	optional uint32 ark = 3;	// Rank setting
+	repeated uint32 grps = 4;	// Clan AccountID_t of Steam Groups that should match
+	optional uint32 launcher = 5;	// Launcher used by the search
+};
+message CMsgGCCStrike15_v2_Party_SearchResults
+{
+	message Entry
+	{
+		optional uint32 id = 1;		// SteamID of the lobby
+		optional uint32 grp = 2;	// Clan AccountID how this lobby was found (not set for nearby)
+	};
+	repeated Entry entries = 1;	// Lobbies discovered
+};
+
+//
+//	k_EMsgGCCStrike15_v2_Party_Invite =						9192;	// GC -> client: you have been invited to this party
+//
+message CMsgGCCStrike15_v2_Party_Invite
+{
+	optional uint32 accountid = 1;	// Inviting user
+	optional uint32 lobbyid = 2;	// SteamID of the lobby
+};
+
+//
+// k_EMsgGCCStrike15_v2_Account_RequestCoPlays
+//
+message CMsgGCCStrike15_v2_Account_RequestCoPlays
+{
+	message Player
+	{
+		optional uint32 accountid = 1;	// AccountID of a teammate
+		optional uint32 rtcoplay = 2;	// RTime32 of most recent co-play experience
+		optional bool online = 3;		// Whether account is currently online
+	};
+	repeated Player players = 1;		// list of recent players
+	optional uint32 servertime = 2;		// Server RTime32 stamp of the response
+};
+
+//
+// k_EMsgGCCStrike15_v2_ClientToGCRequestTicket
+//
+message CMsgGCCStrike15_v2_ClientToGCRequestTicket
+{
+	optional fixed64 authorized_steam_id = 1;					// Client that is being authorized to communicate
+	optional fixed32 authorized_public_ip = 2;					// They are allowed to talk on which public IP?  (This is necessary to prevent ticket sharing.)
+	optional fixed64 gameserver_steam_id = 3;					// Gameserver they are authorized to talk to
+	optional fixed64 gameserver_net_id = 4;						// Network-routable ID of the gameserver
+};

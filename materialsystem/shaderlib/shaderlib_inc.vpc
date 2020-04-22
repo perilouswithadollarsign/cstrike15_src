@@ -1,0 +1,25 @@
+
+$Project
+{
+	$Folder "ShaderLib"
+	{
+
+	$Folder	"Source Files"
+	{
+		$File	"$SHADERLIBDIR\BaseShader.cpp"
+		$File	"$SHADERLIBDIR\ShaderDLL.cpp"
+		$File	"$SHADERLIBDIR\shaderlib_cvar.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SHADERLIBDIR\shaderDLL_Global.h"
+		$File	"$SHADERLIBDIR\shaderlib_cvar.h"
+		$File	"$SRCDIR\public\shaderlib\BaseShader.h"
+		$File	"$SRCDIR\public\shaderlib\cshader.h"
+		$File	"$SRCDIR\public\shaderlib\ShaderDLL.h"
+		$File	"$SRCDIR\public\shaderlib\commandbuilder.h"
+	}
+
+	}
+}

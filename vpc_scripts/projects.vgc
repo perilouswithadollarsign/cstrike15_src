@@ -1,0 +1,2356 @@
+//-----------------------------------------------------------------------------
+//	PROJECTS.VGC
+//
+//	Project Configurations for all Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+/////////////////////////
+// Project definitions //
+/////////////////////////
+
+$Project "libantlr3c"
+{
+	"antlr/libantlr3c.vpc" [$WINDOWS]
+}
+
+$Project "vtex_gui"
+{
+	"utils/vtex_gui/vtex_gui.vpc" [$WINDOWS]
+}
+
+$Project "p4cc"
+{
+	"utils/p4cc/p4cc.vpc" [$WINDOWS]
+}
+
+$Project "actbusy"
+{
+	"tools/actbusy/actbusy.vpc" [$WINDOWS]
+}
+
+$Project "AdminServer"
+{
+	"Tracker/AdminServer/AdminServer.vpc" [$WINDOWS]
+}
+
+$Project "animEngine_python2.5"
+{
+	"sdktools/python/animEngine/animEngine_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "animEngine_python2.6"
+{
+	"sdktools/python/animEngine/animEngine_python2.6.vpc" [$WINDOWS]
+}
+
+//$Project "AppChooser"
+//{
+//	"utils/xbox/AppChooser/AppChooser.vpc" 	[$WINDOWS]
+//}
+
+//$Project "AppInstaller"
+//{
+//	"utils/xbox/AppInstaller/AppInstaller.vpc" 	[$X360]
+//}
+
+$Project "appframework"
+{
+	"appframework/appframework.vpc" 	[$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "autorun"
+{
+	"shell/autorun/autorun.vpc" [$WINDOWS]
+}
+
+$Project "avitest"
+{
+	"unittests/avitest/avitest.vpc" [$WINDOWS]
+}
+
+$Project "binlaunch"
+{
+	"utils/binlaunch/binlaunch.vpc" [$WINDOWS]
+}
+
+$Project "bitmap"
+{
+	"bitmap/bitmap.vpc" [$WINDOWS || $X360 || $DEDICATED || $POSIX || $PS3]
+}
+
+$Project "bitmap_byteswap"
+{
+	"bitmap/bitmap_byteswap.vpc" [$WINDOWS || $DEDICATED || $WIN64 || $POSIX]
+}
+
+$Project "blobulator"
+{
+	"blobulator/blobulator.vpc" [$WINDOWS || $X360 || $PS3 || $POSIX]
+}
+
+$Project "blobulator_job"
+{
+	"blobulator/blobulator_job.vpc" [$PS3]
+}
+
+$Project "bonesetup"
+{
+	"bonesetup/bonesetup.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+$Project "Browser"
+{
+	"Tracker/Browser/Browser.vpc" [$WINDOWS]
+}
+
+$Project "bsppack"
+{
+	"utils/bsppack/bsppack.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "bspzip"
+{
+	"utils/bspzip/bspzip.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "bugreporter"
+{
+	"utils/bugreporter/bugreporter.vpc" [$WINDOWS]
+}
+
+$Project "bugreporter_public"
+{
+	"utils/bugreporter_public/bugreporter_public.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "bugreporter_text"
+{
+	"utils/bugreporter_text/bugreporter_text.vpc" [$WINDOWS]
+}
+
+$Project "bugreporter_filequeue"
+{
+	"utils/bugreporter_filequeue/bugreporter_filequeue.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "bugreporter_remote"
+{
+	"utils/bugreporter_remote/bugreporter_remote.vpc" [$WINDOWS]
+}
+
+$Project "bzip2"
+{
+	"utils/bzip2/bzip2.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+$Project "callstackflow"
+{
+	"devtools/callstackflow/callstackflow.vpc" [$WINDOWS]
+}
+
+$Project "captioncompiler"
+{
+	"utils/captioncompiler/captioncompiler.vpc" [$WINDOWS]
+}
+
+$Project "cardstats"
+{
+	"utils/videocardstats/cardstats.vpc" [$WINDOWS]
+}
+
+$Project "choreoobjects"
+{
+	"choreoobjects/choreoobjects.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3|| $POSIX]
+}
+
+//$Project "choreogen"
+//{
+//	"utils/choreogen/choreogen.vpc" [$WINDOWS]
+//}
+
+$Project "classcheck"
+{
+	"utils/classcheck/classcheck.vpc" [$WINDOWS]
+}
+
+$Project "client"
+{
+//	"game/client/client_episodic.vpc"	[($WINDOWS) && $EPISODIC]
+//	"game/client/client_tf.vpc"			[($WINDOWS) && $TF]
+//	"game/client/client_portal2.vpc"	[($WINDOWS || $X360 || $PS3 || $POSIX) && $PORTAL2]
+//	"game/client/client_swarm.vpc"		[($WINDOWS || $X360) && $SWARM]
+//	"game/client/client_dota.vpc"		[($WINDOWS) && $DOTA]
+//	"game/client/client_sob.vpc"		[($WINDOWS) && $SOB]
+//	"game/client/client_cstrike.vpc"	[($WINDOWS) && $CSTRIKE]
+	"game/client/client_cstrike15.vpc"	[($OSXALL || $WINDOWS || $X360 || $PS3 || $POSIX) && $CSGO]
+}
+
+$Project "client_sdk"
+{
+	"game/client/client_sdk.vpc" [$WINDOWS]
+}
+
+$Project "client_sdk_hl2"
+{
+	"game/client/client_sdk_hl2.vpc" [$WINDOWS]
+}
+
+$Project "commedit"
+{
+	"tools/commedit/commedit.vpc" [$WINDOWS]
+}
+
+$Project "concatworlds"
+{
+	"utils/concatworlds/concatworlds.vpc" [$WINDOWS]
+}
+
+$Project "cubelight"
+{
+	"utils/cubelight/cubelight.vpc" [$WINDOWS]
+}
+
+$Project "datacache"
+{
+	"datacache/datacache.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "datamodel"
+{
+	"datamodel/datamodel.vpc" [$WINDOWS || $POSIX]
+}
+
+$Project "datamodel_pyd_python2.5"
+{
+	"sdktools/python/datamodel_pyd/datamodel_pyd_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "datamodel_pyd_python2.6"
+{
+	"sdktools/python/datamodel_pyd/datamodel_pyd_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "dbmon"
+{
+	"devtools/dbmon/dbmon.vpc" [$WINDOWS]
+}
+
+$Project "dedicated"
+{
+	"dedicated/dedicated.vpc" [$WINDOWS || $DEDICATED || $POSIX]
+}
+
+$Project "dedicated_main"
+{
+	"dedicated_main/dedicated_main.vpc" [$WINDOWS || $DEDICATED || $POSIX]
+}
+
+$Project "demoinfo"
+{
+	"utils/demoinfo/demoinfo.vpc" [$WINDOWS]
+}
+
+$Project "demo_polish"
+{
+	"demo_polish/demo_polish.vpc" [$WINDOWS]
+}
+
+$Project "depcheck"
+{
+	"utils/depcheck/depcheck.vpc" [$WINDOWS]
+}
+
+$Project "diffmemstats"
+{
+	"devtools/diffmemstats/diffmemstats.vpc" [$WINDOWS]
+}
+
+$Project "dist2alpha"
+{
+	"utils/dist2alpha/dist2alpha.vpc" [$WINDOWS]
+}
+
+$Project "dme_controls"
+{
+	"vgui2/dme_controls/dme_controls.vpc" [$WINDOWS]
+}
+
+$Project "dmeutils"
+{
+	"dmeutils/dmeutils.vpc" [$WINDOWS]
+}
+
+$Project "dmserializers"
+{
+	"dmserializers/dmserializers.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "dmxconvert"
+{
+	"utils/dmxconvert/dmxconvert.vpc" [$WINDOWS]
+}
+
+$Project "dmxedit"
+{
+	"utils/dmxedit/dmxedit.vpc" [$WINDOWS]
+}
+
+$Project "dmxeditlib"
+{
+	"dmxeditlib\dmxeditlib.vpc" [$WINDOWS]
+}
+
+$Project "dmxloader"
+{
+	"dmxloader/dmxloader.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "dmxtest"
+{
+	"unittests/dmxtest/dmxtest.vpc" [$WINDOWS]
+}
+
+$Project "dumpmatsyshelp"
+{
+	"utils/dumpmatsyshelp/dumpmatsyshelp.vpc" [$WINDOWS]
+}
+
+$Project "dumpobj"
+{
+	"utils/xbox/dumpobj/dumpobj.vpc" [$WINDOWS]
+}
+
+$Project "dumpworld"
+{
+	"utils/dumpworld/dumpworld.vpc" [$WINDOWS]
+}
+
+$Include "utils/dx_proxy/dx_proxy_all.vgc"
+
+$Project "dxsupportclean"
+{
+	"utils/dxsupportclean/dxsupportclean.vpc" [$WINDOWS]
+}
+
+$Project "elementviewer"
+{
+	"utils/elementviewer/elementviewer.vpc" [$WINDOWS]
+}
+
+$Project "engine"
+{
+	"engine/engine.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "engine_ds"
+{
+	"engine_ds/engine_ds.vpc" [$WINDOWS||$LINUX]
+}
+
+$Project "engine_xlsp"
+{
+	"engine_xlsp/engine_xlsp.vpc" [$WINDOWS ||$POSIX]
+}
+
+$Project "entcount"
+{
+	"utils/entcount/entcount.vpc" [$WINDOWS]
+}
+
+$Project "ep2_deathmap"
+{
+	"devtools/ep2_deathmap/ep2_deathmap.vpc" [$WINDOWS]
+}
+
+$Project "fbx2dmx"
+{
+	"utils/fbx2dmx/fbx2dmx.vpc" [$WINDOWS]
+}
+
+$Project "fbxutils"
+{
+	"fbxutils/fbxutils.vpc" [$WINDOWS]
+}
+
+$Project "fgdlib"
+{
+	"fgdlib/fgdlib.vpc" [!$DEDICATED]
+}
+
+$Project "FileSystemOpenDialog"
+{
+	"utils/FileSystemOpenDialog/filesystemopendialog.vpc" [$WINDOWS]
+}
+
+$Project "filesystem_stdio"
+{
+        "filesystem/filesystem_stdio.vpc" [$WINDOWS||$X360||$POSIX||$PS3]
+}
+
+$Project "finddbgdll"
+{
+	"utils/finddbgdll/finddbgdll.vpc" [$WINDOWS]
+}
+
+$Project "floatbm"
+{
+	"floatbm/floatbm.vpc" [$WINDOWS]
+}
+
+$Project "fontmaker"
+{
+	"utils/xbox/FontMaker/fontmaker.vpc" [$WINDOWS]
+}
+
+$Project "vfont"
+{
+	"utils/vfont/vfont.vpc" [$WINDOWS]
+}
+
+$Project "vfont_decompiler"
+{
+	"utils/vfont/vfont_decompiler.vpc" [$WINDOWS]
+}
+
+$Project "fow"
+{
+	"fow/fow.vpc" [$WINDOWS]
+}
+
+$Project "game_controls"
+{
+	"vgui2/game_controls/game_controls.vpc" [$WINDOWS||$X360||$POSIX]
+}
+
+$Project "gamestats_reader"
+{
+	"utils/gamestats_reader/gamestats_reader.vpc" [$WINDOWS]
+}
+
+$Project "game_shader_generic_advanced"
+{
+	"sdkshaders/advanced/game_shader_generic_advanced.vpc" [$WINDOWS]
+}
+
+$Project "game_shader_generic_sample"
+{
+	"sdkshaders/game_shader_generic_sample.vpc" [$WINDOWS]
+}
+
+$Project "gc"
+{
+	"game\gc\gc_cstrike15.vpc"		[($WINDOWS||$POSIX) && $CSGO]
+}
+
+$Project "gcsdk"
+{
+	"gcsdk\gcsdk_game.vpc"		[$WINDOWS||$POSIX]
+}
+
+$Project "gcsdk_gc"
+{
+	"gcsdk\gcsdk_gc.vpc"		[$WINDOWS||$POSIX]
+}
+
+$Project "genrandomvectors"
+{
+	"utils/genrandomvectors/genrandomvectors.vpc" [$WINDOWS]
+}
+
+$Project "getbugs"
+{
+	"utils/getbugs/getbugs.vpc" [$WINDOWS]
+}
+
+$Project "getmirror"
+{
+	"devtools/getmirror/getmirror.vpc" [$WINDOWS]
+}
+
+$Project "glview"
+{
+	"utils/glview/glview.vpc" [$WINDOWS]
+}
+
+$Project "hammer_dll"
+{
+	"hammer/hammer_dll.vpc" [$WINDOWS]
+}
+
+$Project "hammer_launcher"
+{
+	"hammer_launcher/hammer_launcher.vpc" [$WINDOWS]
+}
+
+$Project "hammer_run_map_launcher"
+{
+	"utils/hammer_run_map_launcher/hammer_run_map_launcher.vpc" [$WINDOWS]
+}
+
+$Project "havana_constraints"
+{
+	"ivp/havana/havana_constraints.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX ]
+}
+
+$Project "height2normal"
+{
+	"utils/height2normal/height2normal.vpc" [$WINDOWS]
+}
+
+$Project "height2ssbump"
+{
+	"utils/height2ssbump/height2ssbump.vpc" [$WINDOWS]
+}
+
+$Project "genesearch"
+{
+	"utils/genesearch/genesearch.vpc" [$WINDOWS]
+}
+
+$Project "hk_base"
+{
+	"ivp/havana/havok/hk_base/hk_base.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "hk_math"
+{
+	"ivp/havana/havok/hk_math/hk_math.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project liblbfgs
+{
+	liblbfgs/liblbfgs.vpc [$WINDOWS]
+}
+
+$Project "lbfgs_test"
+{
+	"utils/lbfgs_test/lbfgs_test.vpc" [$WINDOWS]
+}
+
+$Project "hlfaceposer"
+{
+	"utils/hlfaceposer/hlfaceposer.vpc" [$WINDOWS]
+}
+
+$Project "hlmv"
+{
+	"utils/hlmv/hlmv.vpc" [$WINDOWS]
+}
+
+$Project "hl_res_us"
+{
+	"shell/hl_res/hl_res_us/hl_res_us.vpc" [$WINDOWS]
+}
+
+$Project "hl_sdk"
+{
+	"game/server/hl_sdk.vpc" [$WINDOWS]
+}
+
+$Project "hl_sdk_hl2"
+{
+	"game/server/hl_sdk_hl2.vpc" [$WINDOWS]
+}
+
+$Project "hlsl_to_glsl"
+{
+	"utils/hlsl_to_glsl/hlsl_to_glsl.vpc" [$WINDOWS]
+}
+
+$Project "ifm"
+{
+	"tools/ifm/ifm.vpc" [$WINDOWS]
+}
+
+$Project "ihvtest1"
+{
+	"unittests/ihvtest1/ihvtest1.vpc" [$WINDOWS]
+}
+
+$Project "inputsystem"
+{
+	"inputsystem/inputsystem.vpc" [$WINDOWS || $X360 || $POSIX || $PS3]
+}
+
+$Project "inputtest"
+{
+	"unittests/inputtest/inputtest.vpc" [$WINDOWS]
+}
+
+$Project "interfaces"
+{
+	"interfaces/interfaces.vpc" [$WINDOWS || $WIN64 || $X360 || $POSIX || $PS3]
+}
+
+$Project "ipccomm"
+{
+	"utils/ipccomm/ipccomm.vpc" [$WINDOWS]
+}
+
+$Project "ivp_compactbuilder"
+{
+	"ivp/ivp_compact_builder/ivp_compactbuilder.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "ivp_physics"
+{
+	"ivp/ivp_physics/ivp_physics.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "jpeglib"
+{
+	"utils/jpeglib/jpeglib.vpc" [$WINDOWS || $POSIX ]
+}
+
+$Project "job_accumpose"
+{
+	"vjobs/anim/job_accumpose/job_accumpose.vpc" [$PS3]
+}
+
+$Project "job_benchmark"
+{
+	"vjobs/samples/job_benchmark/job_benchmark.vpc" [$PS3]
+}
+
+$Project "job_buildindices"
+{
+	"vjobs/graphics/job_buildindices/job_buildindices.vpc" [$PS3]
+}
+
+$Project "job_buildrenderables"
+{
+	"vjobs/graphics/job_buildrenderables/job_buildrenderables.vpc" [$PS3]
+}
+
+$Project "job_buildworldlists"
+{
+	"vjobs/graphics/job_buildworldlists/job_buildworldlists.vpc" [$PS3]
+}
+
+$Project "job_ctxflush"
+{
+	"vjobs/graphics/job_ctxflush/job_ctxflush.vpc" [$PS3]
+}
+
+$Project "job_drawindexedprimitive"
+{
+	"vjobs/graphics/job_drawindexedprimitive/job_drawindexedprimitive.vpc" [$PS3]
+}
+
+$Project "job_gcmstateflush"
+{
+	"vjobs/graphics/job_gcmstateflush/job_gcmstateflush.vpc" [$PS3]
+}
+
+
+
+$Project "job_edgegeom"
+{
+	"vjobs/graphics/job_edgegeom/job_edgegeom.vpc" [$PS3]
+}
+
+
+$Project "job_edgemlaa"
+{
+	"vjobs/graphics/job_edgemlaa/job_edgemlaa.vpc" [$PS3]
+}
+
+$Project "rawspu_gcmdraw"
+{
+	"vjobs/graphics/rawspu_gcmdraw/rawspu_gcmdraw.vpc" [$PS3]
+}
+
+
+$Project "job_fpcpatch"
+{
+	"vjobs/graphics/job_fpcpatch/job_fpcpatch.vpc" [$PS3]
+}
+
+$Project "job_fpcpatch2"
+{
+	"vjobs/graphics/job_fpcpatch2/job_fpcpatch2.vpc" [$PS3]
+}
+
+
+$Project "job_hello"
+{
+	"vjobs/samples/job_hello/job_hello.vpc" [$PS3]
+}
+
+$Project "job_mp3dec"
+{
+	"vjobs/sound/job_mp3dec/job_mp3dec.vpc" [$PS3]
+}
+
+$Project "job_notify"
+{
+	"vjobs/synchronization/job_notify/job_notify.vpc" [$PS3]
+}
+
+$Project "job_sndupsampler"
+{
+	"vjobs/sound/job_sndupsampler/job_sndupsampler.vpc" [$PS3]
+}
+
+$Project "job_zlibinflate"
+{
+	"vjobs/compression/job_zlibinflate/job_zlibinflate.vpc" [$PS3]
+}
+
+$Project "job_zlibdeflate"
+{
+	"vjobs/compression/job_zlibdeflate/job_zlibdeflate.vpc" [$PS3]
+}
+
+$Project "job_zpass"
+{
+	"vjobs/graphics/job_zpass/job_zpass.vpc" [$PS3]
+}
+
+$Project "kvc"
+{
+	"utils/kvc/kvc.vpc" [$WINDOWS]
+}
+
+$Project "launcher"
+{
+	"launcher/launcher.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+$Project "launcher_main"
+{
+	"launcher_main/launcher_main.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+$Project "libmad"
+{
+	"utils/libmad/libmad.vpc" [$WINDOWS]
+}
+
+//$Project "LicenseViewed"
+//{
+//	"devtools/WiseInstallerHelpers/LicenseViewed.vpc" [$WINDOWS]
+//}
+
+$Project "lightworld"
+{
+	"utils/lightworld/lightworld.vpc" [$WINDOWS]
+}
+
+$Project "localization_check"
+{
+	"utils/localization_check/localization_check.vpc" [$WINDOWS]
+}
+
+$Project "localresource"
+{
+	"shell/localresource/localresource.vpc" [$WINDOWS]
+}
+
+$Project "lua"
+{
+	"lua/lua.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "lxVsDmxIO_Modo302"
+{
+	"sdktools/modo/lxVsDmxIO/lxVsDmxIO_modo302.vpc" [$WINDOWS]
+}
+
+$Project "lxvsdmxio_modo401"
+{
+	"sdktools/modo/lxVsDmxIO/lxvsdmxio_modo401.vpc" [$WINDOWS]
+}
+
+$Project "lzma"
+{
+	"utils/lzma/lzma.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "MakeGameData"
+{
+	"utils/xbox/MakeGameData/MakeGameData.vpc" [$WINDOWS && !$SOB]
+}
+
+$Project "MakeSoundCache"
+{
+	"utils/makesoundcache/makesoundcache.vpc" [$WINDOWS]
+}
+
+$Project "makephx"
+{
+	"utils/xbox/makephx/makephx.vpc" [$WINDOWS]
+}
+
+$Project "makexcs"
+{
+	"utils/xbox/makexcs/makexcs.vpc" [$WINDOWS]
+}
+
+$Project "makextf"
+{
+	"utils/xbox/makextf/makextf.vpc" [$WINDOWS]
+}
+
+$Project "makexvcd"
+{
+	"utils/xbox/makexvcd/makexvcd.vpc" [$WINDOWS]
+}
+
+$Project "makexzip"
+{
+	"utils/xbox/makexzip/makexzip.vpc" [$WINDOWS]
+}
+
+$Project "map_crack"
+{
+	"devtools/map_crack/map_crack.vpc" [$WINDOWS]
+}
+
+$Project "materialobjects"
+{
+	"materialobjects/materialobjects.vpc" [$WINDOWS]
+}
+
+$Project "materialsystem"
+{
+	"materialsystem/materialsystem.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "matchmaking"
+{
+//	"matchmaking/matchmaking_portal2.vpc" [($WINDOWS || $X360 || $PS3 || $POSIX) && $PORTAL2 && !$SOB]
+//	"matchmaking/matchmaking_swarm.vpc" [($WINDOWS || $X360) && $SWARM]
+//	"matchmaking/matchmaking_dota.vpc" [($WINDOWS || $X360) && $DOTA]
+//	"matchmaking/matchmaking_tf.vpc" [($WINDOWS || $X360) && $TF]
+//	"matchmaking/matchmaking_episodic.vpc" [($WINDOWS || $X360) && $EPISODIC]
+//	"matchmaking/matchmaking_cstrike.vpc" [($WINDOWS || $X360) && $CSTRIKE]
+	"matchmaking/matchmaking_cstrike15.vpc" [($OSXALL || $WINDOWS || $X360 || $PS3 ||$POSIX)) && $CSGO]
+}
+
+$Project "matchmakingbase"
+{
+	"matchmaking/matchmaking_base.vpc" [($OSXALL || $WINDOWS || $X360 || $PS3 ||$POSIX)]
+}
+
+$Project "matchmaking_ds"
+{
+//	"matchmaking/matchmaking_portal2_ds.vpc" [$WINDOWS && $PORTAL2 && !$SOB]
+//	"matchmaking/matchmaking_swarm_ds.vpc" [$WINDOWS && $SWARM]
+//	"matchmaking/matchmaking_dota_ds.vpc" [$WINDOWS && $DOTA]
+//	"matchmaking/matchmaking_tf_ds.vpc" [$WINDOWS && $TF]
+//	"matchmaking/matchmaking_episodic_ds.vpc" [$WINDOWS && $EPISODIC]
+//	"matchmaking/matchmaking_cstrike_ds.vpc" [$WINDOWS && $CSTRIKE]
+	"matchmaking/matchmaking_cstrike15_ds.vpc" [($OSXALL || $DEDICATED || $WINDOWS||$POSIX)) && $CSGO]
+}
+
+$Project "matchmakingbase_ds"
+{
+	"matchmaking/matchmaking_base_ds.vpc" [($OSXALL || $DEDICATED || $WINDOWS||$POSIX))]
+}
+
+$Project "materialsystemtest"
+{
+	"unittests/materialsystemtest/materialsystemtest.vpc" [$WINDOWS]
+}
+
+$Project "mathlib"
+{
+	"mathlib/mathlib.vpc" [$WINDOWS || $X360 || $DEDICATED || $WIN64 || $LINUX || $PS3 || $POSIX]
+}
+
+$Project "mathlib_extended"
+{
+	"mathlib/mathlib_extended.vpc" [$WINDOWS || $DEDICATED || $WIN64 || $LINUX || $POSIX]
+}
+
+$Project "matsys_controls"
+{
+	"vgui2/matsys_controls/matsys_controls.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+$Project "matsys_regressiontest"
+{
+	"utils/matsys_regressiontest/matsys_regressiontest.vpc" [$WINDOWS]
+}
+
+$Project "mdlcheck"
+{
+	"utils/mdlcheck/mdlcheck.vpc" [$WINDOWS]
+}
+
+$Project "mdlcompile"
+{
+	"utils/studiomdl/mdlcompile.vpc" [$WINDOWS]
+}
+
+$Project "mdlobjects"
+{
+	"mdlobjects/mdlobjects.vpc" [$WINDOWS||$WIN64]
+}
+
+//$Project "mdmpRipper"
+//{
+//	"utils/mdmpRipper/mdmpRipper.vpc" [$WINDOWS]
+//}
+
+$Project "memlog"
+{
+	"devtools/memlog/memlog.vpc" [$WINDOWS]
+}
+
+$Project "meshutils"
+{
+	"meshutils/meshutils.vpc" [$WINDOWS || $DEDICATED || $WIN64 || $LINUX || $X360 || $PS3 || $POSIX]
+}
+
+//$Project "meshutilstest"
+//{
+//	"unittests/meshutilstest/meshutilstest.vpc" [$WINDOWS || $WIN64 || $OSX32 || $OSX64 || $LINUX]
+//}
+
+$Project "miniprofilerdump"
+{
+	"utils/miniprofilerdump/miniprofilerdump.vpc" [$WINDOWS]
+}
+
+$Project "mksheet"
+{
+	"utils/mksheet/mksheet.vpc" [$WINDOWS]
+}
+
+$Project "modelbrowser"
+{
+	"utils/modelbrowser/modelbrowser.vpc" [$WINDOWS]
+}
+
+$Project "modelcheckin"
+{
+	"utils/modelcheckin/modelcheckin.vpc" [$WINDOWS]
+}
+
+$Project "motionmapper"
+{
+	"utils/motionmapper/motionmapper.vpc" [$WINDOWS]
+}
+
+
+$Project "mdllib"
+{
+	"mdllib/mdllib.vpc" [$WINDOWS]
+}
+
+$Project "movieobjects"
+{
+	"movieobjects/movieobjects.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "mxtoolkitwin32"
+{
+	"utils/mxtk/mxtoolkitwin32.vpc" [$WINDOWS]
+}
+
+$Project "mysql_wrapper"
+{
+	"utils/vmpi_private/mysql_wrapper/mysql_wrapper.vpc" [$WINDOWS]
+}
+
+//$Project "missionchooser"
+//{
+//	"game/missionchooser/missionchooser_cs.vpc" [$WINDOWS || $POSIX]
+//}
+
+$Project "networksystem"
+{
+	"networksystem/networksystem.vpc" [$WINDOWS || $X360 || $DEDICATED || $POSIX]
+}
+
+//$Project "networktest"
+//{
+//	"unittests/networktest/networktest.vpc" [$WINDOWS]
+//}
+
+$Project "newdat"
+{
+	"utils/newdat/newdat.vpc" [$WINDOWS]
+}
+
+$Project "normal2ssbump"
+{
+	"utils/normal2ssbump/normal2ssbump.vpc" [$WINDOWS]
+}
+
+$Project "nvtristriplib"
+{
+	"utils/nvtristriplib/nvtristriplib.vpc" [$WINDOWS]
+}
+
+$Project "vwatchlib"
+{
+	"utils/vwatch/vwatchlib/vwatchlib.vpc" [$WINDOWS]
+}
+
+$Project "vwatch_console"
+{
+	"utils/vwatch/vwatch_console/vwatch_console.vpc" [$WINDOWS]
+}
+
+$Project "vwatch_service"
+{
+	"utils/vwatch/vwatch_service/vwatch_service.vpc" [$WINDOWS]
+}
+
+$Project "p4lib"
+{
+	"p4lib/p4lib.vpc" [$WINDOWS]
+}
+
+$Project "p4lib_staticlink"
+{
+	"p4lib/p4lib_staticlink.vpc" [$WINDOWS]
+}
+
+$Project "particle_import"
+{
+	"utils/particle_import/particle_import.vpc" [$WINDOWS]
+}
+
+$Project "particles"
+{
+	"particles/particles.vpc" [$WINDOWS || $X360 || $DEDICATED || $OSX32 || $OSX64 || $LINUX || $PS3]
+}
+
+$Project "vpklib"
+{
+	"vpklib/vpklib.vpc" [$WINDOWS || $OSX32 || $OSX64 || $LINUX]
+}
+
+$Project "vpk"
+{
+	"utils/vpk/vpk.vpc" [$WINDOWS]
+}
+
+$Project "paginate"
+{
+	"utils/paginate/paginate.vpc" [$WINDOWS]
+}
+
+$Project "panel_zoo"
+{
+	"utils/vgui_panel_zoo/panel_zoo.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "parsifal"
+{
+	"libparsifal-0.8.3/win32/vc6/parsifal.vpc" [$WINDOWS]
+}
+
+//$Project "pcffix"
+//{
+//	"utils/pcffix/pcffix.vpc" [$WINDOWS]
+//}
+
+$Project "pcfmanager"
+{
+	"utils/pcfmanager/pcfmanager.vpc" [$WINDOWS]
+}
+
+//$Project "perftest"
+//{
+//	"vphysics/perftest/perftest.vpc" [$WINDOWS]
+//}
+
+$Project "pet"
+{
+	"tools/pet/pet.vpc" [$WINDOWS]
+}
+
+$Project "pfmcomp"
+{
+	"utils/pfmcomp/pfmcomp.vpc" [$WINDOWS]
+}
+
+$Project "pfm2tgas"
+{
+	"utils/pfm2tgas/pfm2tgas.vpc" [$WINDOWS]
+}
+
+$Project "phogen"
+{
+	"utils/phogen/phogen.vpc" [$WINDOWS]
+}
+
+$Project "phonemeextractor"
+{
+	"utils/phonemeextractor/phonemeextractor.vpc" [$WINDOWS]
+}
+
+$Project "phonemeextractor_ims"
+{
+	"utils/phonemeextractor/phonemeextractor_ims.vpc" [$WINDOWS]
+}
+
+$Project "printbones"
+{
+	"utils/printbones/printbones.vpc" [$WINDOWS]
+}
+
+$Project "processgamestats"
+{
+	"devtools/processgamestats/processgamestats.vpc" [$WINDOWS]
+}
+
+$Project "processgamestats2"
+{
+	"devtools/processgamestats2/processgamestats2.vpc" [$WINDOWS]
+}
+
+
+$Project "psdinfo"
+{
+	"utils/psdinfo/psdinfo.vpc" [$WINDOWS]
+}
+
+$Project "QCGenerator_Launcher"
+{
+	"utils/QCGenerator/QCGenerator_Launcher.vpc" [$WINDOWS]
+}
+
+$Project "QC_Eyes"
+{
+	"utils/QC_Eyes/qc_eyes.vpc" [$WINDOWS]
+}
+
+$Project "quantize"
+{
+	"quantize/quantize.vpc" [$WINDOWS]
+}
+
+$Project "qthello"
+{
+	"utils/qtsamples/qthello/qthello.vpc" [$WINDOWS]
+}
+
+$Project "quickhull"
+{
+	"thirdparty/quickhull/quickhull.vpc"  [$WINDOWS || $X360 || $POSIX || $LINUXALL]
+}
+
+$Project "raytrace"
+{
+	"raytrace/raytrace.vpc" [$WINDOWS||$X360||$POSIX||$PS3]
+}
+
+$Project "remotebuild"
+{
+	"utils/remotebuild/remotebuild.vpc" [$WINDOWS]
+}
+
+//$Project "remotemirror"
+//{
+//	"utils/remotemirror/remotemirror.vpc" [$WINDOWS]
+//}
+
+$Project "responserules_runtime"
+{
+	"responserules/runtime/responserules_runtime.vpc" [$WINDOWS||$WIN64||$X360||$OSX32||$OSX64||$LINUX||$PS3]
+}
+
+$Project "res2c"
+{
+	"utils/tfstats/res2c/res2c.vpc" [$WINDOWS]
+}
+
+$Project "resourcefile"
+{
+	"resourcefile/resourcefile.vpc" [$WINDOWS||$X360||$OSX32||$OSX64||$LINUX]
+}
+
+$Project "rpt"
+{
+	"utils/rpt/rpt.vpc" [$WINDOWS]
+}
+
+$Project "rt_test"
+{
+	"unittests/rt_test/rt_test.vpc" [$WINDOWS]
+}
+
+$Project "mathlib_test"
+{
+	"unittests/mathlib_test/mathlib_test.vpc" [$WINDOWS]
+}
+
+$Project "runme"
+{
+	"utils/runme/runme.vpc" [$WINDOWS]
+}
+
+$Project "sampletool"
+{
+	"tools/sampletool/sampletool.vpc" [$WINDOWS]
+}
+
+$Project "scaleformui"
+{
+	"scaleformui/scaleformui.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "scaleformui_3"
+{
+	"scaleformui_3/scaleformui_3.vpc" [$WINDOWS||$LINUX]
+}
+
+$Project "scenefilecache"
+{
+	"scenefilecache/scenefilecache.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "scenemanager"
+{
+	"utils/scenemanager/scenemanager.vpc" [$WINDOWS]
+}
+
+$Project "sceneviewer"
+{
+	"utils/sceneviewer/sceneviewer.vpc" [$WINDOWS]
+}
+
+$Project "schemacompiler"
+{
+	"utils/schemacompiler/schemacompiler.vpc" [$WINDOWS||$WIN64]
+}
+
+$Project "scratchpad3dviewer"
+{
+	"utils/scratchpad3dviewer/scratchpad3dviewer.vpc" [$WINDOWS]
+}
+
+$Project "SDKLauncher"
+{
+	"utils/sdklauncher/sdklauncher.vpc" [$WINDOWS]
+}
+
+$Project "server"
+{
+//	"game/server/server_episodic.vpc"	[($WINDOWS) && $EPISODIC]
+//	"game/server/server_tf.vpc"			[($WINDOWS || $DEDICATED) && $TF]
+//	"game/server/server_portal2.vpc"	[($WINDOWS || $X360 || $PS3|| $POSIX) && $PORTAL2]
+//	"game/server/server_swarm.vpc"		[($WINDOWS || $X360) && $SWARM]
+//	"game/server/server_dota.vpc"		[($WINDOWS) && $DOTA]
+//	"game/server/server_sob.vpc"		[($WINDOWS) && $SOB]
+//	"game/server/server_cstrike.vpc"	[($WINDOWS) && $CSTRIKE]
+	"game/server/server_cstrike15.vpc"	[($DEDICATED || $WINDOWS || $X360 || $PS3 || $OSXALL ||$POSIX)) && $CSGO]
+}
+
+$Project "server_valve"
+{
+	"game/server_valve/server_valve_cstrike15.vpc"	[($DEDICATED || $WINDOWS || $LINUX) && $CSGO]
+}
+
+$Project "serverbrowser"
+{
+	"serverbrowser/ServerBrowser.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "ServerMonitor"
+{
+	"Tracker/ServerMonitor/ServerMonitor.vpc" [$WINDOWS]
+}
+
+$Project "serverplugin_empty"
+{
+	"utils/serverplugin_sample/serverplugin_empty.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "sfmgen"
+{
+	"utils/sfmgen/sfmgen.vpc" [$WINDOWS]
+}
+
+$Project "sfmobjects"
+{
+	"sfmobjects/sfmobjects.vpc" [$WINDOWS]
+}
+
+$Project "shadercompile_dll"
+{
+	"utils/shadercompile/shadercompile_dll.vpc" [$WINDOWS]
+}
+
+$Project "shadercompile_launcher"
+{
+	"utils/shadercompile_launcher/shadercompile_launcher.vpc" [$WINDOWS]
+}
+
+$Project "remoteshadercompile"
+{
+	"utils/remoteshadercompile/remoteshadercompile.vpc" [$WINDOWS]
+}
+
+$Project "shaderapidx9"
+{
+	"materialsystem/shaderapidx9/shaderapidx9.vpc" [$WINDOWS||$X360||$LINUX]
+}
+
+$Project "togl"
+{
+	"togl/togl.vpc" [$GL||$OSXALL||($LINUX&&!$DEDICATED)]
+}
+
+$Project "shaderapiempty"
+{
+	"materialsystem/shaderapiempty/shaderapiempty.vpc" [($WINDOWS || $DEDICATED||$POSIX) && !$OSXALL]
+}
+
+$Project "shaderapitest"
+{
+	"unittests/shaderapitest/shaderapitest.vpc" [$WINDOWS]
+}
+
+$Project "shaderinfo"
+{
+	"utils/shaderinfo/shaderinfo.vpc" [$WINDOWS]
+}
+
+$Project "shaderlib"
+{
+	"materialsystem/shaderlib/shaderlib.vpc" [($WINDOWS || $X360 || $DEDICATED||$POSIX) && !$OSXALL]
+}
+
+$Project "shader_test"
+{
+	"materialsystem/stdshaders/shader_test.vpc" [$WINDOWS]
+}
+
+$Project "SMDExportMP"
+{
+	"utils/xsi/SMDExportMP/SMDExportMP.vpc" [$WINDOWS]
+}
+
+//$Project "simdbench"
+//{
+//	"utils/simdbench/simdbench.vpc" [$WINDOWS]
+//}
+
+$Project "simdtest"
+{
+	"utils/simdtest/simdtest.vpc" [ $WINDOWS || $X360 ]
+}
+
+$Project "smdlexp"
+{
+	"utils/smdlexp/smdlexp.vpc" [$WINDOWS]
+}
+
+$Project "smp"
+{
+	"utils/smp/smp.vpc" [$WINDOWS]
+}
+
+$Project "smtpmail"
+{
+	"devtools/smtpmail/smtpmail.vpc" [$WINDOWS]
+}
+
+$Project "statsmap"
+{
+	"devtools/statsmap/statsmap.vpc" [$WINDOWS]
+}
+
+$Project "socket_tests"
+{
+	"utils/socket_tests/socket_tests.vpc" [$WINDOWS]
+}
+
+$Project "soundedit"
+{
+	"tools/soundedit/soundedit.vpc" [$WINDOWS]
+}
+
+$Project "soundemittersystem"
+{
+	"soundemittersystem/soundemittersystem.vpc" [ $WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "soundsystem"
+{
+	"soundsystem/soundsystem.vpc" [$WINDOWS]
+}
+
+$Project "soundsystem_lowlevel"
+{
+	"soundsystem/lowlevel/soundsystem_lowlevel.vpc"
+}
+
+$Project "soundtest"
+{
+	"unittests/soundtest/soundtest.vpc" [$WINDOWS]
+}
+
+$Project "vaudio_speex"
+{
+	"engine/voice_codecs/speex/vaudio_speex.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "vaudio_celt"
+{
+	"engine/voice_codecs/celt/vaudio_celt.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "sqldb_mysql"
+{
+	"Tracker/sqldb_mysql/sqldb_mysql.vpc" [$WINDOWS]
+}
+
+$Project "sqlwrapper"
+{
+	"utils/sqlwrapper/sqlwrapper.vpc" [$WINDOWS]
+}
+
+$Project "standalonedatatabletest"
+{
+	"utils/standalonedatatabletest/standalonedatatabletest.vpc" [$WINDOWS]
+}
+
+$Project "Status"
+{
+	"status/Status.vpc" [$WINDOWS]
+}
+
+$Project "stdshader_dbg"
+{
+	"materialsystem/stdshaders/stdshader_dbg.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "stdshader_dx9"
+{
+	"materialsystem/stdshaders/stdshader_dx9.vpc" [($WINDOWS||$X360||$POSIX) && !$OSXALL]
+}
+
+$Project "SteamBackup"
+{
+	"SteamBackup/SteamBackup.vpc" [$WINDOWS]
+}
+
+$Project "steamdatagramlib"
+{
+	"steamdatagram/clientlib/steamdatagramlib.vpc"
+}
+
+$Project "SteamDebugHelper"
+{
+	"utils/SteamDebugHelper/SteamDebugHelper.vpc" [$WINDOWS]
+}
+
+$Project "SteamUI"
+{
+	"SteamUI/SteamUI.vpc" [$WINDOWS]
+}
+
+$Project "studiomdl"
+{
+	"utils/studiomdl/studiomdl.vpc" [$WINDOWS]
+}
+
+$Project "subdbaker"
+{
+	"utils/SubDBaker/SubDBaker.vpc" [$WINDOWS]
+}
+
+$Project "studiorender"
+{
+	"studiorender/studiorender.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "swig_datamodel_lib_python2.5"
+{
+	"sdktools/python/swig_datamodel_lib/swig_datamodel_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_datamodel_lib_python2.6"
+{
+	"sdktools/python/swig_datamodel_lib/swig_datamodel_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "swig_dmeutils_lib_python2.5"
+{
+	"sdktools/python/swig_dmeutils_lib/swig_dmeutils_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_dmeutils_lib_python2.6"
+{
+	"sdktools/python/swig_dmeutils_lib/swig_dmeutils_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "swig_swig_dmxedit_lib_python2.5"
+{
+	"sdktools/python/swig_swig_dmxedit_lib/swig_swig_dmxedit_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_swig_dmxedit_lib_python2.6"
+{
+	"sdktools/python/swig_swig_dmxedit_lib/swig_swig_dmxedit_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "swig_dmxedit_lib_python2.5"
+{
+	"sdktools/python/swig_dmxedit_lib/swig_dmxedit_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_dmxedit_lib_python2.6"
+{
+	"sdktools/python/swig_dmxedit_lib/swig_dmxedit_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "swig_materialobjects_lib_python2.5"
+{
+	"sdktools/python/swig_materialobjects_lib/swig_materialobjects_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_materialobjects_lib_python2.6"
+{
+	"sdktools/python/swig_materialobjects_lib/swig_materialobjects_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "swig_mdlobjects_lib_python2.5"
+{
+	"sdktools/python/swig_mdlobjects_lib/swig_mdlobjects_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_mdlobjects_lib_python2.6"
+{
+	"sdktools/python/swig_mdlobjects_lib/swig_mdlobjects_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "swig_movieobjects_lib_python2.5"
+{
+	"sdktools/python/swig_movieobjects_lib/swig_movieobjects_lib_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "swig_movieobjects_lib_python2.6"
+{
+	"sdktools/python/swig_movieobjects_lib/swig_movieobjects_lib_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "SymbolStoreUpdate"
+{
+	"utils/SymbolStoreUpdate/SymbolStoreUpdate.vpc" [$WINDOWS]
+}
+
+$Project "syncfrommirror"
+{
+	"devtools/syncfrommirror/syncfrommirror.vpc" [$WINDOWS]
+}
+
+$Project "tagbuild"
+{
+	"devtools/tagbuild/tagbuild.vpc" [$WINDOWS]
+}
+
+$Project "tagxzppreload"
+{
+	"utils/xbox/tagxzppreload/tagxzppreload.vpc" [$WINDOWS]
+}
+
+//$Project "test"
+//{
+//	"shell/uninstall/uninstalltester/test.vpc" [$WINDOWS]
+//}
+
+$Project "test_binaries"
+{
+	"devtools/test_binaries/test_binaries.vpc" [$WINDOWS]
+}
+
+$Project "testprocess"
+{
+	"unittests/testprocess/testprocess.vpc" [$WINDOWS]
+}
+
+$Project "texturecompile_dll"
+{
+	"utils/texturecompile/texturecompile_dll.vpc" [$WINDOWS]
+}
+
+$Project "texturecompile_launcher"
+{
+	"utils/texturecompile_launcher/texturecompile_launcher.vpc" [$WINDOWS]
+}
+
+$Project "texturesynth"
+{
+	"utils/Texturesynth/texturesynth.vpc" [$WINDOWS]
+}
+
+$Project "tfstats"
+{
+	"utils/tfstats/tfstats.vpc" [$WINDOWS]
+}
+
+$Project "tgadiff"
+{
+	"utils/tgadiff/tgadiff.vpc" [$WINDOWS]
+}
+
+$Project "tgamse"
+{
+	"utils/tgamse/tgamse.vpc" [$WINDOWS]
+}
+
+$Project "tier0_staticlib"
+{
+	"tier0/tier0_staticlib.vpc" 	[$PS3]
+}
+
+$Project "tier0"
+{
+	"tier0/tier0.vpc" 	[$WINDOWS || $X360 || $POSIX || $PS3]
+}
+
+$Project "tier1"
+{
+	"tier1/tier1.vpc" 	[$WINDOWS || $X360 || $POSIX || $PS3]
+}
+
+$Project "tier2"
+{
+	"tier2/tier2.vpc" 	[$WINDOWS||$X360 || $POSIX || $PS3]
+}
+
+$Project "tier3"
+{
+	"tier3/tier3.vpc" 	[$WINDOWS || $X360 || $POSIX || $PS3]
+}
+
+$Project "tier1test"
+{
+	"unittests/tier1test/tier1test.vpc" 	[$WINDOWS]
+}
+
+$Project "tier2test"
+{
+	"unittests/tier2test/tier2test.vpc" 	[$WINDOWS]
+}
+
+$Project "tier3test"
+{
+	"unittests/tier3test/tier3test.vpc" 	[$WINDOWS]
+}
+
+$Project "toolutils"
+{
+	"tools/toolutils/toolutils.vpc" [$WINDOWS]
+}
+
+$Project "traceperf"
+{
+	"vphysics/traceperf/traceperf.vpc"	[$WINDOWS]
+}
+
+$Project "triangle"
+{
+	"utils/triangle/triangle.vpc" [$WINDOWS]
+}
+
+$Project "ui"
+{
+	"utils/tfstats/ui/ui.vpc" [$WINDOWS]
+}
+
+$Project "uninstall"
+{
+	"shell/uninstall/uninstall.vpc" [$WINDOWS]
+}
+
+$Project "unitlib"
+{
+	"unitlib/unitlib.vpc" [$WINDOWS || $DEDICATED || $POSIX]
+}
+
+$Project "unittest"
+{
+	"utils/unittest/unittest.vpc" [$WINDOWS]
+}
+
+$Project "unusedcontent"
+{
+	"utils/unusedcontent/unusedcontent.vpc" [$WINDOWS]
+}
+
+$Project "uvlightmap"
+{
+	"utils/uvlightmap/uvlightmap.vpc" [$WINDOWS]
+}
+
+$Project "UpdateProgress"
+{
+	"devtools/WiseInstallerHelpers/UpdateProgress/UpdateProgress.vpc" [$WINDOWS]
+}
+
+$Project "valvelib"
+{
+	"utils/valvelib/valvelib.vpc" [$WINDOWS]
+}
+
+$Project "valve_avi"
+{
+	"avi/valve_avi.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "valvemaya_maya2009"
+{
+	"sdktools/maya/valveMaya/valvemaya_maya2009.vpc" [$WINDOWS]
+}
+
+$Project "valvemaya_maya2011"
+{
+	"sdktools/maya/valveMaya/valvemaya_maya2011.vpc" [$WINDOWS]
+}
+
+$Project "valvemaya_maya2012"
+{
+	"sdktools/maya/valveMaya/valvemaya_maya2012.vpc" [$WINDOWS]
+}
+
+$Project "valvemaya_maya2013"
+{
+	"sdktools/maya/valveMaya/valvemaya_maya2013.vpc" [$WINDOWS]
+}
+
+$Project "valve_pyd_python2.5"
+{
+	"sdktools/python/valve_pyd/valve_pyd_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "valve_pyd_python2.6"
+{
+	"sdktools/python/valve_pyd/valve_pyd_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "valvepython_python2.5"
+{
+	"sdktools/python/valvePython/valvePython_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "valvepython_python2.6"
+{
+	"sdktools/python/valvePython/valvePython_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "vaudio_miles"
+{
+	"engine/voice_codecs/miles/vaudio_miles.vpc" [$WINDOWS||$POSIX]
+}
+
+$Project "vbsp"
+{
+	"utils/vbsp/vbsp.vpc" [$WINDOWS]
+}
+
+$Project "vbsp2"
+{
+	"utils/vbsp2/vbsp2.vpc" [$WINDOWS || $POSIX ]
+}
+
+$Project "vbsp2lib"
+{
+	"vbsp2lib/vbsp2lib.vpc" [$WINDOWS || $POSIX ]
+}
+
+$Project "vbspinfo"
+{
+	"utils/vbspinfo/vbspinfo.vpc" [$WINDOWS]
+}
+
+$Project "vjobs"
+{
+	"vjobs/vjobs.vpc"	[$PS3]
+}
+
+$Project "vmap"
+{
+	"utils/vmap/vmap.vpc" [$WINDOWS]
+}
+
+$Project "vmview"
+{
+	"utils/vmap/vmview.vpc" [$WINDOWS]
+}
+
+$Project "vcd_sound_check"
+{
+	"utils/vcd_sound_check/vcd_sound_check.vpc" [$WINDOWS]
+}
+
+$Project "vcdblock"
+{
+	"tools/vcdblock/vcdblock.vpc" [$WINDOWS]
+}
+
+$Project "vcdupdate"
+{
+	"utils/vcdupdate/vcdupdate.vpc" [$WINDOWS]
+}
+
+$Project "vcrtrace"
+{
+	"utils/vcrtrace/vcrtrace.vpc" [$WINDOWS]
+}
+
+$Project "vguimatsurface"
+{
+	"vguimatsurface/vguimatsurface.vpc" [$WINDOWS || $X360 || $PS3 || $POSIX]
+}
+
+$Project "vgui_controls"
+{
+	"vgui2/vgui_controls/vgui_controls.vpc" [$WINDOWS||$X360||$POSIX||$PS3]
+}
+
+$Project "vgui_dll"
+{
+	"vgui2/src/vgui_dll.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+//$Project "vguiIntro"
+//{
+//	"examples/vguiIntro/vguiIntro.vpc" [$WINDOWS]
+//}
+
+$Project "vguieditor"
+{
+	"tools/vguieditor/vguieditor.vpc" [$WINDOWS]
+}
+
+$Project "vgui_surfacelib"
+{
+	"vgui2/vgui_surfacelib/vgui_surfacelib.vpc" [$WINDOWS||$X360||$PS3||$POSIX]
+}
+
+$Project "vgui_perftest"
+{
+	"vgui2\vgui_perftest\vgui_perftest.vpc" [$WINDOWS]
+}
+
+$Project "vice"
+{
+	"utils/vice/vice.vpc" [$WINDOWS]
+}
+
+$Project "videocfg"
+{
+	"videocfg/videocfg.vpc" 	[$WINDOWS||$X360||$LINUX||$OSX32||$OSX64||$PS3]
+}
+
+//$Project "viewphys"
+//{
+//	"utils/viewphys/viewphys.vpc" [$WINDOWS]
+//}
+
+//$Project "viewphysdc"
+//{
+//	"utils/viewphys/viewphysdc.vpc" [$WINDOWS]
+//}
+
+$Project "viper"
+{
+	"devtools/viper/viper.vpc" [$WINDOWS]
+}
+
+$Project "vkeyedit"
+{
+	"utils/vkeyedit/vkeyedit.vpc" [$WINDOWS]
+}
+
+$Project "vlocalize"
+{
+	"vgui2/vlocalize/vlocalize.vpc" [$WINDOWS]
+}
+
+$Project "vmf_tweak"
+{
+	"utils/vmf_tweak/vmf_tweak.vpc" [$WINDOWS]
+}
+
+$Project "vmpi"
+{
+	"utils/vmpi/vmpi.vpc" [$WINDOWS]
+}
+
+$Project "vmpi_services_watch"
+{
+	"utils/vmpi/vmpi_services_watch/vmpi_services_watch.vpc" [$WINDOWS]
+}
+
+$Project "vmpi_service"
+{
+	"utils/vmpi/vmpi_service/vmpi_service.vpc" [$WINDOWS]
+}
+
+$Project "vmpi_transfer"
+{
+	"utils/vmpi/vmpi_transfer/vmpi_transfer.vpc" [$WINDOWS]
+}
+
+$Project "vmpi_service_install"
+{
+	"utils/vmpi/vmpi_service_install/vmpi_service_install.vpc" [$WINDOWS]
+}
+
+$Project "vmpi_service_ui"
+{
+	"utils/vmpi/vmpi_service_ui/vmpi_service_ui.vpc" [$WINDOWS]
+}
+
+$Project "vmt"
+{
+	"tools/vmt/vmt.vpc" [$WINDOWS]
+}
+
+$Project "vmtcheck"
+{
+	"utils/vmtcheck/vmtcheck.vpc" [$WINDOWS]
+}
+
+$Project "vmtedit"
+{
+	"utils/vmtedit/vmtedit.vpc" [$WINDOWS]
+}
+
+$Project "voice_tweak"
+{
+	"utils/voice_tweak/voice_tweak.vpc" [$WINDOWS]
+}
+
+$Project "vp_python2.5"
+{
+	"sdktools/python/vp/vp_python2.5.vpc" [$WINDOWS]
+}
+
+$Project "vp_python2.6"
+{
+	"sdktools/python/vp/vp_python2.6.vpc" [$WINDOWS]
+}
+
+$Project "vp4"
+{
+	"utils/vp4/vp4.vpc" [$WINDOWS]
+}
+
+//$Project "vp4mutex"
+//{
+//	"utils/vp4mutex/vp4mutex.vpc" [$WINDOWS]
+//}
+
+$Project "vpc"
+{
+	"utils/vpc/vpc/vpcs.vpc"   [$WINDOWS||$POSIX]
+}
+
+$Project "vpccrccheck"
+{
+	"utils/vpccrccheck/vpccrccheck.vpc"   [$WINDOWS]
+}
+
+$Project "vphysics"
+{
+	"vphysics/vphysics.vpc"  [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "vprojtomake"
+{
+	"utils/vprojtomake/vprojtomake.vpc" [$WINDOWS]
+}
+
+$Project "vrad_dll"
+{
+	"utils/vrad/vrad_dll.vpc" [$WINDOWS]
+}
+
+$Project "vrad_launcher"
+{
+	"utils/vrad_launcher/vrad_launcher.vpc" [$WINDOWS]
+}
+
+$Project "vsblendeditor_maya2009"
+{
+	"sdktools/maya/vsBlendEditor/vsBlendEditor_Maya2009.vpc" [$WINDOWS]
+}
+
+$Project "vsblendeditor_maya2011"
+{
+	"sdktools/maya/vsBlendEditor/vsBlendEditor_Maya2011.vpc" [$WINDOWS]
+}
+
+$Project "vscript"
+{
+	"vscript/vscript.vpc"		[($WINDOWS || $X360 || $PS3 || $POSIX) && !$SOB]
+	"vscript/vscript_sob.vpc"	[($WINDOWS) && $SOB]
+}
+
+$Project "vsdmxio_maya2009"
+{
+	"sdktools/maya/vsdmxio/vsdmxIO_maya2009.vpc" [$WINDOWS]
+}
+
+$Project "vsdmxio_maya2011"
+{
+	"sdktools/maya/vsdmxio/vsdmxIO_maya2011.vpc" [$WINDOWS]
+}
+
+$Project "vsdmxio_maya2012"
+{
+	"sdktools/maya/vsdmxio/vsdmxio_maya2012.vpc" [$WINDOWS]
+}
+
+$Project "vsdmxio_maya2013"
+{
+	"sdktools/maya/vsdmxio/vsdmxio_maya2013.vpc" [$WINDOWS]
+}
+
+$Project "vsmaster_maya2009"
+{
+	"sdktools/maya/vsmaster/vsmaster_maya2009.vpc"	[$WINDOWS]
+}
+
+$Project "vsmaster_maya2011"
+{
+	"sdktools/maya/vsmaster/vsmaster_maya2011.vpc"	[$WINDOWS]
+}
+
+$Project "vsmaster_maya2012"
+{
+	"sdktools/maya/vsmaster/vsmaster_maya2012.vpc"	[$WINDOWS]
+}
+
+$Project "vsmaster_maya2013"
+{
+	"sdktools/maya/vsmaster/vsmaster_maya2013.vpc"	[$WINDOWS]
+}
+
+$Project "vsmdlio_maya2009"
+{
+	"sdktools/maya/vsMdlIO/vsMdlIO_Maya2009.vpc"	[$WINDOWS]
+}
+
+$Project "vsmdlio_maya2011"
+{
+	"sdktools/maya/vsMdlIO/vsMdlIO_Maya2011.vpc"	[$WINDOWS]
+}
+
+$Project "vsmdlio_maya2012"
+{
+	"sdktools/maya/vsmdlio/vsmdlio_maya2012.vpc"	[$WINDOWS]
+}
+
+$Project "vsmdlio_maya2013"
+{
+	"sdktools/maya/vsmdlio/vsmdlio_maya2013.vpc"	[$WINDOWS]
+}
+
+$Project "vsoundedit"
+{
+	"utils/vsoundedit/vsoundedit.vpc" [$WINDOWS]
+}
+
+$Project "vsskinner_maya2009"
+{
+	"sdktools/maya/vsskinner/vsSkinner_Maya2009.vpc" [$WINDOWS]
+}
+
+$Project "vsskinner_maya2011"
+{
+	"sdktools/maya/vsskinner/vsSkinner_Maya2011.vpc" [$WINDOWS]
+}
+
+$Project "vsskinner_maya2012"
+{
+	"sdktools/maya/vsskinner/vsskinner_maya2012.vpc" [$WINDOWS]
+}
+
+$Project "vstblendtools_maya2009"
+{
+	"sdktools/maya/vstBlendTools/vstBlendTools_Maya2009.vpc" [$WINDOWS]
+}
+
+$Project "vstblendtools_maya2011"
+{
+	"sdktools/maya/vstBlendTools/vstBlendTools_Maya2011.vpc" [$WINDOWS]
+}
+
+$Project "vstblendtools_maya2012"
+{
+	"sdktools/maya/vstblendtools/vstblendtools_maya2012.vpc" [$WINDOWS]
+}
+
+$Project "vstblendtools_maya2013"
+{
+	"sdktools/maya/vstblendtools/vstblendtools_maya2013.vpc" [$WINDOWS]
+}
+
+$Project "vstdlib_staticlib"
+{
+	"vstdlib/vstdlib_staticlib.vpc"		[$PS3]
+}
+
+$Project "vstdlib"
+{
+	"vstdlib/vstdlib.vpc"		[$WINDOWS || $X360 || $DEDICATED || $WIN64 || $PS3 || $POSIX]
+}
+
+$Project "vstoverlap_maya2009"
+{
+	"sdktools/maya/vstOverlap/vstOverlap_Maya2009.vpc" [$WINDOWS]
+}
+
+$Project "vstoverlap_maya2011"
+{
+	"sdktools/maya/vstOverlap/vstOverlap_Maya2011.vpc" [$WINDOWS]
+}
+
+$Project "vstoverlap_maya2012"
+{
+	"sdktools/maya/vstoverlap/vstoverlap_maya2012.vpc" [$WINDOWS]
+}
+
+$Project "vstoverlap_maya2013"
+{
+	"sdktools/maya/vstoverlap/vstoverlap_maya2013.vpc" [$WINDOWS]
+}
+
+$Project "vstsmdio_maya2009"
+{
+	"sdktools/maya/vstsmdio/vstsmdio_maya2009.vpc" [$WINDOWS]
+}
+
+$Project "vstsmdio_maya2011"
+{
+	"sdktools/maya/vstsmdio/vstsmdio_maya2011.vpc" [$WINDOWS]
+}
+
+$Project "vstsmdio_maya2012"
+{
+	"sdktools/maya/vstsmdio/vstsmdio_maya2012.vpc" [$WINDOWS]
+}
+
+$Project "vstsmdio_maya2013"
+{
+	"sdktools/maya/vstsmdio/vstsmdio_maya2013.vpc" [$WINDOWS]
+}
+
+$Project "vstuihook_maya2009"
+{
+	"sdktools/maya/vstuihook/vstuihook_maya2009.vpc"	[$WINDOWS]
+}
+
+$Project "vstuihook_maya2011"
+{
+	"sdktools/maya/vstuihook/vstuihook_maya2011.vpc"	[$WINDOWS]
+}
+
+$Project "vstuihook_maya2012"
+{
+	"sdktools/maya/vstuihook/vstuihook_maya2012.vpc"	[$WINDOWS]
+}
+
+$Project "vstuihook_maya2013"
+{
+	"sdktools/maya/vstuihook/vstuihook_maya2013.vpc"	[$WINDOWS]
+}
+
+$Project "vstutils_maya2009"
+{
+	"sdktools/maya/vstUtils/vstUtils_Maya2009.vpc"	[$WINDOWS]
+}
+
+$Project "vstutils_maya2011"
+{
+	"sdktools/maya/vstUtils/vstUtils_Maya2011.vpc"	[$WINDOWS]
+}
+
+$Project "vstutils_maya2012"
+{
+	"sdktools/maya/vstutils/vstutils_maya2012.vpc"	[$WINDOWS]
+}
+
+$Project "vstutils_maya2013"
+{
+	"sdktools/maya/vstutils/vstutils_maya2013.vpc"	[$WINDOWS]
+}
+
+$Project "vsvmfio_maya2009"
+{
+	"sdktools/maya/vsVmfIO/vsVmfIO_Maya2009.vpc"	[$WINDOWS]
+}
+
+$Project "vsvmfio_maya2011"
+{
+	"sdktools/maya/vsVmfIO/vsVmfIO_Maya2011.vpc"	[$WINDOWS]
+}
+
+$Project "vsvmfio_maya2012"
+{
+	"sdktools/maya/vsvmfio/vsvmfio_maya2012.vpc"	[$WINDOWS]
+}
+
+$Project "vsvmfio_maya2013"
+{
+	"sdktools/maya/vsvmfio/vsvmfio_maya2013.vpc"	[$WINDOWS]
+}
+
+$Project "vtaexp"
+{
+	"utils/vtaexp/vtaexp.vpc" [$WINDOWS]
+}
+
+$Project "vtex_dll"
+{
+	"utils/vtex/vtex_dll.vpc" [$WINDOWS||$OSXALL]
+}
+
+$Project "vtex_launcher"
+{
+	"utils/vtex/vtex_launcher.vpc" [$WINDOWS]
+}
+
+$Project "vtf"
+{
+	"vtf/vtf.vpc" [$WINDOWS || $X360 || $DEDICATED || $PS3 || $POSIX]
+}
+
+$Project "vtf2tga"
+{
+	"utils/vtf2tga/vtf2tga.vpc" [$WINDOWS]
+}
+
+$Project "vtfdiff"
+{
+	"utils/vtfdiff/vtfdiff.vpc" [$WINDOWS]
+}
+
+$Project "vtfscrew"
+{
+	"utils/vtfscrew/vtfscrew.vpc" [$WINDOWS]
+}
+
+$Project "vvis_dll"
+{
+	"utils/vvis/vvis_dll.vpc" [$WINDOWS]
+}
+
+$Project "vvis_launcher"
+{
+	"utils/vvis_launcher/vvis_launcher.vpc" [$WINDOWS]
+}
+
+$Project "vweightexp"
+{
+	"utils/vweightexp/vweightexp.vpc" [$WINDOWS]
+}
+
+$Project "vxbdm"
+{
+	"utils/xbox/vxbdm/vxbdm.vpc" [$X360]
+	"utils/ps3/vpbdm/vpbdm.vpc" [$PS3]
+}
+
+$Project "vxconsole"
+{
+	"utils/xbox/vxconsole/vxconsole.vpc" [$WINDOWS && !$SOB]
+}
+
+$Project "vxconsole_ps3"
+{
+	"utils/ps3/vxconsole_ps3/vxconsole_ps3.vpc" [$WINDOWS && !$SOB]
+}
+
+$Project "dtlibwrapper"
+{
+	"utils/ps3/dtlibwrapper/dtlibwrapper.vpc" [$WINDOWS && !$SOB]
+}
+
+$Project "WaitAndRestart"
+{
+	"utils/vmpi/WaitAndRestart/WaitAndRestart.vpc" [$WINDOWS]
+}
+
+$Project "worldobjects"
+{
+	"worldobjects/worldobjects.vpc" [$WINDOWS]
+}
+
+$Project "xbox_loader"
+{
+	"utils/xbox/xbox_loader/xbox_loader.vpc" [$WINDOWS]
+}
+
+//$Project "xbspinfo"
+//{
+//	"utils/xbox/xbspinfo/xbspinfo.vpc" [$WINDOWS]
+//}
+
+$Project "xcompress"
+{
+	"utils/xbox/xcompress/xcompress.vpc" [$WINDOWS]
+}
+
+$Project "XLSPMakeFiles"
+{
+	"utils/xbox/XLSPMakeFiles/XLSPMakeFiles.vpc" [$WINDOWS]
+}
+
+$Project "XLSPMaster"
+{
+	"utils/xbox/XLSPMaster/XLSPMaster.vpc" [$WINDOWS]
+}
+
+$Project "XLSPMasterTest"
+{
+	"utils/xbox/XLSPMasterTest/XLSPMasterTest.vpc" [$WINDOWS]
+}
+
+$Project "xwad"
+{
+	"utils/xwad/xwad.vpc" [$WINDOWS]
+}
+
+$Project "ZipAlign"
+{
+	"utils/zipalign/ZipAlign.vpc" [$WINDOWS]
+}
+
+$Project "socketlib"
+{
+	"socketlib/socketlib.vpc"   [$WINDOWS||$X360]
+}
+
+$Project "videocache"
+{
+	"utils/videocache/videocache.vpc" [$WINDOWS]
+}
+
+$Project "localize"
+{
+	"localize/localize.vpc"
+}
+
+$Project "ps3shaderoptimizer"
+{
+	"utils/ps3/ps3shaderoptimizer/ps3shaderoptimizer.vpc" [$WINDOWS]
+}
+
+$Project "vdf2trx"
+{
+	"utils/ps3/vdf2trx/vdf2trx.vpc" [$WINDOWS]
+}
+
+$Project "build_econ_items_game"
+{
+	"utils\build_econ_items_game\csgo_build_econ_items_game.vpc" [$CSGO]
+}
+
+$Project "zlib"
+{
+    "thirdparty\zlib-1.2.5\zlib.vpc" [$WINDOWS]
+}

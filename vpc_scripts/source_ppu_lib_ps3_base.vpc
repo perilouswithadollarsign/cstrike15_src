@@ -1,0 +1,57 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects	
+//-----------------------------------------------------------------------------
+
+$Include "$SRCDIR\vpc_scripts\version.vpc"
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTLIBNAME"	"$PROJECTNAME"
+$MacroRequired				"OUTLIBDIR"
+
+$Macro PLATSUBDIR	"\."
+$Macro LIBPUBLIC	"$SRCDIR\lib\public"
+$Macro LIBCOMMON	"$SRCDIR\lib\common"
+
+$Include "$SRCDIR\vpc_scripts\source_ppu_lib_ps3_debug.vpc"
+$Include "$SRCDIR\vpc_scripts\source_ppu_lib_ps3_release.vpc"
+
+$IgnoreRedundancyWarning	"ON"
+
+// Common Configuration
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;_MEMTEST"		[$MEMTEST]
+		$PreprocessorDefinitions	"$BASE;_LOWVIOLENCE"	[$LV]
+		$PreprocessorDefinitions	"$BASE;_CERT"           [$CERT]
+		$PreprocessorDefinitions	"$BASE;NO_STEAM"        [$NO_STEAM]
+		$PreprocessorDefinitions	"$BASE;_DLL_EXT=$_DLL_EXT"
+		$PreprocessorDefinitions	"$BASE;LIBNAME=$OUTLIBNAME"
+	}
+
+	$PreBuildEvent
+	{
+		$CommandLine		"$CRCCHECK" "\n"
+	}
+}
+
+// Skeleton Project - All derived projects get this as a starting base
+$Project
+{
+	$Folder	"Source Files"
+	{	
+	}
+	
+	$File "vsi.nul"
+	{
+		$Configuration
+		{
+			$CustomBuildStep
+			{
+				$CommandLine	"echo &gt;nul&#x0D;&#x0A;"
+				$Outputs		"$(IntDir)\vsi.out"
+			}
+		}
+	}
+}

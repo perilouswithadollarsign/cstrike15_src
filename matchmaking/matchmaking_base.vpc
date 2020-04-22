@@ -1,0 +1,42 @@
+//-----------------------------------------------------------------------------
+//	matchmaking_base.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro OUTLIBNAME	"matchmakingbase"
+
+$include "matchmaking_base_inc.vpc" 
+
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;MATCHMAKING_DLL" 
+	}
+}
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$IntermediateDirectory		".\Debug_matchmakingbase$PLATSUBDIR"			[$WINDOWS||$POSIX]
+		$IntermediateDirectory		".\Debug_matchmakingbase_360"		[$X360]
+		$IntermediateDirectory		".\Debug_matchmakingbase_PS3"		[$PS3]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{
+		$IntermediateDirectory		".\Release_matchmakingbase$PLATSUBDIR"		[$WINDOWS||$POSIX]
+		$IntermediateDirectory		".\Release_matchmakingbase_360"	[$X360]
+		$IntermediateDirectory		".\Release_matchmakingbase_PS3"	[$PS3]
+	}
+}
+
+$Project "matchmakingbase"
+{
+}

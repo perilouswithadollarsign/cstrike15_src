@@ -1,0 +1,123 @@
+//-----------------------------------------------------------------------------
+//	Base Settings for Source(TM) Projects
+//-----------------------------------------------------------------------------
+
+$MacroRequired				"SRCDIR"
+$MacroRequired				"OUTBINNAME"
+$MacroRequired				"OUTBINDIR"
+$MacroRequired				"SCE_PPU_GCC_LIBROOT"
+$MacroRequired				"SCE_PPU_LIBROOT"
+
+$IgnoreRedundancyWarning	"ON"
+
+$Configuration "Debug"
+{
+	$General	
+	{
+		// General
+		$OutputDirectory					".\Debug_PS3"
+		$IntermediateDirectory				".\Debug_PS3"
+		$ExtensionsToDeleteOnClean
+		$BuildLogFile
+		$SystemIncludeDependencies
+		$SaveDebuggerPropertiesInProject
+		
+		$ConfigurationType					"PRX"
+	}
+
+	$SNCCompiler
+	{
+		// General
+		$AdditionalIncludeDirectories		"$SRCDIR\common;$SRCDIR\public;$SRCDIR\public\tier0;$SRCDIR\public\tier1;$(SN_PS3_PATH)\ppu\include\sn;$(SCE_PS3_ROOT)\target\ppu\include;$(SCE_PS3_ROOT)\target\common\include;"
+		$PreprocessorDefinitions			"SN_TARGET_PS3;_DEBUG;DEBUG;__SNC__;__CELL_ASSERT__;POSIX"
+		$ForceIncludes						"tier0/platform.h"
+		$GenerateDebugInformation			"yes"
+		$Warnings							"Generate Warnings (=1)"
+		$TreatMessagesAsErrors				"Reported Errors Only (=0)"
+		$DisableSpecificWarnings			"64;68;112;129;175;178;186;187;237;285;369;429;496;552;613;832;1011;1323;1421;1437;1772;1773;1778;1787"
+		$ObjectFileName						"$(IntDir)\"
+		$CallprofHierarchicalProfiling		"No"
+
+		// Optimization
+		$OptimizationLevel					"No Optimization, Forced Inlining only (-O0)"
+		$FastMath							"No"
+		$RelaxAliasChecking					"Default"
+		$BranchlessCompares					"Always Use Branches (=0)"
+		$UnrollLoops						"30"
+		$AssumeAlignedPointers				"No"
+		$AssumeCorrectSign					"Yes"
+
+		// Code Generation
+		$TOCPointerPreservation				"Preserve the TOC for all Function Calls (=0)"
+		$InitializedDataPlacement			"Automatic .bss and .data Placement (=1)"
+		$PromoteFPConstantsToDoubles		"No"
+
+		// Language
+		$CC++Dialect						"Mixed with GNU Extensions"
+		$C++ExceptionsAndRTTIUsage			"Using RTTI only"
+		$DefaultCharUnsigned				"No"
+		$DefaultFPConstantsAsTypeFloat		"No"
+		$BuiltInDefinitionForWCHAR_TType	"unsigned short (=ushort)"
+
+		// Precompiled Headers
+		$Create/UsePrecompiledHeader		"Not Using Precompiled Header File(s)"
+		$PrecompiledHeaderFile
+
+		// Command Line
+		$AdditionalOptions
+	}
+
+	$SNCLinker
+	{
+		// General
+		$OutputFile							$(OutDir)/$OUTBINNAME_ps3.prx
+		$OutputFormat                       "PRX file"
+		$AdditionalDependencies				"libgcc.a libsyscall.a liblv2_stub.a libsupc++.a fno-exceptions\libc_stub.a fno-exceptions\libstdc++.a fno-exceptions\libm_stub.a libfios.a libpthread.a libfs_stub.a libsysutil_stub.a libsysutil_np_stub.a libsysmodule_stub.a libsysutil_avconf_ext_stub.a"
+		$AdditionalLibraryDirectories				
+		$IgnoreAllDefaultLibraries			"No"
+		$UsingExceptionHandling				"No"
+		$TOCPointerElimination				"No"
+		$ForceSymbolReferences
+		$CallprofHierarchicalProfiling		"No"
+		$DebugInfoAndSymbolStripping		"No Symbol Stripping"
+		$UnusedFunctionAndDataStripping		"No Code Stripping"
+		$ImportLibrary						"$(TargetDir)$OUTBINNAME_stub.a"
+		$GenerateMapFile					"No Map File"
+		$MapFileName
+		$LinkLibraryDependencies			"Yes"
+
+		// Command Line
+		$AdditionalOptions					"-disable-warning=25 --ppuguid"
+	}
+ 
+	$PreBuildEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PreLinkEvent
+	{
+		$CommandLine
+		$Description
+		$ExcludedFromBuild					"No"
+	}
+
+	$PostBuildEvent
+	{
+		$CommandLine						"$(SCE_PS3_ROOT)\host-win32\bin\make_fself &quot;$(TargetPath)&quot; &quot;$(TargetDir)$(TargetName).sprx&quot;"
+		$Description						"Fake Signing PRX &quot;$(TargetDir)$(TargetName).self&quot;"
+		$ExcludedFromBuild					"No"
+	}
+
+	$CustomBuildStep
+	{
+		// General
+		$CommandLine
+		$Description
+		$Outputs
+		$AdditionalDependencies
+	}
+}
+

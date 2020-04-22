@@ -1,0 +1,190 @@
+//-----------------------------------------------------------------------------
+//	TIER0.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+$Macro NOSCHEMACOMPILER "1"
+$Conditional VTUNE_ENABLED 0
+
+$Include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+//-----------------------------------------------------------------------------
+// VTune defines
+$Macro VTUNE_DIR		"$SRCDIR\thirdparty\vtune"
+$Macro VTUNE_INCLUDE	"$VTUNE_DIR\include"
+$Macro VTUNE_LIB		"$VTUNE_DIR\lib32\libittnotify.lib"
+//-----------------------------------------------------------------------------
+
+$Configuration
+{
+	$General [$X360]
+	{
+		// X360 version publishes to some other directory then copies here so we need to tell VPC to track this
+		// or else it won't know what depends on this project.
+		$AdditionalOutputFiles			"$LIBPUBLIC\$(TargetName).lib"
+	}
+	
+	$Compiler
+	{
+		$PreprocessorDefinitions		"$BASE;TIER0_DLL_EXPORT;CROSS_PLATFORM_VERSION=1;THREAD_MUTEX_TRACING_ENABLED"[$WINDOWS||$X360]
+		$PreprocessorDefinitions		"$BASE;TIER0_DLL_EXPORT;CROSS_PLATFORM_VERSION=1;POSIX" [$PS3||$POSIX]
+		$PreprocessorDefinitions		"$BASE;TIER0_FPO_DISABLED"				[$NOFPO]		
+	}
+	
+	$Compiler [$WINDOWS]
+	{
+		$AdditionalIncludeDirectories	"$BASE;$VTUNE_INCLUDE"	[$VTUNE_ENABLED]
+	}
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies			"$BASE;$VTUNE_LIB" [$VTUNE_ENABLED]
+	}
+	$Compiler [$PS3]
+	{
+		$AdditionalIncludeDirectories	"$BASE;&quot;$(SN_PS3_PATH)/ppu/include&quot;"
+		$PreprocessorDefinitions		"$BASE;PLATFORM_OVERRIDE_TIER0"
+	}
+	$SNCCompiler [$PS3]
+	{
+		$ForceIncludes				"platform_override.h"
+	}
+
+	$Linker [$X360]
+	{
+		// 360 publishes the import library via a post build step
+		$ImportLibrary					"$(TargetDir)\$(TargetName).lib"
+
+		// 360 will auto generate a def file for this import library
+		$ModuleDefinitionFile			" "
+		$AdditionalOptions				"$BASE /AUTODEF:xbox\xbox.def"
+	}
+
+	$Linker [!$X360]
+	{
+		// Everyone but 360 build right to the location.
+		$ImportLibrary					"$LIBPUBLIC\$_IMPLIB_PREFIX$OUTBINNAME$_IMPLIB_EXT"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE &quot;$(SN_PS3_PATH)/ppu/lib/sn/libsn.a&quot; &quot;$(SN_PS3_PATH)/ppu/lib/sn/libsntuner.a&quot;"
+	}
+	
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE ws2_32.lib"							[$WINDOWS]
+	}
+
+	$PreLinkEvent [!$POSIX]
+	{
+		$CommandLine	"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $LIBPUBLIC\$(TargetName).lib $SRCDIR" "\n" \
+						"$BASE"
+	}
+	
+	$PreLinkEvent [$X360]
+	{
+		// Run a pre-link event to clean the .def file from the last link
+		$CommandLine					"if exist xbox\xbox.def del xbox\xbox.def" "\n" \
+										"$BASE"
+	}
+
+	$PreLinkEvent [$PS3]
+	{
+		$CommandLine					"$BASE"
+		$Description					"NOTE - If PRX linking fails, make sure your tier0_staticlib is building in same solution configuration (debug/release) as tier0 prx."
+	}
+
+	$PostBuildEvent [$X360]
+	{
+		// Publish the import lib
+		$CommandLine					"if exist $(TargetDir)$(TargetName).lib copy $(TargetDir)$(TargetName).lib $LIBPUBLIC\$(TargetName).lib" "\n" \
+										"$BASE"
+	}
+	
+	$PostBuildEvent [$PS3]
+	{
+		// Publish the import lib
+		$CommandLine		"if exist $(TargetName)_stub.a move $(TargetName)_stub.a $LIBPUBLIC\$(TargetName).lib" "\n" \
+							"if exist $(TargetName)_verlog.txt del $(TargetName)_verlog.txt" "\n" \
+							"$BASE" "\n"
+	}
+
+	$General [$POSIX]
+	{
+		$GameOutputFile                                 "$OUTBINDIR/$_IMPLIB_PREFIX$OUTBINNAME$_DLL_EXT"
+	}
+
+	$General [$PS3]
+	{
+		$AdditionalProjectDependencies		"$BASE;tier0_staticlib"
+	}
+
+}
+
+$Configuration "Release"
+{
+	$PreBuildEvent [$PS3]
+	{
+		// Clear potentially stale verlog files
+		$CommandLine		"ppu-lv2-prx-exportpickup -o Release_PS3/prxexport.inl Release_tier0staticlib_PS3/prx.obj Release_tier0staticlib_PS3/threadtools.obj Release_tier0staticlib_PS3/vprof.obj Release_tier0staticlib_PS3/dbg.obj Release_tier0staticlib_PS3/logging.obj" "\n" \
+							"if exist tier0_rel_verlog.txt del tier0_rel_verlog.txt" "\n" \
+							"$BASE" "\n"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE &quot;Release_tier0staticlib_PS3/tier0_staticlib_ps3.lib&quot;"
+	}
+}
+
+$Configuration "Debug"
+{
+	$PreBuildEvent [$PS3]
+	{
+		// Clear potentially stale verlog files
+		$CommandLine		"ppu-lv2-prx-exportpickup -o Debug_PS3/prxexport.inl Debug_tier0staticlib_PS3/prx.obj Debug_tier0staticlib_PS3/threadtools.obj Debug_tier0staticlib_PS3/vprof.obj Debug_tier0staticlib_PS3/dbg.obj Debug_tier0staticlib_PS3/logging.obj" "\n" \
+							"if exist tier0_dbg_verlog.txt del tier0_dbg_verlog.txt" "\n" \
+							"$BASE" "\n"
+	}
+
+	$Linker [$PS3]
+	{
+		$AdditionalDependencies			"$BASE &quot;Debug_tier0staticlib_PS3/tier0_staticlib_ps3.lib&quot;"
+	}
+}
+
+$Include "tier0.inc"
+
+$Project
+{
+
+	$Folder "PS3 Files" [$PS3]
+	{
+		$File	"prxexport.cpp"
+	}
+
+	$Folder	"Source Files"  [$PS3]
+	{
+		-$File	"$SRCDIR\common\ps3\prx.cpp"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		-$ImpLib "$LIBPUBLIC\tier0"
+		-$Lib	 "$LIBPUBLIC\tier1"
+		-$implib "$LIBPUBLIC\vstdlib"
+		-$Lib	 "$LIBPUBLIC\interfaces"
+   		
+		$LibExternal	 "$SRCDIR\thirdparty\telemetry\lib\telemetry32.link" [$WIN32 && !$RAD_TELEMETRY_DISABLED]
+		$LibExternal	 "$SRCDIR\thirdparty\telemetry\lib\telemetry64.link" [$WIN64 && !$RAD_TELEMETRY_DISABLED]
+		$LibExternal	 "$SRCDIR/thirdparty/telemetry/lib/libtelemetryx86.link" [$LINUX32 && !$RAD_TELEMETRY_DISABLED]
+		$LibExternal	 "$SRCDIR/thirdparty/telemetry/lib/libtelemetryx64.link" [$LINUX64 && !$RAD_TELEMETRY_DISABLED]
+	}
+}
+
+$Project "tier0"
+{
+}

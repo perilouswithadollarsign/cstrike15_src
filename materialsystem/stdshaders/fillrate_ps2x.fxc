@@ -1,0 +1,12 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+const float4 g_ColorConstant	: register( c0 );
+
+float4_color_return_type main( void ) : COLOR
+{
+	float4 result = (g_ColorConstant * (1.0 / 2.0));
+	
+	return FinalOutput( result, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_NONE );
+}

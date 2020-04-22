@@ -1,0 +1,63 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:	"GENERATEBASETEXTURE"		"0..1"
+// STATIC:	"GENERATENORMAL"			"0..1"
+// STATIC:  "GENERATEMASKS1"			"0..1"
+// STATIC:  "CHEAPFILTERING"			"0..1"
+// STATIC:	"BASEALPHAPHONGMASK"		"0..1"
+// STATIC:  "BASEALPHAENVMASK"			"0..1"
+// STATIC:  "BUMPALPHAENVMASK"			"0..1"
+// STATIC:  "USEPATTERN"				"0..4"
+
+#include "common_ps_fxc.h"
+
+// SKIP: ( $GENERATEBASETEXTURE == 1 ) && ( $GENERATENORMAL == 1 )
+// SKIP: ( $GENERATEBASETEXTURE == 1 ) && ( GENERATEMASKS1 == 1 )
+// SKIP: ( $GENERATENORMAL == 1 ) && ( $GENERATEMASKS1 == 1 )
+// SKIP: ( $CHEAPFILTERING == 1 ) && ( $GENERATEBASETEXTURE == 0 )
+// SKIP: ( $USEPATTERN > 0 ) && ( $GENERATEBASETEXTURE == 0 )
+// SKIP: ( $GENERATEBASETEXTURE == 0 ) && ( $GENERATENORMAL == 0 ) && ( GENERATEMASKS1 == 0 )
+// SKIP: ( $GENERATENORMAL == 0 ) && ( $BUMPALPHAENVMASK == 1 )
+// SKIP: ( $GENERATEBASETEXTURE == 0 ) && ( $BASEALPHAPHONGMASK == 1 )
+// SKIP: ( $GENERATEBASETEXTURE == 0 ) && ( $BASEALPHAENVMASK == 1 )
+
+#if ( GENERATENORMAL == 1 )
+	sampler NormalMapSampler			: register( s0 );
+#endif
+
+#if ( GENERATEMASKS1 == 1 )
+	sampler Masks1Sampler				: register( s1 );
+#endif
+
+#include "custom_character_fxc.h"
+
+struct PS_INPUT
+{
+	float2 vTexCoord0							: TEXCOORD0;
+};
+
+// ======================= MAIN ======================= //
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	float4 fvBaseTexture = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+	float4 fvNormal = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+	float4 fvMasks1 = float4( 1.0f, 1.0f, 1.0f, 1.0f );
+
+	#if ( GENERATEMASKS1 == 1 )
+		fvMasks1 = tex2D( Masks1Sampler, i.vTexCoord0 );
+	#endif
+	#if ( GENERATENORMAL == 1 )
+		fvNormal = tex2D( NormalMapSampler, i.vTexCoord0 );
+	#endif
+
+	customizeCharacter( i.vTexCoord0.xy, fvBaseTexture, fvNormal, fvMasks1 );
+
+	#if ( GENERATEMASKS1 == 1 )
+		return fvMasks1;
+	#endif
+	#if ( GENERATENORMAL == 1 )
+		return fvNormal;
+	#endif
+
+	return fvBaseTexture;
+}

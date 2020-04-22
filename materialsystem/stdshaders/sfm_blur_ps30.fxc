@@ -1,0 +1,35 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+#include "common_ps_fxc.h"
+
+#define NUM_TAPS 18
+
+struct PS_INPUT
+{
+	float2 vPos				: VPOS;		// Normalized Screenpos, call ComputeScreenPos() to get useful 2D coordinates
+};
+
+sampler TexSampler			: register( s0 );
+float2 vDir					: register( c0 ); // This will be [1,0] or [0,1]
+float  vCoeff[NUM_TAPS]		: register( c33 );
+
+
+float4 main( PS_INPUT i )	: COLOR
+{
+	// Center tap at vPos
+	float4 sampleCenter = tex2D( TexSampler, saturate( ComputeScreenPos( i.vPos ) ) );
+	float4 accum = vCoeff[0] * sampleCenter;
+
+	// Positive and negative offsets per "loop" (we unroll because we can't actually index the constant store)
+	[unroll]
+	for ( int j=1; j < NUM_TAPS; j++ )
+	{
+		float4 sample0 = tex2D( TexSampler, saturate( ComputeScreenPos( i.vPos + ( vDir * j ) ) ) );
+		accum += vCoeff[j] * sample0;
+
+		float4 sample1 = tex2D( TexSampler, saturate( ComputeScreenPos( i.vPos - ( vDir * j ) ) ) );
+		accum += vCoeff[j] * sample1;
+	}
+
+	return max( 0, accum );
+}

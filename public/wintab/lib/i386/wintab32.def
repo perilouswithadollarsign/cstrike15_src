@@ -1,0 +1,61 @@
+LIBRARY     WINTAB32
+EXPORTS
+
+;Table 5.1. Ordinal Function Numbers for Dynamic Linking
+;Function Name                  Ordinal Parameter-words
+WTInfoA@12                      @20
+WTInfoW@12                      @1020
+WTOpenA@12                      @21
+WTOpenW@12                      @1021
+WTClose@4                       @22
+WTPacketsGet@12                 @23
+WTPacket@12                     @24
+
+WTEnable@8                      @40
+WTOverlap@8                     @41
+WTConfig@8                      @60
+WTGetA@8                        @61
+WTGetW@8                        @1061
+WTSetA@8                        @62	 
+WTSetW@8                        @1062
+WTExtGet@12                     @63
+WTExtSet@12                     @64
+WTSave@8                        @65
+WTRestore@12                    @66
+
+WTPacketsPeek@12                @80
+WTDataGet@24                    @81
+WTDataPeek@24                   @82
+
+WTQueuePacketsEx@12             @200
+WTQueueSizeGet@4                @84
+WTQueueSizeSet@8                @85
+
+WTMgrOpen@8                     @100
+WTMgrClose@4                    @101
+
+WTMgrContextEnum@12             @120
+WTMgrContextOwner@8             @121
+WTMgrDefContext@8               @122
+WTMgrDefContextEx@12            @206
+
+WTMgrDeviceConfig@12            @140
+
+WTMgrConfigReplaceExA@16        @202
+WTMgrConfigReplaceExW@16        @1202
+
+
+WTMgrPacketHookExA@16           @203
+WTMgrPacketHookExW@16           @1203
+WTMgrPacketUnhook@4             @204
+
+WTMgrPacketHookNext@16          @205
+WTMgrExt@12                     @180
+WTMgrCsrEnable@12               @181
+WTMgrCsrButtonMap@16            @182
+WTMgrCsrPressureBtnMarks@16     @183
+WTMgrCsrPressureBtnMarksEx@16   @201
+WTMgrCsrPressureResponse@16     @184
+WTMgrCsrExt@16                  @185
+
+

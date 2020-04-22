@@ -1,0 +1,535 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "PHONG"						"0..1"
+// STATIC:  "PHONGEXPONENTTEXTURE"		"0..1"
+// STATIC:	"CUBEMAP"					"0..1"
+// STATIC:	"DECALSTYLE"				"0..5"
+// STATIC:	"THIRDPERSON"				"0..1"
+// STATIC:  "CASCADED_SHADOW_MAPPING"	"0..1" [ps30]
+// STATIC:  "ALPHAMASK"					"0..1" [ps30]
+// STATIC:	"DESATBASETINT"				"0..1"
+
+// DYNAMIC: "NUM_LIGHTS"				"0..2" [ps20]
+// DYNAMIC: "NUM_LIGHTS"				"0..4" [ps20b] [ps30]
+// DYNAMIC: "DYN_CSM_ENABLED"			"0..1"
+// DYNAMIC:	"HIGHLIGHT"					"0..1" [ps20] [ps20b]
+// DYNAMIC:	"HIGHLIGHT"					"0..2" [ps30]
+// DYNAMIC: "PEEL"						"0..1"
+
+// SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $DYN_CSM_ENABLED == 1 )
+// SKIP: ( $HIGHLIGHT == 1 ) [ps30]
+// SKIP: ( $HIGHLIGHT > 0 ) && ( $THIRDPERSON == 1 )
+// SKIP: ( $HIGHLIGHT > 0 ) && ( $PEEL == 1 )
+// SKIP: ( $PEEL == 1 ) && ( $THIRDPERSON == 1 )
+// SKIP: ( $ALPHAMASK == 1 ) && ( $THIRDPERSON == 1 )
+// SKIP: ( $ALPHAMASK == 1 ) && ( $HIGHLIGHT == 1 )
+// SKIP: ( $ALPHAMASK == 1 ) && ( $PEEL == 1 )
+
+#include "common_ps_fxc.h"
+//#include "common_vertexlitgeneric_dx9.h"
+#include "shader_constant_register_map.h"
+
+
+// SAMPLERS
+sampler			BaseSampler							: register( s0 );
+#if (THIRDPERSON == 0)
+sampler			AOSampler							: register( s1 );
+#endif
+
+#if (PHONGEXPONENTTEXTURE == 1)
+sampler			ExpSampler							: register( s2 );
+#endif
+
+#if (CUBEMAP == 1)
+samplerCUBE		EnvmapSampler						: register( s3 );
+#endif
+
+#if (THIRDPERSON == 0)
+sampler			ScratchesSampler					: register( s4 );
+sampler			GrungeSampler						: register( s9 );
+#endif
+
+#if (DECALSTYLE == 3)
+sampler			HoloSpectrumSampler					: register( s6 );
+sampler			HoloMaskSampler						: register( s7 );
+#endif
+
+#if ( (DECALSTYLE == 4) || ( DECALSTYLE==5 ) )
+sampler NormalMapSampler							: register( s6 );
+#endif
+
+#if ( DECALSTYLE == 5 )
+sampler AnisoDirSampler :							register( s8 );
+#endif
+
+sampler			NormalizeSampler					: register( s5 );
+
+#if ( CASCADED_SHADOW_MAPPING == 1 )
+	sampler CSMDepthAtlasSampler					: register( s15 );
+	#define CASCADE_SIZE 3
+	#define CSM_ENABLED 1
+	#include "csm_common_fxc.h"
+#endif
+
+// REGISTERS
+const float4	g_fvConstRegister0					: register( c0 );
+#define			g_flWearAmt							g_fvConstRegister0.x
+#define			g_flWearWidth						g_fvConstRegister0.y
+#define			g_flWearRemapped					g_fvConstRegister0.z
+#define			g_flUnWearStrength					g_fvConstRegister0.w
+
+const float4	g_fvConstRegister1					: register( c1 );
+#define			g_flPhongExponent					g_fvConstRegister1.x
+#define			g_flPhongBoost						g_fvConstRegister1.y
+#define			g_flPhongAlbedoBoost				g_fvConstRegister1.z
+#define			g_flGrungeScale						g_fvConstRegister1.w
+
+const float4	g_fvConstRegister2					: register( c2 );
+#define			g_fvPhongFresnelRanges				g_fvConstRegister2.xyz
+#define			g_bPhongAlbedoTint					g_fvConstRegister2.w
+
+const float4	g_fvConstRegister3					: register( c3 );
+#define			g_fvEnvmapTint						g_fvConstRegister3.xyz
+
+const float4	g_fvConstRegister10					: register( c10 );
+#define			g_fvColorTint						g_fvConstRegister10.xyz
+
+const float4	g_fvConstRegister13					: register( c13 );
+
+#if (DECALSTYLE == 2)
+	const float4	g_fvConstRegister11					: register( c11 );
+	#define			g_fvColorTint2						g_fvConstRegister11.xyz
+	#define			g_fvColorTint3						float3( g_fvConstRegister3.w, g_fvConstRegister10.w, g_fvConstRegister11.w )
+	#define			g_fvColorTint4						g_fvConstRegister13.xyz
+#endif
+
+#define			g_flTintLerpBase						g_fvConstRegister13.w
+
+#if (HIGHLIGHT > 0)
+	#define			TAU									6.28318
+	#define			ONE_OVER_SIXTEEN					0.0625
+	#define			CSTRIKE_BLUE						float3( 0.204, 0.266, 0.343 )
+#endif
+
+#if (HIGHLIGHT > 0) || (PEEL == 1)
+	const float4	g_fvConstRegister14					: register( c14 );
+	#define			g_flHighlightAmount					g_fvConstRegister14.x
+	#define			g_flHighlightCycle					g_fvConstRegister14.y
+#endif
+
+const float4	g_EyePos_unused						: register( c12 );
+#define			g_EyePos							g_EyePos_unused.xyz
+
+const float3	g_cAmbientCube[6]					: register( PSREG_AMBIENT_CUBE ); // 4 through 9
+PixelShaderLightInfo cLightInfo[3]					: register( PSREG_LIGHT_INFO_ARRAY ); // 20 through 25
+
+#define			g_flScratchwidth					0.02f
+
+struct PS_INPUT
+{
+	float4 vBaseUV_PatternUV	: TEXCOORD0;
+	//float4 vWearUV_GrungeUV		: TEXCOORD1;
+	float4   lightAtten				: TEXCOORD2;
+	float3   worldPos				: TEXCOORD3;
+#if ( ( DECALSTYLE == 4 ) || ( DECALSTYLE == 5) )
+	float3x3 tangentSpaceTranspose	: TEXCOORD4;
+	//	     second row				: TEXCOORD5;
+	//	     third row				: TEXCOORD6;
+#else
+	float3   vWorldNormal			: TEXCOORD4;
+#endif
+};
+
+void PixelShaderDoAnisotropicSpecularLight( const float3 vWorldNormal, const float3 vWorldTangentS, const float3 vWorldTangentT, 
+											const float fSpecularExponent, const float3 vEyeDir,
+											const float fAtten, const float3 vLightColor, const float3 vLightDir,
+											const float2 vAnisoDir,
+
+											// Outputs
+											out float3 specularLighting )
+{
+	float3 vTangent = vAnisoDir.x * vWorldTangentS + vAnisoDir.y * vWorldTangentT;
+	
+	float cs = -dot( vEyeDir, vTangent );
+	float sn = sqrt( 1 - cs * cs );
+	float cl = -dot( vLightDir, vTangent );
+	float sl = sqrt( 1 - cl * cl );
+	specularLighting = pow( saturate(cs * cl + sn * sl), fSpecularExponent );
+
+	specularLighting *= pow( saturate( dot( vWorldNormal, vLightDir ) ), 0.5 ); // Mask with N.L raised to a power
+	specularLighting *= vLightColor * fAtten;									// Modulate with light color
+}
+
+void PixelShaderDoAnisotropicSpecularLighting( const float3 worldPos, const float3 worldNormal, const float3 worldTangentS, const float3 worldTangentT,
+											   const float fSpecularExponent, const float3 vEyeDir,
+											   const float4 lightAtten, const int nNumLights, PixelShaderLightInfo cLightInfo[3], float fFresnel,
+											   const float2 anisoDir, const float flDirectShadow,
+
+									// Outputs
+									out float3 specularLighting )
+{
+	specularLighting = float3( 0.0f, 0.0f, 0.0f );
+	float3 localSpecularTerm;
+
+	if( nNumLights > 0 )
+	{
+		// First local light will always be forced to a directional light in CS:GO (see CanonicalizeMaterialLightingState() in shaderapidx8.cpp) - it may be completely black.
+		PixelShaderDoAnisotropicSpecularLight( worldNormal, worldTangentS, worldTangentT, fSpecularExponent, vEyeDir, lightAtten,
+											   PixelShaderGetLightColor( cLightInfo, 0 ), 
+											   PixelShaderGetLightVector( worldPos, cLightInfo, 0 ), 
+											   anisoDir, localSpecularTerm );
+
+		specularLighting += localSpecularTerm * flDirectShadow;		// Accumulate specular and rim terms
+	}
+
+	if( nNumLights > 1 )
+	{
+		PixelShaderDoAnisotropicSpecularLight( worldNormal, worldTangentS, worldTangentT, fSpecularExponent, vEyeDir, lightAtten,
+											   PixelShaderGetLightColor( cLightInfo, 1 ), 
+											   PixelShaderGetLightVector( worldPos, cLightInfo, 1 ), 
+											   anisoDir, localSpecularTerm );
+
+		specularLighting += localSpecularTerm;		// Accumulate specular and rim terms
+	}
+
+
+	if( nNumLights > 2 )
+	{
+		PixelShaderDoAnisotropicSpecularLight( worldNormal, worldTangentS, worldTangentT, fSpecularExponent, vEyeDir, lightAtten,
+											   PixelShaderGetLightColor( cLightInfo, 2 ), 
+											   PixelShaderGetLightVector( worldPos, cLightInfo, 2 ), 
+											   anisoDir, localSpecularTerm );
+
+		specularLighting += localSpecularTerm;		// Accumulate specular and rim terms
+	}
+
+	if( nNumLights > 3 )
+	{
+		PixelShaderDoAnisotropicSpecularLight( worldNormal, worldTangentS, worldTangentT, fSpecularExponent, vEyeDir, lightAtten,
+											   PixelShaderGetLightColor( cLightInfo, 3 ), 
+											   PixelShaderGetLightVector( worldPos, cLightInfo, 3 ), 
+											   anisoDir, localSpecularTerm );
+
+		specularLighting += localSpecularTerm;		// Accumulate specular and rim terms
+	}
+
+	specularLighting *= fFresnel;
+
+}
+
+#if ( DESATBASETINT == 1 )
+	static const float3 g_desat = { 0.299, 0.587, 0.114 };
+#endif
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+
+#if defined( _X360 ) || defined( _PS3 )
+	float4 cOut = float4( 0.0f, 0.0f, 0.0f, 1.0f );
+#else
+
+	float4 cOut = tex2D( BaseSampler, i.vBaseUV_PatternUV.zw );
+	
+	#if ( DESATBASETINT == 1 )
+		cOut.rgb = lerp( dot(g_desat.rgb, cOut.rgb).xxx, cOut.rgb, g_flTintLerpBase );
+	#endif
+
+	#if ( ALPHAMASK == 1 )
+		cOut.a = step( 0.1f, cOut.a );
+		cOut.rgb = cOut.a;
+		cOut.a = 1;
+		return cOut;
+	#endif
+
+	#if ( THIRDPERSON == 1 )
+		//clip off any pixels outside 0-1 UV space to prevent smearing edge pixels on lower mips
+		clip( (saturate( i.vBaseUV_PatternUV.z ) != i.vBaseUV_PatternUV.z) ? -1 : 1 );
+		clip( (saturate( i.vBaseUV_PatternUV.w ) != i.vBaseUV_PatternUV.w) ? -1 : 1 );
+	#endif
+
+	//alpha values above 0.1 locally decrease wear to retain important areas of the sticker
+	float flUnWearImportance = g_flUnWearStrength * ( 1.0f - cOut.a );
+	
+	//semi-on/off alpha
+	cOut.a = step( 0.1f, cOut.a );
+	#if (HIGHLIGHT == 0) && (PEEL == 0)
+		clip( cOut.a - 0.001f );
+	#endif
+
+	#if (DECALSTYLE != 2) // non-color-replace logos can still be color tinted by the first color tint value
+		
+		#if (DESATBASETINT == 1)
+			cOut.rgb = lerp( cOut.rgb * g_fvColorTint, cOut.rgb, cOut.g * g_flTintLerpBase );
+		#else
+			cOut.rgb *= g_fvColorTint;
+		#endif
+
+	#endif
+
+	#if (PHONG == 1)
+		// default to numerically defined specular values
+		float4 fvSpecularExponent = float4( g_flPhongExponent, g_bPhongAlbedoTint, 0.0f, 1.0f );
+		#if (PHONGEXPONENTTEXTURE == 1)
+			// override the existing specular exponent values with values from the exponent map
+			fvSpecularExponent.xy = tex2D( ExpSampler, i.vBaseUV_PatternUV.xy ).xy;
+		#endif
+	#endif
+
+	float3 vWorldPos = i.worldPos;
+	float3 vEyeDir = normalize( g_EyePos - vWorldPos );
+
+	#if ( (DECALSTYLE == 4) || ( DECALSTYLE == 5 ) )// foil emboss uses normal map
+		float4 vNormalTexel = tex2D( NormalMapSampler, i.vBaseUV_PatternUV.zw );
+		float3 vTangentSpaceNormal = 2.0f * vNormalTexel.xyz - 1.0f;
+		float3 vWorldNormal = normalize( mul( (float3x3)i.tangentSpaceTranspose, vTangentSpaceNormal ) );
+		#if ( DECALSTYLE == 5)
+			// flatten the normal for anisotropic spec to reduce aliasing
+			float3 vSpecNormal = normalize( mul( (float3x3)i.tangentSpaceTranspose, lerp( vTangentSpaceNormal, float3( 0.0f, 0.0f, 1.0f ), 0.95f ) ) );
+		#endif
+	#else
+		float3 vWorldNormal = normalize ( i.vWorldNormal.xyz );
+	#endif
+	
+	#if (DECALSTYLE == 2) // color-replace logo
+		cOut.rgb = lerp( lerp( lerp( g_fvColorTint, g_fvColorTint2, cOut.r ), g_fvColorTint3, cOut.g ), g_fvColorTint4, cOut.b );
+	#endif
+
+	#if (DECALSTYLE == 3) // hologram	
+		float3 fvHoloMask = tex2D( HoloMaskSampler, i.vBaseUV_PatternUV.zw ).rgb;
+
+		#if (NUM_LIGHTS > 0)
+			float2 fvSpectrumUV = float2( fvHoloMask.g + dot( vEyeDir, vWorldNormal ), fvHoloMask.b );
+			float3 fvlightdir0 = normalize(cLightInfo[0].pos.xyz - vWorldPos);
+			fvSpectrumUV.x += dot( vEyeDir, fvlightdir0 );
+		#else
+			float2 fvSpectrumUV = float2( fvHoloMask.g + dot( vEyeDir + vWorldNormal, float3( 0, 1, 0 ) ), fvHoloMask.b );
+		#endif
+
+		float3 fvHoloSpectrumSrc = tex2D( HoloSpectrumSampler, fvSpectrumUV ).rgb;
+		cOut.rgb = lerp( cOut.rgb, fvHoloSpectrumSrc, fvHoloMask.r );
+	#endif
+
+	// lighting
+	#if ( (CASCADED_SHADOW_MAPPING == 1) && (DYN_CSM_ENABLED == 1) )
+		float flCSMShadow = CSMComputeShadowing( vWorldPos );
+	#else
+		float flCSMShadow = 1.0f;
+	#endif
+
+	float3 linearColor = PixelShaderDoLighting( vWorldPos, vWorldNormal, float3( 0.1f, 0.1f, 0.1f), false, true, i.lightAtten, g_cAmbientCube, NormalizeSampler, NUM_LIGHTS, cLightInfo, false, false, NULL, flCSMShadow );
+	
+	#if (CUBEMAP == 1)
+		float3 vReflect = CalcReflectionVectorUnnormalized( vWorldNormal, vEyeDir );
+		float3 envMapColor = ENV_MAP_SCALE * texCUBE( EnvmapSampler, vReflect ).rgb * g_fvEnvmapTint;
+		// TODO: envmap fresnel
+		#if (DECALSTYLE == 4)
+			envMapColor *= cOut.rgb * linearColor.rgb;
+		#endif
+	#endif
+
+	#if (PHONG == 1)
+		float3 specularLighting, rimLighting;
+		float fFresnelRanges = Fresnel( vWorldNormal, vEyeDir, g_fvPhongFresnelRanges );
+		#if ( DECALSTYLE == 5)
+			float3 vTangentS = float3( i.tangentSpaceTranspose[0][0], i.tangentSpaceTranspose[1][0], i.tangentSpaceTranspose[2][0] );
+			vTangentS = normalize( mul( (float3x3)i.tangentSpaceTranspose, vTangentS ) );
+			float3 vTangentT = float3( i.tangentSpaceTranspose[0][1], i.tangentSpaceTranspose[1][1], i.tangentSpaceTranspose[2][1] );
+			vTangentT = normalize( mul( (float3x3)i.tangentSpaceTranspose, vTangentT ) );
+
+			vTangentS = normalize( cross( vSpecNormal, vTangentT ) );
+			vTangentT = normalize( cross( vSpecNormal, vTangentS ) );
+
+			float4 vAnisoDirSample = tex2D( AnisoDirSampler, i.vBaseUV_PatternUV.zw );
+			float2 vAnisoDir = vAnisoDirSample.yx * 2.0f - 1.0f;
+			
+			PixelShaderDoAnisotropicSpecularLighting( vWorldPos, vWorldNormal, vTangentS, vTangentT, fvSpecularExponent.r * 255.0f, vEyeDir, i.lightAtten, NUM_LIGHTS, cLightInfo, fFresnelRanges, vAnisoDir, 1.0f, specularLighting );
+
+			rimLighting = 0.0f;
+
+			specularLighting *= vAnisoDirSample.a;
+		#else
+			PixelShaderDoSpecularLighting( vWorldPos, vWorldNormal, fvSpecularExponent.r * 255.0f, vEyeDir, i.lightAtten, NUM_LIGHTS, cLightInfo, false, NULL, fFresnelRanges, false, 1.0f, 1.0f, specularLighting, rimLighting );
+		#endif
+
+		specularLighting *= max( g_flPhongBoost.xxx, fvSpecularExponent.g * g_flPhongAlbedoBoost ) * cOut.rgb ;
+		//specularLighting *= lerp( g_flPhongBoost.xxx, g_flPhongAlbedoBoost * cOut.rgb, fvSpecularExponent.g );
+		//specularLighting *= g_flPhongBoost;
+
+		#if ( DECALSTYLE != 5 )
+			specularLighting *= cOut.a * fFresnelRanges; // specular mask
+		#endif
+	#endif
+
+	#if ( THIRDPERSON == 0 )
+
+		//sample ao
+		float4 fvAOSrc = tex2D( AOSampler, i.vBaseUV_PatternUV.xy );
+
+		//apply scratches and grunge
+	
+		//sample cavity and ao
+		float4 fvScratchesSrc = tex2D( ScratchesSampler, i.vBaseUV_PatternUV.xy * 0.5 );
+		float4 fvGrungeSrc = tex2D( GrungeSampler, i.vBaseUV_PatternUV.zw * g_flGrungeScale );
+		float cavity = 1 - fvAOSrc.r * fvAOSrc.g * fvScratchesSrc.g;
+
+		//apply uniform grunge
+		cOut.rgb = lerp( cOut.rgb, cOut.rgb * fvGrungeSrc.rgb, g_flWearAmt * 0.7 );
+
+		float flLocalRemappedWear = g_flWearRemapped - flUnWearImportance;
+
+		float alphaWearPoint = saturate( flLocalRemappedWear - g_flWearWidth );
+
+		//fast wear vertical threshold
+		//float flFastWearThresholdValue = step( g_flFastWearThreshold, i.vBaseUV_PatternUV.w ) * g_flWearAmt * 2.0f;
+		//alphaWearPoint += flFastWearThresholdValue;
+		//flLocalRemappedWear += flFastWearThresholdValue;
+
+		#if (DECALSTYLE == 4)
+			//foil embossed labels have hard wear edges
+			cOut.a *= step( alphaWearPoint + g_flScratchwidth, cavity );
+		#else
+			cOut.a *= smoothstep( alphaWearPoint - g_flScratchwidth, alphaWearPoint + g_flScratchwidth, cavity );
+		#endif
+	
+		#if ( DECALSTYLE == 1 || DECALSTYLE == 3 ) //paper-backed or holographic (which is also paper-backed)
+			// wear down color to white paper backing
+			float colorWear = smoothstep( flLocalRemappedWear - g_flScratchwidth, flLocalRemappedWear + g_flScratchwidth, cavity );
+			cOut.rgb = lerp( fvGrungeSrc.rgb, cOut.rgb, colorWear );
+		#endif
+
+		#if ( ( DECALSTYLE != 4 ) && ( DECALSTYLE != 5 ) ) //foil stickers don't lose their shine
+			// wear down spec and envmap
+			#if (PHONG == 1 || CUBEMAP == 1)
+				float specWearPoint = saturate( flLocalRemappedWear + g_flWearWidth );
+				float specWear = smoothstep( specWearPoint - g_flScratchwidth, specWearPoint + g_flScratchwidth, cavity );
+				#if (PHONG == 1)
+					specularLighting *= specWear;
+				#endif
+				#if (CUBEMAP == 1)
+					envMapColor *= specWear;
+				#endif
+			#endif
+		#endif
+
+	#endif //THIRDPERSON == 0
+
+	#if ( DECALSTYLE == 5 ) // color burn lighting for extra saturation
+		cOut.rgb = lerp( cOut.rgb * cOut.rgb * cOut.rgb, cOut.rgb, linearColor );
+	#endif
+
+	#if (PHONG == 1)
+		cOut.rgb += specularLighting;
+	#endif
+
+	// apply lighting
+	cOut.rgb *= linearColor;
+
+	#if (CUBEMAP == 1)
+		cOut.rgb += envMapColor;
+	#endif
+
+	#if ( THIRDPERSON == 0 )
+		//secondary blurred ao
+		cOut.rgb *= lerp( 1.0, fvAOSrc.b, g_flWearAmt * 0.35 );
+
+		//apply AO
+		cOut.rgb *= fvAOSrc.g;
+	#endif //THIRDPERSON == 0
+	
+	#if ( HIGHLIGHT > 0 )
+		// cheap highlighting base pass
+		float flModdedCycle = fmod( 0.5f * i.vBaseUV_PatternUV.x + i.vBaseUV_PatternUV.y + g_flHighlightCycle, 1.5f );
+		flModdedCycle = smoothstep( 0.2f, 0.6f, abs( flModdedCycle - 0.5f ) );
+		
+		#if (CUBEMAP == 1)
+			vReflect.r += flModdedCycle;
+			float3 envMapColorSelect = texCUBE( EnvmapSampler, vReflect ).rgb * HDR_INPUT_MAP_SCALE;
+			float3 selectionColor = max( 4*envMapColorSelect, CSTRIKE_BLUE );
+		#else
+			float3 selectionColor = max( 4*cOut, CSTRIKE_BLUE );
+		#endif
+		
+		cOut.rgb = lerp( cOut.rgb, selectionColor, flModdedCycle * g_flHighlightAmount );
+
+	#endif
+
+	#if ( HIGHLIGHT == 2)
+		
+		//also do expensive edge detection
+		float flEdgeAlphaDetect = 0.0f;
+		
+		float2 offsets[16] = {
+			float2( 1.0f, 0.0f ),
+			float2( 0.9211f, 0.3894f ),
+			float2( 0.6967f, 0.7174f ),
+			float2( 0.3624f, 0.932f ),
+			float2( -0.0292f, 0.9996f ),
+			float2( -0.4161f, 0.9093f ),
+			float2( -0.7374f, 0.6755f ),
+			float2( -0.9422f, 0.335f ),
+			float2( -0.9983f, -0.0584f ),
+			float2( -0.8968f, -0.4425f ),
+			float2( -0.6536f, -0.7568f ),
+			float2( -0.3073f, -0.9516f ),
+			float2( 0.0875f, -0.9962f ),
+			float2( 0.4685f, -0.8835f ),
+			float2( 0.7756f, -0.6313f ),
+			float2( 0.9602f, -0.2794f ),
+		};
+		
+		for ( int k = 0; k < 16; k++ )
+		{
+			float flAlphaTap = tex2D( BaseSampler, i.vBaseUV_PatternUV.zw + offsets[k] * 0.015f ).a;
+			flEdgeAlphaDetect += step( 0.1f, flAlphaTap );
+		}
+		
+		flEdgeAlphaDetect = step( abs( (flEdgeAlphaDetect * ONE_OVER_SIXTEEN) - 0.5f ), 0.499f );
+		
+		cOut = lerp( cOut, float4(selectionColor, 1), flEdgeAlphaDetect * g_flHighlightAmount );
+		
+	#endif
+
+	#if ( PEEL == 1 )
+		//sticker peeling application effect in 2D
+		float invHighlight = 1.0f - g_flHighlightAmount;
+		float distort = pow( (invHighlight - i.vBaseUV_PatternUV.x), 0.3f ) * 0.3f;
+
+		float2 backingUV = float2(invHighlight + (invHighlight - i.vBaseUV_PatternUV.x), i.vBaseUV_PatternUV.y );
+
+		//fake vertical parallax
+		float flParallaxY = dot( float3(0,0,1), vWorldNormal );
+		backingUV.y += (flParallaxY * distort );
+
+		float4 flBackingSample = tex2D( BaseSampler, backingUV );
+
+		//desaturate backing sample
+		flBackingSample.rgb = dot( flBackingSample.rgb, float3(0.299,0.587,0.114) );
+
+		distort = smoothstep( 0.01f, 0.2f, distort);
+		flBackingSample.rgb = lerp( flBackingSample.rgb, 0.5f, 0.2f ) * distort;
+		flBackingSample.a = step( 0.1f, flBackingSample.a );
+		
+		//if ( flBackingSample.a > 0 && i.vBaseUV_PatternUV.x < invHighlight )
+		//{
+		//	cOut.rgb = flBackingSample.rgb;
+		//	float edgeFade = smoothstep( 0.0f, 0.2f, min( i.vBaseUV_PatternUV.x, i.vBaseUV_PatternUV.y ) );
+		//	cOut.a = max( cOut.a, edgeFade );
+		//}
+		//becomes:
+		cOut = lerp( cOut, 
+			   float4( flBackingSample.rgb, max( cOut.a, smoothstep( 0.0f, 0.2f, min( i.vBaseUV_PatternUV.x, i.vBaseUV_PatternUV.y ) ) ) ),
+			   step( i.vBaseUV_PatternUV.x, invHighlight ) * flBackingSample.a );
+
+		//if ( i.vBaseUV_PatternUV.x > invHighlight )
+		//{
+		//	cOut.rgb = 0;
+		//	cOut.a *= (1.0f - distort) * 0.8f;
+		//}
+		//becomes:
+		cOut = lerp( cOut, float4( 0, 0, 0, cOut.a * (1.0f - distort) * 0.8f ), step( invHighlight, i.vBaseUV_PatternUV.x ) );
+
+	#endif
+
+#endif
+	return FinalOutput( cOut, 0, PIXEL_FOG_TYPE_NONE, TONEMAP_SCALE_LINEAR );
+}

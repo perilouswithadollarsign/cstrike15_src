@@ -1,0 +1,38 @@
+#include "common_ps_fxc.h"
+#include "common_fog_ps_forcevertexfog_fxc.h"
+
+struct PS_INPUT
+{
+    float4 projPos						: POSITION;			// Projection-space position	
+
+	#if ( !HARDWAREFOGBLEND )
+		// This is simply a blend between black and the fog color.  Go ahead and send alpha through so that we can keep the pixel shader down to one instruction.
+		float4 color					: TEXCOORD0;
+	#endif
+	
+	#if defined( _X360 )
+		float2 vScreenPos : VPOS;
+	#endif
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	#if ( HARDWAREFOGBLEND )
+	{
+		return float4_color_return_type( 0.0f, 0.0f, 0.0f, 1.0f );
+	}
+	#else
+	{
+		float4_color_return_type vColor = i.color;
+		
+		#if ( defined( _X360 ) )
+		{
+			vColor.xyz += ScreenSpaceOrderedDither( i.vScreenPos );
+		}
+		#endif
+		
+		return vColor;
+	}
+	#endif
+}
+

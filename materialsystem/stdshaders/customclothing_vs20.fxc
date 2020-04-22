@@ -1,0 +1,105 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC:  "COMPOSITEMODE"					"0..2"
+
+// DYNAMIC: "SKINNING"					"0..1"
+// DYNAMIC: "COMPRESSED_VERTS"			"0..1"
+// DYNAMIC: "NUM_LIGHTS"				"0..4"
+
+// SKIP: ( ( $COMPOSITEMODE == 1 ) && ( $SKINNING != 0 ) )
+// SKIP: ( ( $COMPOSITEMODE == 1 ) && ( $NUM_LIGHTS != 0 ) )
+
+#include "common_vs_fxc.h"
+
+const float4 g_baseTextureTransform[2]		: register( SHADER_SPECIFIC_CONST_0 ); // 0 & 1
+const float4 g_wearTexCoordTransform[2]		: register( SHADER_SPECIFIC_CONST_2 ); // 2 & 3
+const float4 g_grungeTexCoordTransform[2]	: register( SHADER_SPECIFIC_CONST_4 ); // 4 & 5
+
+#if ( COMPOSITEMODE != 1 )
+	static const bool g_bSkinning				= SKINNING ? true : false;
+#endif
+
+struct VS_INPUT
+{
+	float4 vPos							: POSITION;
+	float2 vTexCoord					: TEXCOORD0;
+
+	#if ( COMPOSITEMODE != 1 )
+		float4 vNormal					: NORMAL;
+		float4 vTangent					: TANGENT;
+		float4 vBoneWeights				: BLENDWEIGHT;
+		float4 vBoneIndices				: BLENDINDICES;
+	#endif
+};
+
+struct VS_OUTPUT
+{
+	float4 vProjPos_POSITION			: POSITION;
+	float4 vBaseUV_PatternUV			: TEXCOORD0;
+	float4 vWearUV_GrungeUV				: TEXCOORD1;
+
+	#if ( COMPOSITEMODE != 1 )
+		float4 lightAtten				: TEXCOORD2;
+		float3 worldPos					: TEXCOORD3;
+		float3x3 tangentSpaceTranspose	: TEXCOORD4;
+		//	     second row				: TEXCOORD5;
+		//	     third row				: TEXCOORD6;
+		float4 vProjPos					: TEXCOORD7;
+	#endif
+};
+
+// Main
+VS_OUTPUT main( const VS_INPUT i )
+{
+	VS_OUTPUT o;
+
+	#if ( COMPOSITEMODE == 1 ) // image-space composite mode
+
+		o.vProjPos_POSITION = i.vPos;
+
+	#else // COMPOSITEMODE != 1 (3d mode)
+
+		float4 vPosition, vTangent;
+		float3 vNormal, worldPos, worldNormal, worldTangentS, worldTangentT;
+	
+		vPosition = i.vPos;
+	
+		// Perform skinning
+		DecompressVertex_NormalTangent( i.vNormal, i.vTangent, vNormal, vTangent );
+		SkinPositionNormalAndTangentSpace( g_bSkinning, vPosition, vNormal, vTangent,
+											i.vBoneWeights, i.vBoneIndices, worldPos,
+											worldNormal, worldTangentS, worldTangentT );
+		worldTangentS = normalize( worldTangentS );
+		worldTangentT = normalize( worldTangentT );
+		worldNormal   = normalize( worldNormal );
+		
+		// Tangent space transform
+		o.tangentSpaceTranspose[0].xyz = float3( worldTangentS.x, worldTangentT.x, worldNormal.x );
+		o.tangentSpaceTranspose[1].xyz = float3( worldTangentS.y, worldTangentT.y, worldNormal.y );
+		o.tangentSpaceTranspose[2].xyz = float3( worldTangentS.z, worldTangentT.z, worldNormal.z );
+
+		o.worldPos = worldPos;
+		o.vProjPos = o.vProjPos_POSITION = mul( float4( worldPos, 1.0f ), cViewProj );
+		
+		o.lightAtten.x = GetVertexAttenForLight( worldPos, 0, false );
+		o.lightAtten.y = GetVertexAttenForLight( worldPos, 1, false );
+		o.lightAtten.z = GetVertexAttenForLight( worldPos, 2, false );
+		o.lightAtten.w = GetVertexAttenForLight( worldPos, 3, false );
+	
+	#endif
+
+
+	o.vBaseUV_PatternUV.xy = i.vTexCoord;
+
+	o.vBaseUV_PatternUV.z =		dot ( i.vTexCoord, g_baseTextureTransform[0].xy )		+ g_baseTextureTransform[0].w;
+	o.vBaseUV_PatternUV.w =		dot ( i.vTexCoord, g_baseTextureTransform[1].xy )		+ g_baseTextureTransform[1].w;
+
+	o.vWearUV_GrungeUV.x =		dot ( i.vTexCoord, g_wearTexCoordTransform[0].xy )		+ g_wearTexCoordTransform[0].w;
+	o.vWearUV_GrungeUV.y =		dot ( i.vTexCoord, g_wearTexCoordTransform[1].xy )		+ g_wearTexCoordTransform[1].w;
+
+	o.vWearUV_GrungeUV.z =		dot ( i.vTexCoord, g_grungeTexCoordTransform[0].xy )	+ g_grungeTexCoordTransform[0].w;
+	o.vWearUV_GrungeUV.w =		dot ( i.vTexCoord, g_grungeTexCoordTransform[1].xy )	+ g_grungeTexCoordTransform[1].w;
+
+	return o;
+
+}

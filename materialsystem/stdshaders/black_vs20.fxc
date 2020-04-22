@@ -1,0 +1,58 @@
+#include "common_fog_vs_forcevertexfog_fxc.h"
+#include "common_vs_fxc.h"
+
+// DYNAMIC: "SKINNING"				"0..1"
+
+const float3 g_FogColorPostTonemapLinearSpace : register( SHADER_SPECIFIC_CONST_0 );
+
+struct VS_INPUT
+{
+	float4 vPos				: POSITION;
+	float4 vBoneWeights		: BLENDWEIGHT;
+	float4 vBoneIndices		: BLENDINDICES;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos						: POSITION;			// Projection-space position	
+
+	#if ( HARDWAREFOGBLEND )
+		float fog						: FOG;
+	#else
+		float4 color					: TEXCOORD0;
+	#endif
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	float3 worldPos;
+	SkinPosition( SKINNING, v.vPos, v.vBoneWeights, v.vBoneIndices, worldPos );
+
+	// Transform into projection space
+	o.projPos = mul( float4( worldPos, 1 ), cViewProj );
+
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	#if ( HARDWAREFOGBLEND )
+	{
+		o.fog = CalcFixedFunctionFog( worldPos, DOWATERFOG );
+	}
+	#else
+	{
+		float flFogFactor = CalcNonFixedFunctionFog( worldPos, false );
+
+		// squaring the factor will get the middle range mixing closer to hardware fog
+		o.color.xyz = g_FogColorPostTonemapLinearSpace * flFogFactor * flFogFactor;
+		o.color.a = 1.0f;
+	}
+	#endif
+
+	return o;
+}
+

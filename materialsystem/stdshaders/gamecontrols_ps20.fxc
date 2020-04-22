@@ -1,0 +1,17 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+
+sampler Texture1Sampler	: register( s0 );
+
+struct PS_INPUT
+{
+	float3 vTexCoord	: TEXCOORD0;
+	float4 vColor		: TEXCOORD1;
+};
+
+float4 main( PS_INPUT i ) : COLOR
+{
+	float4 c = tex2D( Texture1Sampler, i.vTexCoord.xy );
+	c *= i.vColor;
+	return c;
+}

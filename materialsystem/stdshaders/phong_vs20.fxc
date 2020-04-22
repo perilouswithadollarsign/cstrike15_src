@@ -1,0 +1,316 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "SFM"						"0..0" [vs20] [PC]
+// STATIC: "SFM"						"0..1" [vs30] [PC]
+// STATIC: "SFM"						"0..0" [CONSOLE]
+
+// STATIC: "DECAL"							"0..1" [vs30]
+// STATIC: "WORLD_NORMAL"					"0..0" [vs20] [PC]
+// STATIC: "WORLD_NORMAL"					"0..1" [vs30] [PC]
+// STATIC: "WORLD_NORMAL"					"0..0" [CONSOLE]
+// STATIC: "FLATTEN_STATIC_CONTROL_FLOW"	"0..1" [vs20] [PC]
+// STATIC: "FLATTEN_STATIC_CONTROL_FLOW"	"0..0" [CONSOLE]
+// STATIC: "CASCADED_SHADOW_MAPPING"		"0..1" [vs20] [PC]
+// STATIC: "CASCADED_SHADOW_MAPPING"		"0..0" [vs30] [PC]
+
+// DYNAMIC: "CSM_VIEWMODELQUALITY"			"0..1" [vs20] [PC]
+// DYNAMIC: "CSM_VIEWMODELQUALITY"			"0..0" [vs30] [PC]
+// DYNAMIC: "COMPRESSED_VERTS"				"0..1"
+// DYNAMIC: "SKINNING"						"0..1"
+// DYNAMIC: "MORPHING"						"0..0" [ = false ]
+// DYNAMIC: "TESSELLATION"					"0..0" [vs30] [PC]
+// DYNAMIC: "TESSELLATION"					"0..0" [vs20] [PC]
+// DYNAMIC: "TESSELLATION"					"0..0" [CONSOLE]
+// DYNAMIC: "NUM_LIGHTS"					"0..2" [vs20] [PC]
+// DYNAMIC: "NUM_LIGHTS"					"0..0" [vs20] [CONSOLE]
+// DYNAMIC: "STATICLIGHT3"					"0..1" 
+
+//	SKIP: ( $SFM == 0 ) && ( $MORPHING )
+//	SKIP: ( $SFM == 0 ) && ( $TESSELLATION )
+
+// If using static control flow on Direct3D, we should use the NUM_LIGHTS=0 combo
+//  SKIP: ( $FLATTEN_STATIC_CONTROL_FLOW == 0 ) && ( $NUM_LIGHTS > 0 ) [vs20] [PC]
+
+// SKIP: ( $MORPHING || $SKINNING || $COMPRESSED_VERTS ) && $TESSELLATION
+
+#include "common_fog_vs_supportsvertexfog_fxc.h"
+#include "common_vs_fxc.h"
+
+static const bool g_bSkinning		= SKINNING ? true : false;
+static const int g_FogType			= DOWATERFOG;
+
+const float4 cBaseTexCoordTransform[2]		: register( SHADER_SPECIFIC_CONST_0 );
+const float4 cBumpTexCoordTransform[2]		: register( SHADER_SPECIFIC_CONST_2 );
+const float4 cDetailTexCoordTransform[2]	: register( SHADER_SPECIFIC_CONST_4 );
+
+#if ( MORPHING )
+	// NOTE: cMorphTargetTextureDim.xy = target dimensions,
+	//		 cMorphTargetTextureDim.z = 4tuples/morph
+	const float3 cMorphTargetTextureDim			: register( SHADER_SPECIFIC_CONST_6 );
+	const float4 cMorphSubrect					: register( SHADER_SPECIFIC_CONST_7 );
+	
+	sampler2D morphSampler						: register( s0 );
+#endif
+
+const float4 g_vEyeVector					: register( SHADER_SPECIFIC_CONST_8 );
+
+const float2 g_teamIdMinMax					: register( SHADER_SPECIFIC_CONST_10 );
+
+#if ( CASCADED_SHADOW_MAPPING )
+const float4x4 g_matWorldToShadowTexMatrices[2] : register( SHADER_SPECIFIC_CONST_CSM_0 );
+const float4 g_matWorldToShadowTexMatrix0_z : register( SHADER_SPECIFIC_CONST_CSM_1 );
+#endif
+
+#if TESSELLATION
+
+	// VS_INPUT defined in header
+	#include "tessellation_vs_fxc.h"
+	const float4 g_SubDControls					: register( SHADER_SPECIFIC_CONST_9 );
+	sampler2D BezierSampler						: register( s1 );
+	sampler2D DispSampler						: register( s2 );
+
+#else // no TESSELLATION
+
+	struct VS_INPUT
+	{
+		// This is all of the stuff that we ever use.
+		float4 vPos						: POSITION;
+		float4 vBoneWeights				: BLENDWEIGHT;
+		float4 vBoneIndices				: BLENDINDICES;
+		float4 vNormal					: NORMAL;
+		float4 vColor					: COLOR0;
+		float4 vStaticLight				: COLOR1;
+		#if STATICLIGHT3
+			float4 vStaticLight2		: COLOR2;
+			float4 vStaticLight3		: COLOR3;
+		#endif
+		// make these float2's and stick the [n n 0 1] in the dot math.
+		float4 vTexCoord0				: TEXCOORD0;
+		float4 vTexCoord1				: TEXCOORD1;
+		float4 vTexCoord2				: TEXCOORD2;
+		float4 vTexCoord3				: TEXCOORD3;
+		float3 vTangentS				: TANGENT;
+		float3 vTangentT				: BINORMAL;
+		float4 vUserData				: TANGENT;
+	
+		// Position and normal/tangent deltas
+		float4 vPosFlex					: POSITION1;
+		float4 vNormalFlex				: NORMAL1;
+	
+	#if ( SFM )
+		float vVertexID					: POSITION2;
+	#endif
+	};
+
+#endif // TESSELLATION
+
+struct VS_OUTPUT
+{
+	// Stuff that isn't seen by the pixel shader
+	float4 projPos								: POSITION;	
+
+	// Stuff that is seen by the pixel shader
+	float4 baseTexCoord_baseTexCoord2			: TEXCOORD0;	// Base texture coordinates in .xy, 2nd (decal) uv set in .zw
+	float4 bumpTexCoord_detailTexCoord			: TEXCOORD1;	
+
+	float4 vWorldNormal_flTeamIdFade			: TEXCOORD2;
+	float4 vWorldTangent						: TEXCOORD3;
+
+	float4 vWorldPos_vertexFogFactor			: TEXCOORD4;
+	float4 vProjPos_fWrinkleWeight				: TEXCOORD5;
+
+	#if defined( SHADER_MODEL_VS_3_0 )
+		float4 staticLight0						: TEXCOORD6;	// STATICLIGHT3 output basis 0 in .xyz, sun amount (if applicable) in .w 
+		float4 staticLight1						: TEXCOORD7;	// STATICLIGHT3 output basis 1 in .xyz
+		float4 staticLight2						: TEXCOORD8;	// STATICLIGHT3 output basis 2 in .xyz
+		float4 lightAtten						: TEXCOORD9;	// light attenuation for 4 lights
+	#else
+		float4 csmXform0or1_csmXform2			: TEXCOORD6;
+		float4 staticLight_csmXform0z			: TEXCOORD7;	// STATICLIGHT3 average rgb in .xyz, csm lightToWorldxformcascade0.z in .w
+		float4 lightAtten						: COLOR0;		// light attenuation for lights 0 and 1 in .xy (lower precision for sm2_b/OSX), sun amount (if applicable) in .w
+	#endif
+};
+
+float RemapValClamped( float val, float A, float B, float C, float D)
+{
+	float cVal = (val - A) / (B - A);
+	cVal = saturate( cVal );
+
+	return C + (D - C) * cVal;
+}
+
+//-----------------------------------------------------------------------------
+// Main shader entry point
+//-----------------------------------------------------------------------------
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o = ( VS_OUTPUT )0;
+
+	float4 vPosition, vTangent, vTexCoords;
+	float3 vNormal, worldPos, worldNormal, worldTangentS, worldTangentT;
+
+	#if TESSELLATION
+	{
+		float flBiTangentSign;
+		EvaluateSubdivisionSurface( v, g_SubDControls.x, g_SubDControls.y, g_SubDControls.z, BezierSampler, DispSampler,
+								    worldNormal, worldPos, worldTangentS, worldTangentT, flBiTangentSign,
+									o.vProjPos_fWrinkleWeight.w, o.baseTexCoord_baseTexCoord2.xy, o.bumpTexCoord_detailTexCoord.zw );
+	}
+	#else // not tessellating
+	{
+		vPosition = v.vPos;
+
+		DecompressVertex_NormalTangent( v.vNormal, v.vUserData, vNormal, vTangent );
+
+		#if ( !MORPHING )
+		{
+			ApplyMorph( v.vPosFlex, v.vNormalFlex.xyz, vPosition.xyz, vNormal, vTangent.xyz, o.vProjPos_fWrinkleWeight.w );
+		}
+		#else
+		{
+			ApplyMorph( morphSampler, cMorphTargetTextureDim, cMorphSubrect, v.vVertexID, v.vTexCoord2,
+						vPosition.xyz, vNormal, vTangent.xyz, o.vProjPos_fWrinkleWeight.w );
+		}
+		#endif
+
+		// Perform skinning
+		SkinPositionNormalAndTangentSpace( g_bSkinning, vPosition, vNormal, vTangent,
+											v.vBoneWeights, v.vBoneIndices, worldPos,
+											worldNormal, worldTangentS, worldTangentT );
+
+		// Always normalize since flex path can denormalize
+		worldNormal   = normalize( worldNormal );
+		worldTangentS = normalize( worldTangentS );
+		worldTangentT = normalize( worldTangentT );
+
+		#if ( MORPHING && DECAL && !WORLD_NORMAL )
+		{
+			// Avoid z precision errors
+			worldPos += worldNormal * 0.05f * v.vTexCoord2.z;
+		}
+		#endif
+
+		#if ( STATICLIGHT3 )
+		{
+			// for phong, to start with we'll try only baking indirect light from vrad - so that we don't lose the ability to acquire phong highlights
+			// from map lights (including the sun/csm casting light) - direct lights will still come through as dynamic lights!
+
+			#if defined( SHADER_MODEL_VS_3_0 )
+				// Adjust lighting data (static lighting in linear space * cOverbright)
+				o.staticLight0.rgb = GammaToLinear( v.vStaticLight.rgb * cOverbright );
+				o.staticLight1.rgb = GammaToLinear( v.vStaticLight2.rgb * cOverbright );
+				o.staticLight2.rgb = GammaToLinear( v.vStaticLight3.rgb * cOverbright );
+
+				o.staticLight0.a = v.vStaticLight.a;
+				o.staticLight1.a = v.vStaticLight2.a;
+				o.staticLight2.a = v.vStaticLight3.a;
+			#else
+				// take average of STATICLIGHT3 data for shader model 2b (OSX)
+				// Adjust lighting data (static lighting in linear space * cOverbright)
+				o.staticLight_csmXform0z.rgb = GammaToLinear( v.vStaticLight.rgb * cOverbright );
+				o.staticLight_csmXform0z.rgb += GammaToLinear( v.vStaticLight2.rgb * cOverbright );
+				o.staticLight_csmXform0z.rgb += GammaToLinear( v.vStaticLight3.rgb * cOverbright );
+				o.staticLight_csmXform0z.rgb *= 0.3333f;
+			
+				o.lightAtten.w = ( v.vStaticLight.a + v.vStaticLight2.a + v.vStaticLight3.a ) * 0.3333f;
+			#endif
+		}
+		#endif
+
+		vTexCoords = v.vTexCoord0;
+
+		// Base texture coordinate transform
+		o.baseTexCoord_baseTexCoord2.x = dot( vTexCoords, cBaseTexCoordTransform[0] );
+		o.baseTexCoord_baseTexCoord2.y = dot( vTexCoords, cBaseTexCoordTransform[1] );
+
+		// 2nd uv set, pass through for now
+		o.baseTexCoord_baseTexCoord2.zw = v.vTexCoord1.xy;
+
+		// bump texture coordinate transform - temp
+		o.bumpTexCoord_detailTexCoord.x = dot( v.vTexCoord0, cBumpTexCoordTransform[0] );
+		o.bumpTexCoord_detailTexCoord.y = dot( v.vTexCoord0, cBumpTexCoordTransform[1] );
+
+		// Detail texture coordinate transform
+		o.bumpTexCoord_detailTexCoord.z = dot( v.vTexCoord0, cDetailTexCoordTransform[0] );
+		o.bumpTexCoord_detailTexCoord.w = dot( v.vTexCoord0, cDetailTexCoordTransform[1] );
+	}
+	#endif
+	
+	#if ( !DOPIXELFOG )
+	{
+		o.vWorldPos_vertexFogFactor.w = CalcNonFixedFunctionFog( worldPos, g_FogType );
+	}
+	#endif
+
+	// Needed for water fog alpha and diffuse lighting 
+	// FIXME: we shouldn't have to compute this all the time.
+	o.vWorldPos_vertexFogFactor.xyz = worldPos;
+
+	// Compute lighting attenuations
+	#if ( defined ( SHADER_MODEL_VS_2_0 ) && FLATTEN_STATIC_CONTROL_FLOW )
+	{
+		#if ( NUM_LIGHTS > 0 )
+			o.lightAtten.x = GetVertexAttenForLight( worldPos.xyz, 0, false );
+		#endif
+		#if ( NUM_LIGHTS > 1 )
+			o.lightAtten.y = GetVertexAttenForLight( worldPos.xyz, 1, false );
+		#endif
+	}
+	#else
+	{
+		o.lightAtten.x = GetVertexAttenForLight( worldPos, 0 );
+		o.lightAtten.y = GetVertexAttenForLight( worldPos, 1 );
+#if defined( SHADER_MODEL_VS_3_0 )
+		o.lightAtten.z = GetVertexAttenForLight( worldPos, 2 );
+		o.lightAtten.w = GetVertexAttenForLight( worldPos, 3 );
+#endif
+	}
+	#endif
+
+	// Tangent space transform
+	o.vWorldNormal_flTeamIdFade.xyz = worldNormal.xyz;
+	o.vWorldTangent = float4( worldTangentS.xyz, vTangent.w );	 // Propagate binormal sign in world tangent.w
+
+	// Transform into projection space
+	o.projPos = mul( float4( worldPos, 1 ), cViewProj );
+	
+#ifdef _PS3
+	// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+	o.projPos.y = -o.projPos.y;
+	o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+#endif // _PS3
+
+	o.vProjPos_fWrinkleWeight.xyz = o.projPos.xyz;
+
+	#if ( WORLD_NORMAL )
+	{
+		o.vProjPos_fWrinkleWeight.z = dot( g_vEyeVector, worldPos.xyz - cEyePos.xyz );	// Linear depth
+	}
+	#endif
+
+	// Don't have to worry about hardware blend here since we never do that with phong.
+	#if ( !DOPIXELFOG )
+	{
+		o.vWorldPos_vertexFogFactor.w = CalcNonFixedFunctionFog( worldPos, g_FogType );
+	}
+	#endif
+
+	o.vWorldNormal_flTeamIdFade.w = RemapValClamped( distance( cEyePos, worldPos.xyz ), g_teamIdMinMax.x, g_teamIdMinMax.y, 0.0, 1.0 );
+
+	#if( CASCADED_SHADOW_MAPPING )
+	{
+		float4 worldPos = float4( o.vWorldPos_vertexFogFactor.xyz, 1.0f );
+
+		#if CSM_VIEWMODELQUALITY
+			o.csmXform0or1_csmXform2.xy	= mul( worldPos, g_matWorldToShadowTexMatrices[0] ).xy;
+		#else
+			o.csmXform0or1_csmXform2.xy	= mul( worldPos, g_matWorldToShadowTexMatrices[0] ).xy; 
+			o.csmXform0or1_csmXform2.zw	= mul( worldPos, g_matWorldToShadowTexMatrices[1] ).xy;
+		#endif
+		
+		o.staticLight_csmXform0z.w		= mul( worldPos, g_matWorldToShadowTexMatrix0_z );
+	}
+	#endif
+
+	return o;
+}

@@ -1,0 +1,79 @@
+#include "common_fog_vs_forcevertexfog_fxc.h"
+#include "common_vs_fxc.h"
+
+// DYNAMIC: "SKINNING"					"0..1"
+// DYNAMIC: "COMPRESSED_VERTS"			"0..1"
+// DYNAMIC: "FLASHLIGHT"				"0..1"
+
+struct VS_INPUT
+{
+	float4 vPos				: POSITION;
+	float4 vNormal			: NORMAL;
+	float4 vBoneWeights		: BLENDWEIGHT;
+	float4 vBoneIndices		: BLENDINDICES;
+	float2 vBaseTexCoord	: TEXCOORD0;
+};
+
+struct VS_OUTPUT
+{
+    float4 projPos						: POSITION;			// Projection-space position	
+
+	#if ( HARDWAREFOGBLEND )
+		float fog						: FOG;
+	#else
+		float fog						: TEXCOORD0;
+	#endif
+
+	float2 vBaseTexCoord				: TEXCOORD1;
+
+	#if ( FLASHLIGHT )
+		float3 worldPos					: TEXCOORD2;
+		float3 worldNormal				: TEXCOORD3;
+	#endif
+};
+
+VS_OUTPUT main( const VS_INPUT v )
+{
+	VS_OUTPUT o;
+
+	float3 worldPos, vNormal, worldNormal;
+
+	#if ( FLASHLIGHT )
+	{
+		DecompressVertex_Normal( v.vNormal, vNormal );
+		SkinPositionAndNormal( SKINNING, v.vPos, vNormal, v.vBoneWeights, v.vBoneIndices, worldPos, worldNormal );
+		o.worldPos = worldPos;
+		o.worldNormal = worldNormal;
+	}
+	#else
+	{
+		SkinPosition( SKINNING, v.vPos, v.vBoneWeights, v.vBoneIndices, worldPos );
+	}
+	#endif
+
+	// Transform into projection space
+	o.projPos = mul( float4( worldPos, 1 ), cViewProj );
+
+	#ifdef _PS3
+	{
+		// Account for OpenGL's flipped y coordinate and expanded z range [-1,1] instead of [0,1]
+		o.projPos.y = -o.projPos.y;
+		o.projPos.z = 2.0f * o.projPos.z - o.projPos.w;
+	}
+	#endif // _PS3
+
+	#if ( HARDWAREFOGBLEND )
+	{
+		o.fog = CalcFixedFunctionFog( worldPos, DOWATERFOG );
+	}
+	#else
+	{
+		o.fog = CalcNonFixedFunctionFog( worldPos, false );
+	}
+	#endif
+
+	o.vBaseTexCoord = v.vBaseTexCoord;
+
+	return o;
+}
+

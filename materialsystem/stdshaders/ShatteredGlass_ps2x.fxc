@@ -1,0 +1,127 @@
+//========== Copyright (c) Valve Corporation, All rights reserved. ==========//
+
+// STATIC: "CUBEMAP"				"0..1"
+// STATIC: "VERTEXCOLOR"			"0..1"
+// STATIC: "ENVMAPMASK"				"0..1"
+// STATIC: "BASEALPHAENVMAPMASK"	"0..1"
+// STATIC: "HDRTYPE"				"0..2"
+				   
+#include "common_fog_ps_fxc.h"
+
+// HDRFIXME: Need to make this work.
+
+// Turning off 32bit lightmaps on Portal 2 to save shader perf. --Thorsten
+//#define USE_32BIT_LIGHTMAPS_ON_360 //uncomment to use 32bit lightmaps, be sure to keep this in sync with the same #define in materialsystem/cmatlightmaps.cpp
+
+#include "common_ps_fxc.h"
+#include "common_lightmappedgeneric_fxc.h"
+
+const float4 g_EnvmapTint					: register( c0 );
+const float3 g_DiffuseModulation				: register( c1 );
+const float3 g_EnvmapContrast				: register( c2 );
+const float3 g_EnvmapSaturation				: register( c3 );
+const float4 g_FresnelReflection				: register( c4 );
+const float3 g_EyePos						: register( c5 );
+const float3 g_OverbrightFactor				: register( c6 );
+
+const float4 g_FogParams						: register( c12 );
+
+sampler BaseTextureSampler	: register( s0 );
+sampler LightmapSampler		: register( s1 );
+samplerCUBE EnvmapSampler	: register( s2 );
+sampler DetailSampler		: register( s3 );
+sampler EnvmapMaskSampler	: register( s5 );
+
+samplerCUBE NormalizeSampler : register( s6 );
+
+struct PS_INPUT
+{
+	float2 baseTexCoord				: TEXCOORD0;
+	float2 detailTexCoord			: TEXCOORD1;
+	float2 lightmapTexCoord			: TEXCOORD2_centroid;
+	float2 envmapMaskTexCoord		: TEXCOORD3;
+	float4 worldPos_projPosZ		: TEXCOORD4;
+	float3 worldSpaceNormal			: TEXCOORD5;
+	float4 vertexColor				: COLOR;
+};
+
+float4_color_return_type main( PS_INPUT i ) : COLOR
+{
+	bool bCubemap = CUBEMAP ? true : false;
+	bool bVertexColor = VERTEXCOLOR ? true : false;
+	bool bEnvmapMask = ENVMAPMASK ? true : false;
+	bool bBaseAlphaEnvmapMask = BASEALPHAENVMAPMASK ? true : false;
+
+	float4 baseColor = tex2D( BaseTextureSampler, i.baseTexCoord );
+	float4 detailColor = tex2D( DetailSampler, i.detailTexCoord );
+
+	float2 lightmapCoordinates = i.lightmapTexCoord;
+	float3 lightmapColor = LightMapSample( LightmapSampler, lightmapCoordinates ).rgb;
+
+	float3 specularFactor = 1.0f;
+	if( bEnvmapMask )
+	{
+		specularFactor = tex2D( EnvmapMaskSampler, i.detailTexCoord ).xyz;	
+	}
+
+	if( bBaseAlphaEnvmapMask )
+	{
+		specularFactor *= 1.0 - baseColor.a; // this blows!
+	}
+
+	float3 diffuseLighting = lightmapColor;
+	diffuseLighting *= g_DiffuseModulation;
+	diffuseLighting *= LIGHT_MAP_SCALE;
+
+	float3 albedo = baseColor.rgb;
+	float alpha = 1.0f;
+
+	if( !bBaseAlphaEnvmapMask )
+	{
+		alpha *= baseColor.a;
+	}
+
+	albedo *= detailColor.rgb;
+	alpha  *= detailColor.a;
+
+	// FIXME: seperate vertexcolor and vertexalpha?
+	// vertex alpha is ignored if vertexcolor isn't set. . need to check other version.
+	if( bVertexColor )
+	{
+		albedo *= i.vertexColor.rgb;
+		alpha  *= i.vertexColor.a; // not sure about this one
+	}
+
+	float3 specularLighting = float3( 0.0f, 0.0f, 0.0f );
+	if( bCubemap )
+	{
+		float3 worldVertToEyeVector = g_EyePos - i.worldPos_projPosZ.xyz;
+		worldVertToEyeVector = NormalizeWithCubemap( NormalizeSampler, worldVertToEyeVector );
+		float3 reflectVect = CalcReflectionVectorUnnormalized( i.worldSpaceNormal, worldVertToEyeVector );
+
+		// Calc Fresnel factor
+		float3 worldSpaceNormal = NormalizeWithCubemap( NormalizeSampler, i.worldSpaceNormal );
+		float fresnel = 1.0 - dot( worldSpaceNormal, worldVertToEyeVector );
+		fresnel = pow( fresnel, 5.0 );
+		fresnel = fresnel * g_FresnelReflection.b + g_FresnelReflection.a;
+			 
+		specularLighting = texCUBE( EnvmapSampler, reflectVect ).rgb;
+		specularLighting *= specularFactor;
+
+		specularLighting *= g_EnvmapTint.rgb;
+#if HDRTYPE == HDR_TYPE_NONE
+		float3 specularLightingSquared = specularLighting * specularLighting;
+		specularLighting = lerp( specularLighting, specularLightingSquared, g_EnvmapContrast );
+		float3 greyScale = dot( specularLighting, float3( 0.299f, 0.587f, 0.114f ) );
+		specularLighting = lerp( greyScale, specularLighting, g_EnvmapSaturation );
+#endif
+		specularLighting *= fresnel;
+	}
+
+	// Do it somewhat unlit
+	float3 result = albedo*(g_OverbrightFactor.z*diffuseLighting + g_OverbrightFactor.y) + specularLighting;
+	
+	float fogFactor = CalcPixelFogFactor( PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos_projPosZ.xyz, i.worldPos_projPosZ.w );
+	return FinalOutput( float4( result, alpha ), fogFactor, PIXELFOGTYPE, TONEMAP_SCALE_LINEAR );
+}
+

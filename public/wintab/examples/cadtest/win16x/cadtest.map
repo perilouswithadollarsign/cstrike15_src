@@ -1,0 +1,53 @@
+
+ CADTEST
+
+ Start     Length     Name                   Class
+ 0001:0000 01320H     _TEXT                  CODE
+ 0002:0000 00010H     NULL                   BEGDATA
+ 0002:0010 002A2H     _DATA                  DATA
+ 0002:02B2 0000EH     CDATA                  DATA
+ 0002:02C0 00000H     XIFB                   DATA
+ 0002:02C0 00000H     XIF                    DATA
+ 0002:02C0 00000H     XIFE                   DATA
+ 0002:02C0 00000H     XIB                    DATA
+ 0002:02C0 00000H     XI                     DATA
+ 0002:02C0 00000H     XIE                    DATA
+ 0002:02C0 00000H     XPB                    DATA
+ 0002:02C0 00000H     XP                     DATA
+ 0002:02C0 00000H     XPE                    DATA
+ 0002:02C0 00000H     XCB                    DATA
+ 0002:02C0 00000H     XC                     DATA
+ 0002:02C0 00000H     XCE                    DATA
+ 0002:02C0 00000H     XCFB                   DATA
+ 0002:02C0 00000H     XCFCRT                 DATA
+ 0002:02C0 00000H     XCF                    DATA
+ 0002:02C0 00000H     XCFE                   DATA
+ 0002:02C0 00000H     XIFCB                  DATA
+ 0002:02C0 00000H     XIFU                   DATA
+ 0002:02C0 00000H     XIFL                   DATA
+ 0002:02C0 00000H     XIFM                   DATA
+ 0002:02C0 00000H     XIFCE                  DATA
+ 0002:02C0 00000H     DBDATA                 DATA
+ 0002:02C0 00000H     CONST                  CONST
+ 0002:02C0 00008H     HDR                    MSG
+ 0002:02C8 00146H     MSG                    MSG
+ 0002:040E 00002H     PAD                    MSG
+ 0002:0410 00001H     EPAD                   MSG
+ 0002:0412 00014H     _BSS                   BSS
+ 0002:0426 00000H     XOB                    BSS
+ 0002:0426 00000H     XO                     BSS
+ 0002:0426 00000H     XOE                    BSS
+ 0002:0426 00000H     XOFB                   BSS
+ 0002:0426 00000H     XOF                    BSS
+ 0002:0426 00000H     XOFE                   BSS
+ 0002:0430 00002H     c_common               BSS
+
+ Origin   Group
+ 0002:0   DGROUP
+
+ Address   Export                  Alias
+
+ 0001:095A About                   About
+ 0001:0588 MainWndProc             MainWndProc
+
+Program entry point at 0001:0baa

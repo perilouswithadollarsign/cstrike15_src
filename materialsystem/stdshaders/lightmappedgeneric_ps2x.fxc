@@ -1,0 +1,101 @@
+//===================== Copyright (c) Valve Corporation. All Rights Reserved. ======================
+
+// STATIC: "BASETEXTURE2"				"0..1"
+// STATIC: "BUMPMAP"					"0..2"
+// STATIC: "BUMPMAP2"					"0..1"  [ps20b] [ps30]
+// STATIC: "BUMPMAP2"					"0..0"  [ps20]
+// STATIC: "CUBEMAP"					"0..2"
+// STATIC: "ENVMAPMASK"					"0..1"  
+// STATIC: "BASEALPHAENVMAPMASK"		"0..1"
+// STATIC: "SELFILLUM"					"0..1"
+// STATIC: "NORMALMAPALPHAENVMAPMASK"	"0..1"
+// STATIC: "FANCY_BLENDING"				"0..3"  [ps20b] [ps30]
+// STATIC: "FANCY_BLENDING"				"0..0"  [ps20]
+// STATIC: "SEAMLESS"					"0..1"
+// STATIC: "ENVMAPANISOTROPY"			"0..1"  [ps20b] [ps30]
+// STATIC: "ENVMAPANISOTROPY"			"0..0"  [ps20]
+// STATIC: "ADDBUMPMAPS"				"0..1"  [ps20b] [ps30]
+// STATIC: "ADDBUMPMAPS"				"0..0"  [ps20]
+
+// disabling things that are unused for now
+// STATIC: "BUMPMASK"                   "0..0"
+// diffuse bump map is always true when bumpmapping is enabled, so just set it to 1
+#define DIFFUSEBUMPMAP 1
+
+// STATIC: "DETAIL_BLEND_MODE"			"0..12"
+// STATIC: "DETAIL2"					"0..1"	[ps30] 
+// STATIC: "DETAIL2"					"0..0"	[ps20b]
+// STATIC: "FLASHLIGHT"					"0..1"	[ps20b] [CONSOLE]
+// STATIC: "SHADER_SRGB_READ"			"0..1"	[XBOX]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[PC]
+// STATIC: "SHADER_SRGB_READ"			"0..0"	[SONYPS3]
+// STATIC: "LIGHTING_PREVIEW"			"0..1"	[PC]
+// STATIC: "LIGHTING_PREVIEW"			"0..0"	[CONSOLE]
+
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[ = g_pHardwareConfig->SupportsCascadedShadowMapping() ] [CONSOLE]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..0"	[ = 0 ] [ps20] [PC]
+// STATIC: "CASCADED_SHADOW_MAPPING"	"0..1"	[ = g_pHardwareConfig->SupportsCascadedShadowMapping() && !ToolsEnabled() ] [ps20b] [ps30] [PC]
+// STATIC: "CSM_MODE"					"0..0"	[ = 0 ] [CONSOLE]
+// STATIC: "CSM_MODE"					"0..0"	[ = 0 ] [ps20] [ps20b] [PC]
+// STATIC: "CSM_MODE"					"0..3"	[ps30] [PC]
+
+// STATIC: "CSM_BLENDING"				"0..1"  // 0 is old, 1 is for new/fixed blending of CSM and baked shadows
+
+// STATIC: "PHONG"						"0..1"	[ps30]
+// STATIC: "PHONG"						"0..0"	[ps20] [ps20b]
+
+// DYNAMIC: "FASTPATHENVMAPCONTRAST"	"0..1"
+// DYNAMIC: "FASTPATH"					"0..1"
+// DYNAMIC: "WRITEWATERFOGTODESTALPHA"	"0..1"
+// DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"	"0..0"
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..1"	[ps20b] [CONSOLE]
+// DYNAMIC: "FLASHLIGHTSHADOWS"			"0..0"	[ps20b] [ps30] [PC]
+
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[ = ( pShaderAPI->IsCascadedShadowMapping() ) ? 1 : 0 ] [CONSOLE]
+// DYNAMIC: "CASCADE_SIZE"				"0..1"	[ = ( pShaderAPI->IsCascadedShadowMapping() ) ? 1 : 0 ] [ps20b] [PC]
+// DYNAMIC: "CASCADE_SIZE"				"0..0"  [ps20] [ps30] [PC]
+
+// we only support detail blend modes 0, 7, 9, 10, 11, and 12
+//  SKIP: ($DETAIL_BLEND_MODE == 1 )
+//  SKIP: ($DETAIL_BLEND_MODE == 2 )
+//  SKIP: ($DETAIL_BLEND_MODE == 3 )
+//  SKIP: ($DETAIL_BLEND_MODE == 4 )
+//  SKIP: ($DETAIL_BLEND_MODE == 5 )
+//  SKIP: ($DETAIL_BLEND_MODE == 6 )
+//  SKIP: ($DETAIL_BLEND_MODE == 8 )
+
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $BASETEXTURE2 )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $BUMPMAP )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $BUMPMAP2 )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $CUBEMAP )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $ENVMAPMASK )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $BASEALPHAENVMAPMASK )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $SELFILLUM )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $NORMALMAPALPHAENVMAPMASK )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $FANCY_BLENDING )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $SEAMLESS )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $ENVMAPANISOTROPY )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $ADDBUMPMAPS )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $BUMPMASK )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $DETAIL2 )
+//  SKIP: ($DETAIL_BLEND_MODE == 9) && ( $LIGHTING_PREVIEW )
+
+//  SKIP: ($FANCY_BLENDING) && ($DETAIL_BLEND_MODE == 7 )
+//  SKIP: ($FANCY_BLENDING) && ($BASETEXTURE2 == 0 ) && ($BUMPMAP2 == 0 )
+//  SKIP: ( $FLASHLIGHT == 0 ) && ( $FLASHLIGHTSHADOWS == 1 )
+
+// program too complex for ps20. Don't do darkened cubemaps and 2 bump maps at the same time. Fairly arbitrary pairing just to get the damn thing compiling
+//	SKIP: ( $CUBEMAP == 2 ) && ( $BUMPMAP2 ) [ps20]
+// program slightly more complex on 360 because of shader srgb read. Eliminate coexistance of srgb read, water fog, and darkened cubemaps
+//	SKIP: ( $CUBEMAP == 2 ) && ( $PIXELFOGTYPE == 1 ) && ( $SHADER_SRGB_READ == 1 ) [CONSOLE]
+
+//  SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CASCADE_SIZE != 0 ) 
+//  SKIP: ( $CASCADED_SHADOW_MAPPING != 0 ) && ( $SFM != 0 ) 
+//  SKIP: ( $CASCADED_SHADOW_MAPPING == 0 ) && ( $CSM_MODE != 0 ) 
+
+//  SKIP: ( $PHONG == 1 ) && ( $CASCADED_SHADOW_MAPPING == 0 ) 
+
+//  SKIP: ( $DETAIL_BLEND_MODE == 12 ) && ( $DETAIL2 == 1 )
+
+#include "common_fog_ps_supportsvertexfog_fxc.h"
+#include "lightmappedgeneric_ps2_3_x.h"

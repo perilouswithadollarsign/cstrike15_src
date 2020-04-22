@@ -1,0 +1,7 @@
+
+#include "windows.h"
+#include "rule2.h"
+
+rcinclude rule2.dlg
+Rule2 ICON Rule2.ico
+

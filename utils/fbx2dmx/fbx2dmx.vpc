@@ -1,0 +1,36 @@
+//-----------------------------------------------------------------------------
+//
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$Include "$SRCDIR\vpc_scripts\source_exe_con_base.vpc"
+
+$Include "$SRCDIR\vpc_scripts\fbx.vpc"
+
+$Project "fbx2dmx"
+{
+	$Folder	"Source Files"
+	{
+		$File	"main.cpp"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$Lib	appframework
+		$Lib	bitmap
+		$Lib	bonesetup
+		$Lib	mathlib_extended
+		$Lib	mathlib
+		$Lib	datamodel
+		$Lib	dmserializers
+		$Lib	dmeutils
+		$Lib	fbxutils
+		$Lib	meshutils
+		$Lib	movieobjects
+		$Lib	resourcefile
+		$Lib	tier2
+	}
+}
