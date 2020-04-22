@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"mdllib.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"mdllib.vcxproj"
+			"1"		"mdllib.vcxproj.filters"
+		}
+	}
+}

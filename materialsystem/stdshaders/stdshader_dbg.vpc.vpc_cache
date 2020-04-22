@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"stdshader_dbg.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"stdshader_dbg.vcxproj"
+			"1"		"stdshader_dbg.vcxproj.filters"
+		}
+	}
+}

@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"vguimatsurface.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"vguimatsurface.vcxproj"
+			"1"		"vguimatsurface.vcxproj.filters"
+		}
+	}
+}

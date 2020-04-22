@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"matsys_controls.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"matsys_controls.vcxproj"
+			"1"		"matsys_controls.vcxproj.filters"
+		}
+	}
+}

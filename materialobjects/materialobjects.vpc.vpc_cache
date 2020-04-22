@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"materialobjects.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"materialobjects.vcxproj"
+			"1"		"materialobjects.vcxproj.filters"
+		}
+	}
+}

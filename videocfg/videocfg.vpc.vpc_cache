@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"videocfg.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"videocfg.vcxproj"
+			"1"		"videocfg.vcxproj.filters"
+		}
+	}
+}

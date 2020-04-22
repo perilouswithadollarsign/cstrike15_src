@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"server_csgo.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"server_csgo.vcxproj"
+			"1"		"server_csgo.vcxproj.filters"
+		}
+	}
+}

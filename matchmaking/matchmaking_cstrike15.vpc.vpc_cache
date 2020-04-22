@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"matchmaking_csgo.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"matchmaking_csgo.vcxproj"
+			"1"		"matchmaking_csgo.vcxproj.filters"
+		}
+	}
+}

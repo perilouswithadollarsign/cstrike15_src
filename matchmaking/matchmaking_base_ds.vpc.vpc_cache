@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"matchmakingbase_ds.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"matchmakingbase_ds.vcxproj"
+			"1"		"matchmakingbase_ds.vcxproj.filters"
+		}
+	}
+}

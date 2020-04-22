@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"FileSystemOpenDialog.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"FileSystemOpenDialog.vcxproj"
+			"1"		"FileSystemOpenDialog.vcxproj.filters"
+		}
+	}
+}

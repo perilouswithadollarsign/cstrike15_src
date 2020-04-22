@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"dmxloader.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"dmxloader.vcxproj"
+			"1"		"dmxloader.vcxproj.filters"
+		}
+	}
+}

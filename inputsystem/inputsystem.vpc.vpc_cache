@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"inputsystem.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"inputsystem.vcxproj"
+			"1"		"inputsystem.vcxproj.filters"
+		}
+	}
+}

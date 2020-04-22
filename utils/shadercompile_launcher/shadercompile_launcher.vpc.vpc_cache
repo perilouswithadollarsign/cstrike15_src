@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"shadercompile_launcher.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"shadercompile_launcher.vcxproj"
+			"1"		"shadercompile_launcher.vcxproj.filters"
+		}
+	}
+}

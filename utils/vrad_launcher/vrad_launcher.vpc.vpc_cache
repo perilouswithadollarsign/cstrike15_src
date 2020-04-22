@@ -1,0 +1,13 @@
+"vpc_cache"
+{
+	"CacheVersion"		"1"
+	"win32"
+	{
+		"CRCFile"		"vrad_launcher.vcxproj.vpc_crc"
+		"OutputFiles"
+		{
+			"0"		"vrad_launcher.vcxproj"
+			"1"		"vrad_launcher.vcxproj.filters"
+		}
+	}
+}
