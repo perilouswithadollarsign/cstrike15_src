@@ -1,0 +1,351 @@
+//-----------------------------------------------------------------------------
+//	SERVER_PORTAL2.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro GAMENAME 	"portal2"
+$Macro GENERATED_PROTO_DIR	"$SRCDIR\game\server\portal2\generated_proto"
+
+$Include "server_portal_base.vpc"
+$Include "server_econ_base.vpc"		[($WIN32 || $OSXALL) && !$NO_STEAM]
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\game\shared\hl2;$SRCDIR\game\shared\episodic;.\hl2;.\episodic;$SRCDIR\game\shared\portal;.\portal;$SRCDIR\game\shared\multiplayer;$SRCDIR\game\shared\portal2;.\portal2;$SRCDIR\public\meshutils;"
+		$PreprocessorDefinitions		"$BASE;USES_SAVERESTORE;PORTAL2;PORTAL"
+		$PreprocessorDefinitions		"$BASE;PORTAL2_PUZZLEMAKER"					[ $WIN32 ||  $OSXALL ]
+		$PreprocessorDefinitions		"$BASE;USE_CEG"								[ $WIN32 && !$NO_CEG ]
+	}
+
+	$Linker	[$WIN32 && !$NO_CEG]
+	{
+		$AdditionalDependencies			"$BASE $LIBCOMMON\ceglib.lib"
+		$FunctionOrder					"$(IntDir)\functionorder.txt"
+		$References						"Eliminate Unreferenced Data (/OPT:REF)"
+		$EnableCOMDATFolding			"Remove Redundant COMDATs (/OPT:ICF)"
+	}
+
+	$PreBuildEvent	[$WIN32 && !$NO_CEG]
+	{
+		$CommandLine		"del $(IntDir)\*.temp" "\n" \ 
+							"del $(IntDir)\*.substitutions*" "\n" \
+							"if EXIST $OUTBINDIR\$(TargetFileName) for /f $QUOTEdelims=$QUOTE %%A in ('attrib $QUOTE$OUTBINDIR\$(TargetFileName)$QUOTE') do set valveTmpIsReadOnly=$QUOTE%%A$QUOTE" "\n" \
+							"set valveTmpIsReadOnlyLetter=%valveTmpIsReadOnly:~6,1%" "\n" \
+							"if $QUOTE%valveTmpIsReadOnlyLetter%$QUOTE==$QUOTER$QUOTE del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+							"$CRCCHECK"						
+	}
+	
+	$PreLinkEvent	[$WIN32 && !$NO_CEG]
+	{
+		$CommandLine		"$(InputDir)\..\..\devtools\bin\ceg\mingle.exe -subst:$(ProjectDir)\..\..\lib\common\ceglib.lib -mingle:$(ProjectDir)\..\..\lib\common\ceglib.lib $(IntDir)\*.obj -log:$(IntDir)\mingle.log > $(IntDir)\functionorder.txt" "\n"
+
+		$Description		"Mingle processes .obj files - changing Steamworks_TestSecret and Steamworks_SelfCheck references and generating function order file. Report problems to Neilk@valvesoftware.com"
+	}
+	
+	$PostBuildEvent	[$WIN32 && !$NO_CEG]
+	{
+		$CommandLine	"if exist $OUTCEGDIR goto CegExists" "\n" \
+						"mkdir $OUTCEGDIR" "\n" \
+						":CegExists" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).original $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).stripped $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).strips $SRCDIR" "\n" \	
+						"ECHO Generating CEG binaries..." "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -drm:$(TargetPath) -path:$(ProjectDir)\..\..\devtools\bin\ceg -drmout:$(TargetPath).ceg -output:$OUTCEGDIR -logfile:$(IntDir)\drmpe.log -drmclean" "\n" \
+						"copy $(TargetPath).ceg $(TargetPath)" "\n"	\
+						"if exist $OUTBINDIR goto ValveStart" "\n" \
+						"mkdir $OUTBINDIR" "\n" \
+						":ValveStart" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetFileName) $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetFileName) $OUTBINDIR\$(TargetFileName)" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"if exist $QUOTE$(TargetDir)$QUOTE$(TargetName).map copy $QUOTE$(TargetDir)$QUOTE$(TargetName).map $OUTBINDIR\$(TargetName).map" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetName).pdb $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetName).pdb $OUTBINDIR\$(TargetName).pdb" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"goto BuildEventOK" "\n" \
+						":BuildEventFailed" "\n" \
+						"echo *** ERROR! PostBuildStep FAILED for $(ProjectName)! EXE or DLL is probably running. ***" "\n" \
+						"del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+						"exit 1" "\n" \
+						":BuildEventOK" "\n" [!$UPLOAD_CEG]
+
+		$CommandLine	"if exist $OUTCEGDIR goto CegExists" "\n" \
+						"mkdir $OUTCEGDIR" "\n" \
+						":CegExists" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).original $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).stripped $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).strips $SRCDIR" "\n" \
+						"ECHO Generating CEG binaries..." "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -path:$(ProjectDir)\..\..\devtools\bin\ceg -split:$(TargetPath) -logfile:$(IntDir)\drmpe.log" "\n" \
+						"if exist drmpe.cfg del /f drmpe.cfg" "\n" \
+						"ECHO Uploading CEG binaries..." "\n" \
+						"copy drmpe_beta.cfg drmpe.cfg" "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -path:$(ProjectDir)\..\..\devtools\bin\ceg -upload:620 -logfile:$(IntDir)\drmpe_beta_upload.log" "\n" \
+						"copy drmpe_public.cfg drmpe.cfg" "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -path:$(ProjectDir)\..\..\devtools\bin\ceg -upload:620 -logfile:$(IntDir)\drmpe_public_upload.log" "\n" \
+						"ECHO Moving CEG binaries to output folder..." "\n" \
+						"copy $(ProjectDir)\submission\$(TargetFileName).original $OUTCEGDIR\$(TargetFileName).original" "\n"	\
+						"copy $(ProjectDir)\submission\$(TargetFileName).stripped $OUTCEGDIR\$(TargetFileName).stripped" "\n"	\
+						"copy $(ProjectDir)\submission\$(TargetFileName).strips $OUTCEGDIR\$(TargetFileName).strips" "\n"	\
+						"copy $OUTCEGDIR\$(TargetFileName).stripped $(TargetPath)" "\n"	\
+						"if exist $OUTBINDIR goto ValveStart" "\n" \
+						"mkdir $OUTBINDIR" "\n" \
+						":ValveStart" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetFileName) $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetFileName) $OUTBINDIR\$(TargetFileName)" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"if exist $QUOTE$(TargetDir)$QUOTE$(TargetName).map copy $QUOTE$(TargetDir)$QUOTE$(TargetName).map $OUTBINDIR\$(TargetName).map" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetName).pdb $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetName).pdb $OUTBINDIR\$(TargetName).pdb" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"goto BuildEventOK" "\n" \
+						":BuildEventFailed" "\n" \
+						"echo *** ERROR! PostBuildStep FAILED for $(ProjectName)! EXE or DLL is probably running. ***" "\n" \
+						"del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+						"exit 1" "\n" \
+						":BuildEventOK" "\n" [$UPLOAD_CEG]
+
+		$Description	"CEG the file, copy resultant files to perforce locations, and upload to Steam if appropriate.  Report problems with drmpe.exe to Neilk@valvesoftware.com"
+	}
+}
+
+$Project "Server (Portal 2)"
+{
+	$Folder	"Source Files"
+	{
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.cpp"
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.h"
+		
+		$Folder "Workshop"
+		{
+			$File	"$SRCDIR\game\shared\ugc_request_manager.cpp"
+			$File	"$SRCDIR\game\shared\ugc_request_manager.h"
+			$File	"$SRCDIR\game\shared\ugc_utils.cpp"
+			$File 	"$SRCDIR\game\shared\ugc_utils.h"
+			$File	"$SRCDIR\game\shared\ugc_file_info_manager.cpp"
+			$File	"$SRCDIR\game\shared\ugc_file_info_manager.h"
+			$File	"$SRCDIR\game\shared\ugc_workshop_manager.cpp"
+			$File	"$SRCDIR\game\shared\ugc_workshop_manager.h"
+		}
+
+		$Folder	"Portal"
+		{
+			$File	"portal\portal_client.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_gamerules.h"
+			$File	"$SRCDIR\game\shared\portal\portal_mp_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_mp_gamerules.h"
+			
+			$Folder "Economy"	[ ( $WIN32 || $OSXALL) && !$NO_STEAM ]
+			{
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_inventory.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_inventory.h"
+
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_schema.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_schema.h"
+
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_system.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_system.h"
+			}
+
+			$Folder "Portal 2"
+			{
+				$File	"portal2\baseprojectedentity.cpp"
+				$File	"portal2\baseprojectedentity.h"
+				$File	"portal2\baseprojector.cpp"
+				$File	"portal2\baseprojector.h"
+				$File	"portal2\projected_entity_ambient_sound_proxy.cpp"
+				$File	"portal2\projected_entity_ambient_sound_proxy.h"
+				$File	"portal2\env_portal_laser.cpp"
+				$File	"portal2\env_portal_laser.h"
+				$File	"portal2\func_placement_clip.cpp"
+				$File	"portal2\info_coop_spawn.cpp"
+				$File	"portal2\info_placement_helper.cpp"
+				$File	"portal2\info_placement_helper.h"
+				$File	"portal2\info_player_ping_detector.cpp"
+				$File	"portal2\logic_timescale.cpp"
+				$File	"portal2\logic_timescale.h"
+				$File	"portal2\item_nugget.cpp"
+				$File	"portal2\npc_hover_turret.cpp"
+				$File	"portal2\point_laser_target.cpp"
+				$File	"portal2\point_laser_target.h"
+				$File	"portal2\point_futbol_shooter.cpp"
+				$File	"portal2\portal_playerlocaldata.cpp"
+				$File	"portal2\portal_playerlocaldata.h"
+				$File	"portal2\projectedwallentity.h"
+				$File	"portal2\projectedwallentity.cpp"
+				$File	"portal2\prop_button.cpp"
+				$File	"portal2\prop_floor_button.cpp"
+				$File	"portal2\prop_linked_portal_door.cpp"
+				$File	"portal2\propglassfutbol.cpp"
+				$File	"portal2\propwallprojector.cpp"
+				$File	"portal2\propwallprojector.h"
+				$File	"portal2\prop_rockettripwire.h"
+				$File	"portal2\prop_rockettripwire.cpp"
+				$File	"portal2\prop_weightedcube.cpp"
+				$File	"portal2\prop_weightedcube.h"
+				$File	"portal2\prop_personality_sphere.cpp"
+				$File	"portal2\func_portalled.cpp"
+				$File	"portal2\func_portalled.h"
+				$File	"portal2\npc_personality_core.cpp"		
+				$File	"portal2\prop_monster_box.cpp"	
+				$File	"portal2\prop_monster_box.h"	
+				$File	"portal2\indicator_panel.cpp"
+				$File	"portal2\indicator_panel.h"
+				$File	"portal2\trigger_catapult.cpp"
+				$File	"portal2\trigger_catapult.h"
+				$File	"portal2\trigger_playerteam.cpp"
+				$File	"portal2\trigger_ping_detector.cpp"
+				$File	"portal2\point_changelevel.cpp"
+				$File	"portal2\pointsurvey.cpp"
+				$File	"portal2\pointsurvey.h"
+				$File	"portal2\trigger_tractorbeam.h"
+				$File	"portal2\trigger_tractorbeam.cpp"
+				$File	"portal2\prop_tractorbeam.h"
+				$File	"portal2\prop_tractorbeam.cpp"
+				$File	"portal2\rocketprojectile.cpp"
+				$File	"portal2\rocketprojectile.h"
+				$File	"portal2\level_placard_display.cpp"
+				$File	"portal2\mp_lobby_screen.cpp"
+				$File	"portal2\portal_race_checkpoint.cpp"
+				$File	"portal2\prop_exploding_futbol.cpp"
+				$File	"portal2\prop_exploding_futbol.h"
+				$File	"portal2\portal_pointpush.h"
+				$File	"portal2\portal_pointpush.cpp"
+				$File	"portal2\fizzler_effects.h"
+				$File	"portal2\fizzler_effects.cpp"
+				$File	"portal2\hitbox_damaged_entity.h"
+				$File	"portal2\npc_wheatley_boss.cpp"
+				$File	"portal2\portal_mp_stats.h"
+				$File	"portal2\portal_mp_stats.cpp"
+				$File	"portal2\fizzler_multiorigin_sound_player.h"
+				$File	"portal2\fizzler_multiorigin_sound_player.cpp"
+				$File	"portal2\prop_hot_potato.cpp"
+				$File	"portal2\portal_ui_controller.h"
+				$File	"portal2\portal_ui_controller.cpp"
+				$File	"portal2\portal_procedural_generator.h"
+				$File	"portal2\portal_procedural_generator.cpp"
+				$File	"portal2\challenge_mode_end_node.cpp"
+				$File	"portal2\portal2_research_data_tracker.h"
+				$File	"portal2\portal2_research_data_tracker.cpp"
+
+				$File	"portal2\info_portal_score.cpp"
+				$File	"$SRCDIR\game\shared\portal2\vs_game_shared.h"
+
+				$File	"$SRCDIR\game\shared\portal2\hitbox_damaged_entity_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\hitbox_damaged_entity_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal_grabcontroller_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\portal_grabcontroller_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\player_pickup.h"
+				$File	"$SRCDIR\game\shared\portal2\player_pickup.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal_pointpush_shared.cpp"
+				
+				$File	"$SRCDIR\game\shared\portal2\weapon_item_base_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\weapon_item_base_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\weapon_promo_items_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\weapon_promo_items_shared.cpp"
+
+				$File	"$SRCDIR\game\shared\portal\baseprojectedentity_shared.h"
+				$File	"$SRCDIR\game\shared\portal\baseprojectedentity_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\projectedwallentity_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\trigger_tractorbeam_shared.h"
+				$File	"$SRCDIR\game\shared\portal\trigger_tractorbeam_shared.cpp"
+
+				$File	"$SRCDIR\game\shared\portal2\damage_database.h"
+				$File	"$SRCDIR\game\shared\portal2\damage_database.cpp"
+				$File	"$SRCDIR\game\shared\portal2\trigger_catapult_shared.cpp"
+
+				$File	"$SRCDIR\game\server\portal2\prop_testchamber_door.cpp"
+				$File	"$SRCDIR\game\server\portal2\prop_testchamber_door.h"
+
+				$File	"$SRCDIR\game\shared\portal2\material_index_data_ops_proxy.h"
+				$File	"$SRCDIR\game\shared\portal2\material_index_data_ops_proxy.cpp"
+			}
+			
+			$Folder "Paint"
+			{
+				// shared
+				$File	"$SRCDIR\game\shared\portal\paintable_entity.h"
+				$File	"$SRCDIR\game\shared\portal\prop_paint_power_user.h"
+				$File	"$SRCDIR\game\shared\portal\player_pickup_paint_power_user.h"
+				$File	"$SRCDIR\game\shared\portal\paint_color_manager.h"
+				$File	"$SRCDIR\game\shared\portal\paint_color_manager.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_power_user_interface.h"
+				$File	"$SRCDIR\game\shared\portal\paint_power_user_interface.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_power_user.h"
+				$File	"$SRCDIR\game\shared\portal\paint_power_info.h"
+				$File	"$SRCDIR\game\shared\portal\paint_power_info.cpp"
+				$File	"$SRCDIR\game\shared\portal\stick_partner.h"
+				$File	"$SRCDIR\game\shared\portal\stick_partner.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_blobs_shared.h"
+				$File	"$SRCDIR\game\shared\portal\paint_blobs_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_manager.h"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_manager.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_sprayer_shared.h"
+				$File	"$SRCDIR\game\shared\portal\paint_sprayer_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_cleanser_manager.h"
+				$File	"$SRCDIR\game\shared\portal\paint_cleanser_manager.cpp"
+				$File	"$SRCDIR\game\shared\portal\weapon_paintgun_shared.h"
+				$File	"$SRCDIR\game\shared\portal\weapon_paintgun_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_shared.h"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\paint_saverestore.h"
+				$File	"$SRCDIR\game\shared\portal2\paint_saverestore.cpp"
+				
+				// server
+				$File	"portal2\paint_database.h"
+				$File	"portal2\paint_database.cpp"
+				$File	"portal2\paint_sprayer.h"
+				$File	"portal2\paint_sprayer.cpp"
+				$File	"portal2\trigger_paint_cleanser.h"
+				$File	"portal2\trigger_paint_cleanser.cpp"
+				$File	"portal2\weapon_paintgun.h"
+				$File	"portal2\weapon_paintgun.cpp"
+				$File	"portal2\paint_swap_guns.h"
+				$File	"portal2\paint_swap_guns.cpp"
+				$File	"portal2\item_paint_power_pickup.cpp"
+				$File	"portal2\prop_paint_bomb.h"
+				$File	"portal2\prop_paint_bomb.cpp"
+				$File	"portal2\paint_bot_temp.h"
+				$File	"portal2\paint_bot_temp.cpp"
+				$File	"portal2\prop_physics_paintable.cpp"
+				$File	"portal2\cpaintblob.h"
+				$File	"portal2\cpaintblob.cpp"
+				$File	"portal2\paint_stream.h"
+				$File	"portal2\paint_stream.cpp"
+				$File	"portal2\paint_sphere.h"
+				$File	"portal2\paint_sphere.cpp"
+				
+				$Folder	"Additional Public Header Files"
+				{
+					$File	"$SRCDIR\public\meshutils\mesh.h"
+				}
+
+				$Folder	"Additional Link Libraries"
+				{
+					$Lib	"$LIBPUBLIC\meshutils"
+					$Lib	"$LIBCOMMON\blobulator" [$WIN32||$POSIX]
+					$Lib	"$LIBCOMMON\fileextd"	[$WIN32 && !$NO_CEG]
+				}
+			}
+		}
+
+		$Folder "Protobuf Files"	[ ( $WIN32 || $OSXALL ) && !$NO_STEAM ]
+		{
+			$DynamicFile "$GENERATED_PROTO_DIR\steammessages.pb.cc"
+			{
+				$Configuration
+				{
+					$Compiler 
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+					}
+				}
+			}
+		}
+	}
+}

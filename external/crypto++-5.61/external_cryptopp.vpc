@@ -1,0 +1,41 @@
+//
+// This file configures include directories and link libraries for Crypto++
+//
+
+$MacroRequired "PLATFORM"
+$MacroRequired "EXTERNALCRYPTOPP"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories			"$BASE;$SRCDIR\external\$EXTERNALCRYPTOPP"
+	}
+}
+
+$Project
+{
+        $Folder "Link Libraries"
+        {
+                $LibExternal					"$SRCDIR\lib\$PLATFORM\release\libcryptopp" [($LINUX&&$DEDICATED)||$OSXALL]
+                $LibExternal					"$SRCDIR\lib\$PLATFORM\release\libcryptopp_client" [$LINUX&&!$DEDICATED]
+        }
+}
+
+$Configuration "Debug"
+{
+	$Linker
+	{
+		$AdditionalDependencies					"$BASE $SRCDIR\lib\$PLATFORM\debug\cryptlib.lib" [$WINDOWS && !$VS2015]
+		$AdditionalDependencies					"$BASE $SRCDIR\lib\$PLATFORM\2015\debug\cryptlib.lib" [$WINDOWS && $VS2015]
+	}
+}
+
+$Configuration "Release"
+{
+	$Linker
+	{
+		$AdditionalDependencies					"$BASE $SRCDIR\lib\$PLATFORM\release\cryptlib.lib" [$WINDOWS && !$VS2015]
+		$AdditionalDependencies					"$BASE $SRCDIR\lib\$PLATFORM\2015\release\cryptlib.lib" [$WINDOWS && $VS2015]
+	}
+}

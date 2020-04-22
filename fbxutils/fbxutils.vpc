@@ -1,0 +1,38 @@
+//-----------------------------------------------------------------------------
+//
+// Utility code for use with the Autodesk FBX SDK
+//
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+
+// $Macro LEGACYSRCDIR	"$SRCDIR\source1_legacy"
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Include "$SRCDIR\vpc_scripts\fbx_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions			"$BASE;FBXUTILS_LIB"
+//		$AdditionalIncludeDirectories		"$BASE;$LEGACYSRCDIR\public"
+	}
+}
+
+$Project "fbxutils"
+{
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR/public/fbxutils/dmfbxserializer.h"
+		$File	"$SRCDIR/public/fbxsystem/ifbxsystem.h"
+		$File	"$SRCDIR/public/fbxsystem/fbxsystem.h"
+	}
+
+	$Folder	"Source Files"
+	{
+		$File	"dmfbxserializer.cpp"
+		$File	"$SRCDIR/public/fbxsystem/fbxsystem.cpp"
+	}
+}

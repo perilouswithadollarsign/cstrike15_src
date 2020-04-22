@@ -1,0 +1,47 @@
+//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//
+// Purpose: 
+//
+// $Workfile:     $
+// $Date:         $
+// $NoKeywords: $
+//=============================================================================//
+#if !defined( VGUICENTERPRINT_H )
+#define VGUICENTERPRINT_H
+#ifdef _WIN32
+#pragma once
+#endif
+
+#include <vgui/vgui.h>
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+namespace vgui
+{
+class Panel;
+}
+
+class CCenterStringLabel;
+class CCenterPrint
+{
+private:
+	CCenterStringLabel	*vguiCenterString;
+
+public:
+						CCenterPrint( void );
+
+	virtual void		Create( vgui::VPANEL parent );
+	virtual void		Destroy( void );
+	
+	virtual void		SetTextColor( int r, int g, int b, int a );
+	virtual void		Print( char *text );
+	virtual void		Print( wchar_t *text );
+	virtual void		ColorPrint( int r, int g, int b, int a, char *text );
+	virtual void		ColorPrint( int r, int g, int b, int a, wchar_t *text );
+	virtual void		Clear( void );
+};
+
+extern CCenterPrint *GetCenterPrint();
+
+#endif // VGUICENTERPRINT_H

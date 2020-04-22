@@ -1,0 +1,40 @@
+//-----------------------------------------------------------------------------
+//	MDLOBJECTS.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTLIBNAME	"dmxedit"
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions			"$BASE;DMXEDIT_LIB"
+	}
+}
+
+$Project "dmxeditlib"
+{
+	$Folder	"Header Files"
+	{
+	}
+
+	$Folder	"Source Files"
+	{
+		$File	"dmxedit.cpp"
+		$File	"winstuff.cpp"
+	}
+
+	$Folder	"Interface"
+	{
+		$File	"$SRCDIR\public\dmxeditlib\dmxedit.h"
+	}
+
+	$Folder	"external"
+	{
+	}
+}

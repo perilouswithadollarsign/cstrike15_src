@@ -1,0 +1,47 @@
+//-----------------------------------------------------------------------------
+//	MATHLIB.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;..\public"
+	}
+}
+
+$Project "bonesetup"
+{
+	$Folder	"Source Files"
+	{
+		$File	"bone_setup_PS3.cpp"	[$PS3]
+		$File	"bone_ik_PS3.cpp"		[$PS3]
+		$File	"bone_utils_PS3.cpp"	[$PS3]
+		$File	"bone_decode_PS3.cpp"	[$PS3]
+		$File	"bone_setup.cpp"
+		$File	"bone_ik.cpp"
+		$File	"bone_utils.cpp"
+		$File	"bone_decode.cpp"
+		$File	"bone_constraints.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"bone_utils.h"
+		$File	"bone_utils_PS3.h"		[$PS3]
+	}
+
+
+	$Folder	"Public Header Files"
+	{
+		$File	"$SRCDIR\public\bone_setup.h"			[$WINDOWS||$POSIX]		
+		$File	"$SRCDIR\public\bone_setup_PS3.h"		[$PS3]		
+	}
+}

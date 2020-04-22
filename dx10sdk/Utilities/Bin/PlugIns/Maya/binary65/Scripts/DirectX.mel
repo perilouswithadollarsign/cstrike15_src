@@ -1,0 +1,154 @@
+
+global string $g_dxMenu;
+global string $g_dxPreviewToggle;
+global string $g_dxViewerStartupToggle;
+
+{
+	DirectX_BuildMenu();
+}
+
+
+
+global proc DirectX_SetPreviewState(int $state)
+{
+	global string $g_dxPreviewToggle;
+
+	menuItem -e -checkBox $state $g_dxPreviewToggle;
+}
+
+global proc int DirectX_GetPreviewState()
+{
+	global string $g_dxPreviewToggle;
+
+	int $result= `menuItem -q -checkBox  $g_dxPreviewToggle`;
+
+	return $result;
+}
+
+global proc DirectX_SetViewerStartupState(int $state)
+{
+	global string $g_dxViewerStartupToggle;
+
+	menuItem -e -checkBox $state  $g_dxViewerStartupToggle;
+}
+
+global proc int DirectX_GetViewerStartupState()
+{
+	global string $g_dxViewerStartupToggle;
+
+	int $result= `menuItem -q -checkBox  $g_dxViewerStartupToggle`;
+
+	return $result;
+}
+
+global proc DirectX_RemoveMenu()
+{
+	global string $g_dxMenu;
+
+	if(`menu -q -exists $g_dxMenu`)
+		deleteUI $g_dxMenu;
+
+}
+
+global string $g_dxMenu;
+global proc DirectX_BuildMenu()
+{
+	global string $gMainWindow;
+	global string $g_dxMenu;
+	global string $g_dxPreviewToggle;
+	global string $g_dxSkinToggle;
+	global string $g_dxAnimationToggle;
+	global string $g_dxViewerStartupToggle;
+
+	// If menu exists or if main window doesn't exist, just return.
+	if(`menu -q -exists $g_dxMenu` 
+	  || !(`window -q -exists $gMainWindow`)) 
+		return;
+
+	$g_dxMenu= `menu -parent $gMainWindow -tearOff true -aob true 
+					-label "DirectX"`;
+
+	setParent -m $g_dxMenu;
+
+	$g_dxPreviewToggle= `menuItem -l "Realtime Previewing"
+		-annotation "Realtime Previewing of scene in Direct3D viewers."
+		-cb 1
+		-c ("DXCCPreviewChanged")`;
+
+	menuItem -d true;
+
+	menuItem -l "Rebuild All"
+		-annotation "Rebuild scene data for realtime viewers and export"
+		-c "DXCCRebuildScene"
+		dxRebuildSceneItem;
+
+	menuItem -l "Rebuild Dirty"
+		-aob true
+		-annotation "Rebuild dirty data for realtime viewers and export"
+		-c ("DXCCRebuildDirty")
+		dxRebuildDirtyItem;
+
+	menuItem -d true;
+		
+	menuItem -l "Export All"
+		-annotation "Export the scene to an X-File."
+		-c ("DXCCExportScene")
+		dxExportSceneItem;
+	
+	menuItem -l "Export Options"
+		-annotation "Popup the Export Options dialog"
+		-c ("DXCCExportOptions")
+		dxExportOptionsItem;	
+	
+	menuItem -d true;
+
+	menuItem  -l "Viewers..." 
+                -sm 1 
+                -to 1
+			-annotation "Realtime Viewers"
+			dxViewerItem;
+			
+	$g_dxViewerStartupToggle= `menuItem -l "Open on Startup"
+		-annotation "Open the viewer when Maya starts"
+		-cb 0`;
+
+	menuItem  -l "None" 
+			-annotation "Close the Viewer"
+			-c "DXCCCloseViewer"
+			dxCloseViewerItem;
+			
+	menuItem  -l "Floating" 
+			-annotation "Floating Viewers"
+			-c "DXCCFloatingView"
+			dxFloatingViewerItem;
+
+	menuItem  -l "Top" 
+			-annotation "Place Viewer over Top Pane"
+			-c "DXCCTopView"
+			dxTopViewerItem;
+
+	menuItem  -l "Side" 
+			-annotation "Place Viewer over Side Pane"
+			-c "DXCCSideView"
+			dxSideViewerItem;
+
+	menuItem  -l "Front" 
+			-annotation "Place Viewer over Front Pane"
+			-c "DXCCFrontView"
+			dxFrontViewerItem;
+
+	menuItem -d true;
+
+
+	setParent -m $g_dxMenu;
+	
+	menuItem -d true;
+	
+	menuItem  -l "Help" 
+			-annotation "Help"
+			-c "DXMUiHelp"
+			dxHelpItem;
+	
+}
+
+

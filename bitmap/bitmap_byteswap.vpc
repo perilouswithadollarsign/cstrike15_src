@@ -1,0 +1,47 @@
+//-----------------------------------------------------------------------------
+//	BITMAP_BYTESWAP.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTLIBDIR	"$LIBPUBLIC"
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$(XEDK)\include\win32"	[$WINDOWS]
+	}
+}
+
+$Configuration "Debug"
+{
+	$General
+	{
+		$IntermediateDirectory		".\Debug_BitmapByteswap$PLATSUBDIR"		[$WINDOWS]
+	}
+}
+
+$Configuration "Release"
+{
+	$General
+	{
+		$IntermediateDirectory		".\Debug_BitmapByteswap$PLATSUBDIR"		[$WINDOWS]
+	}
+}
+
+$Project "bitmap_byteswap"
+{
+	$Folder	"Source Files"
+	{
+		$File	"ImageByteSwap.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\bitmap\imageformat.h"
+	}
+}

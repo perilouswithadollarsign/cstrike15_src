@@ -1,0 +1,8 @@
+[%CommonProgramFiles%\aliaswavefront shared\modules\maya\6.0\Microsoft DirectX 9.0 SDK.txt]
+1=+ D3DMaya6ExportX 5.0 %DXSDKMayaPlugInPath%\Binary6
+
+[%CommonProgramFiles%\Alias Shared\Modules\Maya\6.0\Microsoft DirectX 9.0 SDK.txt]
+1=+ D3DMaya6ExportX 5.0 %DXSDKMayaPlugInPath%\Binary6
+
+[%CommonProgramFiles%\Alias Shared\Modules\Maya\6.5\Microsoft DirectX 9.0 SDK.txt]
+1=+ D3DMaya65ExportX 5.0 %DXSDKMayaPlugInPath%\Binary65

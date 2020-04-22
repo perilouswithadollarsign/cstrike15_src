@@ -1,0 +1,21 @@
+$MacroRequired	PROTOBUF_BUILDER_INCLUDED
+
+$Project
+{
+	$Folder "Protobuf Files"
+	{
+		$File "$SRCDIR\game\shared\base_gcmessages.proto"
+		$DynamicFile "$GENERATED_PROTO_DIR\base_gcmessages.pb.h"
+		$DynamicFile "$GENERATED_PROTO_DIR\base_gcmessages.pb.cc"
+		{
+			$Configuration
+			{
+				$Compiler [$WINDOWS]
+				{
+					$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+				}
+			}
+		}
+	}
+
+}

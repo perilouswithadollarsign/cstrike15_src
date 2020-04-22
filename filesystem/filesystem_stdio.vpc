@@ -1,0 +1,98 @@
+//-----------------------------------------------------------------------------
+//	FILESYSTEM_STDIO.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$Configuration	"Debug"
+{
+	$General
+	{
+		$OutputDirectory		"Debug_Stdio$PLATSUBDIR"		[$WINDOWS]
+		$IntermediateDirectory	"Debug_Stdio$PLATSUBDIR"		[$WINDOWS]
+		$OutputDirectory		"Debug_Stdio_360"	[$X360]
+		$IntermediateDirectory	"Debug_Stdio_360"	[$X360]
+	}
+}
+
+$Configuration	"Release"
+{
+	$General
+	{		
+		$OutputDirectory		"Release_Stdio$PLATSUBDIR"		[$WINDOWS]
+		$IntermediateDirectory	"Release_Stdio$PLATSUBDIR"		[$WINDOWS]
+		$OutputDirectory		"Release_Stdio_360"	[$X360]
+		$IntermediateDirectory	"Release_Stdio_360"	[$X360]
+	}
+}
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;FILESYSTEM_STDIO_EXPORTS;DONT_PROTECT_FILEIO_FUNCTIONS;PROTECTED_THINGS_ENABLE"
+		$PreprocessorDefinitions	"$BASE;_USE_32BIT_TIME_T" [$WIN32]
+	}
+	$Linker [!$PS3]
+	{
+			$SystemLibraries                                                        "iconv" [$OSXALL]
+	}
+}
+
+$Project "filesystem_stdio"
+{
+	$Folder	"Source Files"
+	{
+		$File	"basefilesystem.cpp"
+		$File	"basefilesystemasync.cpp"
+		$File	"filetracker.cpp"
+		$File	"filesystemasync.cpp"		[!$PS3]
+		$File	"filesystem_stdio.cpp"
+		$File	"$SRCDIR\public\kevvaluescompiler.cpp" [!$PS3]
+		$File	"$SRCDIR\public\zip_utils.cpp"	[!$PS3]
+		$File	"QueuedLoader.cpp"			
+		$File	"xboxinstaller.cpp"			[$X360]
+		$File	"linux_support.cpp"			[$POSIX]
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"basefilesystem.h"
+		$File	"filesystemasync.h"
+		$File	"filetracker.h"
+		$File	"threadsaferefcountedobject.h"
+		$File	"$SRCDIR\public\tier0\basetypes.h"
+		$File	"$SRCDIR\public\bspfile.h"
+		$File	"$SRCDIR\public\bspflags.h"
+		$File	"$SRCDIR\public\tier1\characterset.h"
+		$File	"$SRCDIR\public\tier0\dbg.h"
+		$File	"$SRCDIR\public\tier0\fasttimer.h"
+		$File	"$SRCDIR\public\filesystem.h"
+		$File   "$SRCDIR\public\filesystem\iasyncfilesystem.h"
+		$File	"$SRCDIR\public\ifilelist.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\tier1\interface.h"
+		$File	"$SRCDIR\public\tier0\platform.h"
+		$File	"$SRCDIR\public\tier1\strtools.h"
+		$File	"$SRCDIR\public\tier1\utlmemory.h"
+		$File	"$SRCDIR\public\tier1\utlrbtree.h"
+		$File	"$SRCDIR\public\tier1\utlsymbol.h"
+		$File	"$SRCDIR\public\tier1\utlvector.h"
+		$File	"$SRCDIR\public\vstdlib\vstdlib.h"
+		$File	"$SRCDIR\public\keyvaluescompiler.h"
+		$File	"$SRCDIR\public\filesystem\IQueuedLoader.h"
+	}
+	
+	$Folder "Link Libraries"
+	{
+		$lib	tier2
+		$lib	vpklib [!$X360 && !$PS3]
+	}
+	
+	
+}

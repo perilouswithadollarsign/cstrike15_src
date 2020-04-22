@@ -1,0 +1,49 @@
+//-----------------------------------------------------------------------------
+//	DEDICATED_MAIN.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game"
+
+$Macro OUTBINNAME	"srcds"			[$WIN32]
+$Macro OUTBINNAME	"srcds_x64"		[$WIN64]
+$Macro OUTBINNAME	"srcds_linux" 	[$LINUX && !$CYGWIN]
+$Macro OUTBINNAME	"srcds_osx" 	[$OSX32 || $OSX64]
+$Macro OUTBINNAME	"srcds_cygwin" 	[$CYGWIN && $DEDICATED]
+$Include "$SRCDIR\vpc_scripts\source_exe_base.vpc"
+
+$Configuration
+{
+	$Linker
+	{
+		$AdditionalDependencies				"$BASE Advapi32.lib" [$WINDOWS]
+	}
+}
+
+$Project "Dedicated_main"
+{
+	$Folder	"Source Files"
+	{
+		$File	"main.cpp"
+		$File	"$SRCDIR\common\SteamAppStartup.cpp"
+		$File	"$SRCDIR\common\SteamAppStartup.h"
+		-$File	"$SRCDIR\public\tier0\memoverride.cpp"
+	}
+
+	$Folder	"Resources"
+	{
+		$File	"$SRCDIR\launcher\res\launcher.ico"
+		$File	"dedicated_main.rc"
+	}
+	
+	$Folder "Link Libraries"
+	{
+		-$Implib	"$LIBPUBLIC\tier0"
+		-$Lib		"$LIBPUBLIC\tier1"
+		-$Lib		"$LIBPUBLIC\interfaces"
+		-$Implib	"$LIBPUBLIC\vstdlib"
+        $Lib     "$SRCDIR/thirdparty/telemetry/lib/libtelemetryx86.link" [$LINUX]
+	}
+}

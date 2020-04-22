@@ -1,0 +1,815 @@
+//-----------------------------------------------------------------------------
+//	CLIENT_PORTAL2.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro GAMENAME 			"portal2"
+$Macro GENERATED_PROTO_DIR	"$SRCDIR\game\client\portal2\generated_proto"
+
+$Include "client_portal_base.vpc"
+$Include "client_econ_base.vpc"		[ ($WIN32 || $OSXALL ) && !$NO_STEAM ]
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	".\hl2;.\hl2\elements;$SRCDIR\game\shared\hl2;$SRCDIR\game\shared\episodic;..\..\public;;$SRCDIR\game\shared\multiplayer;$SRCDIR\game\shared\portal;;.\portal;.\portal2;$BASE;$SRCDIR\public\meshutils;$SRCDIR\game\client\portal2\gameui;$SRCDIR\game\shared\portal2"
+		$PreprocessorDefinitions		"$BASE;PORTAL2;PORTAL;GAMEUI_EMBEDDED;GAMEUI_EXPORTS;VERSION_SAFE_STEAM_API_INTERFACES"
+		$PreprocessorDefinitions		"$BASE;USE_CEG"								[ $WIN32 && !$NO_CEG ]		
+		$ForceIncludes					"tier0\platform.h"							[ $WIN32 ||  $POSIX  ]
+
+		// The PuzzleMaker is loaded as a DLL during development (on WIN32), but for public builds it is linked as a static LIB:
+		// Always link as a static library in this branch
+		// $PreprocessorDefinitions		"$BASE;PUZZLEMAKER_DLL_IMPORT"				[ $WIN32 ]
+		$PreprocessorDefinitions		"$BASE;PORTAL2_PUZZLEMAKER"					[ $WIN32 ||  $OSXALL ]
+	}
+
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE Imm32.lib" [$WIN32]
+		$AdditionalDependencies			"$BASE libspurs_stub.a libspurs_jq_stub.a libsysutil_stub.a libsysutil_game_stub.a libnetctl_stub.a"						[$PS3]
+		$AdditionalDependencies			"$BASE $LIBCOMMON\ceglib.lib"				[ $WIN32 && !$NO_CEG ]
+		//$FunctionOrder				"$(IntDir)\functionorder.txt" 				[ $WIN32 && !$NO_CEG ]
+		//$References					"Eliminate Unreferenced Data (/OPT:REF)"	[ $WIN32 && !$NO_CEG ]
+		//$EnableCOMDATFolding			"Remove Redundant COMDATs (/OPT:ICF)"		[ $WIN32 && !$NO_CEG ]
+	}
+
+	$PreBuildEvent	[$WIN32 && !$NO_CEG]
+	{
+		$CommandLine		"del $(IntDir)\*.temp" "\n" \ 
+							"del $(IntDir)\*.substitutions*" "\n" \
+							"if EXIST $OUTBINDIR\$(TargetFileName) for /f $QUOTEdelims=$QUOTE %%A in ('attrib $QUOTE$OUTBINDIR\$(TargetFileName)$QUOTE') do set valveTmpIsReadOnly=$QUOTE%%A$QUOTE" "\n" \
+							"set valveTmpIsReadOnlyLetter=%valveTmpIsReadOnly:~6,1%" "\n" \
+							"if $QUOTE%valveTmpIsReadOnlyLetter%$QUOTE==$QUOTER$QUOTE del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+							"$CRCCHECK"						
+	}
+	
+	$PreLinkEvent	[$WIN32 && !$NO_CEG]
+	{
+		$CommandLine		"$(InputDir)\..\..\devtools\bin\ceg\mingle.exe -subst:$(ProjectDir)\..\..\lib\common\ceglib.lib -mingle:$(ProjectDir)\..\..\lib\common\ceglib.lib $(IntDir)\*.obj -log:$(IntDir)\mingle.log > $(IntDir)\functionorder.txt" "\n"
+
+		$Description		"Mingle processes .obj files - changing Steamworks_TestSecret and Steamworks_SelfCheck references and generating function order file. Report problems to Neilk@valvesoftware.com"
+	}
+	
+	$PostBuildEvent	[$WIN32 && !$NO_CEG]
+	{
+		$CommandLine	"if exist $OUTCEGDIR goto CegExists" "\n" \
+						"mkdir $OUTCEGDIR" "\n" \
+						":CegExists" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).original $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).stripped $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).strips $SRCDIR" "\n" \	
+						"ECHO Generating CEG binaries..." "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -drm:$(TargetPath) -path:$(ProjectDir)\..\..\devtools\bin\ceg -drmout:$(TargetPath).ceg -output:$OUTCEGDIR -logfile:$(IntDir)\drmpe.log -drmclean" "\n" \
+						"copy $(TargetPath).ceg $(TargetPath)" "\n"	\
+						"if exist $OUTBINDIR goto ValveStart" "\n" \
+						"mkdir $OUTBINDIR" "\n" \
+						":ValveStart" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetFileName) $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetFileName) $OUTBINDIR\$(TargetFileName)" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"if exist $QUOTE$(TargetDir)$QUOTE$(TargetName).map copy $QUOTE$(TargetDir)$QUOTE$(TargetName).map $OUTBINDIR\$(TargetName).map" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetName).pdb $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetName).pdb $OUTBINDIR\$(TargetName).pdb" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"goto BuildEventOK" "\n" \
+						":BuildEventFailed" "\n" \
+						"echo *** ERROR! PostBuildStep FAILED for $(ProjectName)! EXE or DLL is probably running. ***" "\n" \
+						"del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+						"exit 1" "\n" \
+						":BuildEventOK" "\n" [!$UPLOAD_CEG]
+
+		$CommandLine	"if exist $OUTCEGDIR goto CegExists" "\n" \
+						"mkdir $OUTCEGDIR" "\n" \
+						":CegExists" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).original $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).stripped $SRCDIR" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTCEGDIR\$(TargetFileName).strips $SRCDIR" "\n" \
+						"ECHO Generating CEG binaries..." "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -path:$(ProjectDir)\..\..\devtools\bin\ceg -split:$(TargetPath) -logfile:$(IntDir)\drmpe.log" "\n" \
+						"if exist drmpe.cfg del /f drmpe.cfg" "\n" \
+						"ECHO Uploading CEG binaries..." "\n" \
+						"copy drmpe_beta.cfg drmpe.cfg" "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -path:$(ProjectDir)\..\..\devtools\bin\ceg -upload:620 -logfile:$(IntDir)\drmpe_beta_upload.log" "\n" \
+						"copy drmpe_public.cfg drmpe.cfg" "\n" \
+						"$(ProjectDir)\..\..\devtools\bin\ceg\drmpe -path:$(ProjectDir)\..\..\devtools\bin\ceg -upload:620 -logfile:$(IntDir)\drmpe_public_upload.log" "\n" \
+						"ECHO Moving CEG binaries to output folder..." "\n" \
+						"copy $(ProjectDir)\submission\$(TargetFileName).original $OUTCEGDIR\$(TargetFileName).original" "\n"	\
+						"copy $(ProjectDir)\submission\$(TargetFileName).stripped $OUTCEGDIR\$(TargetFileName).stripped" "\n"	\
+						"copy $(ProjectDir)\submission\$(TargetFileName).strips $OUTCEGDIR\$(TargetFileName).strips" "\n"	\
+						"copy $OUTCEGDIR\$(TargetFileName).stripped $(TargetPath)" "\n"	\
+						"if exist $OUTBINDIR goto ValveStart" "\n" \
+						"mkdir $OUTBINDIR" "\n" \
+						":ValveStart" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetFileName) $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetFileName) $OUTBINDIR\$(TargetFileName)" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"if exist $QUOTE$(TargetDir)$QUOTE$(TargetName).map copy $QUOTE$(TargetDir)$QUOTE$(TargetName).map $OUTBINDIR\$(TargetName).map" "\n" \
+						"call $SRCDIR\vpc_scripts\valve_p4_edit.cmd $OUTBINDIR\$(TargetName).pdb $SRCDIR" "\n" \
+						"copy $QUOTE$(TargetDir)$QUOTE$(TargetName).pdb $OUTBINDIR\$(TargetName).pdb" "\n" \
+						"if ERRORLEVEL 1 goto BuildEventFailed" "\n" \
+						"goto BuildEventOK" "\n" \
+						":BuildEventFailed" "\n" \
+						"echo *** ERROR! PostBuildStep FAILED for $(ProjectName)! EXE or DLL is probably running. ***" "\n" \
+						"del /q $QUOTE$(TargetDir)$QUOTE$(TargetFileName)" "\n" \
+						"exit 1" "\n" \
+						":BuildEventOK" "\n" [$UPLOAD_CEG]
+
+		$Description	"CEG the file, copy resultant files to perforce locations, and upload to Steam if appropriate.  Report problems with drmpe.exe to Neilk@valvesoftware.com"
+	}
+}
+
+$Project "Client (Portal 2)"
+{
+	$Folder	"Source Files"
+	{
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.cpp"
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.h"
+		$File	"$SRCDIR\game\shared\cam_thirdperson.cpp"
+		$File	"$SRCDIR\game\shared\cam_thirdperson.h"
+		
+		-$File	"$SRCDIR\game\shared\weapon_parse_default.cpp"
+		$File	"$SRCDIR\game\shared\portal\portal_weapon_parse.cpp"
+		-$File	"geiger.cpp"
+		-$File	"hud_animationinfo.cpp"
+		-$File	"hud_basetimer.cpp"
+		-$File	"hud_bitmapnumericdisplay.cpp"
+		-$File	"hl2\hud_filmdemo.cpp"
+		-$File	"hl2\hud_hdrdemo.cpp"
+		-$File	"hud_hintdisplay.cpp"
+		-$File	"hud_numericdisplay.cpp"
+		-$File	"hud_vehicle.cpp"
+		-$File	"c_mod_lesson_stubs.cpp"
+		
+		$Folder "Workshop"
+		{
+			$File	"$SRCDIR\game\shared\ugc_request_manager.cpp"
+			$File	"$SRCDIR\game\shared\ugc_request_manager.h"
+			$File	"$SRCDIR\game\shared\ugc_utils.cpp"
+			$File 	"$SRCDIR\game\shared\ugc_utils.h"
+			$File	"$SRCDIR\game\shared\ugc_file_info_manager.cpp"
+			$File	"$SRCDIR\game\shared\ugc_file_info_manager.h"
+			$File	"$SRCDIR\game\shared\ugc_workshop_manager.cpp"
+			$File	"$SRCDIR\game\shared\ugc_workshop_manager.h"
+		}
+
+		$Folder	"Portal"
+		{
+
+			$File	"$SRCDIR\game\shared\portal\portal_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_gamerules.h"
+			
+			$File	"$SRCDIR\game\shared\portal\portal_mp_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_mp_gamerules.h"
+
+			$Folder "Economy"	[ ($WIN32 || $OSXALL ) && !$NO_STEAM ]
+			{
+				$File	"portal2\portal2_econ_ui.cpp"
+				$File	"portal2\portal2_playermodelpanel.cpp"
+				$File	"portal2\portal2_playermodelpanel.h"
+				$File	"portal2\portal2_store_preview_item.cpp"
+				$File	"portal2\portal2_store_preview_item.h"
+				$File	"portal2\portal2_item_selection_panel.cpp"
+				$File	"portal2\portal2_item_selection_panel.h"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_inventory.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_inventory.h"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_schema.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_schema.h"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_system.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_system.h"
+				$File	"$SRCDIR\game\shared\portal2\portal2_item_constants.h"
+			}
+
+			$Folder "gameui" [$IFDEF_GAMEUI_UISYSTEM2_ENABLED]
+			{
+				$File	"gameui.cpp"
+				$File	"gameui.h"
+				
+				$Folder "nuggets"
+				{
+					$Folder "system"
+					{
+						$File	"gameui\nuggets\ui_nugget.h"
+						$File	"gameui\nuggets\ui_nugget.cpp"
+					}
+					$File	"gameui\nuggets\ui_application.cpp"
+					$File	"gameui\nuggets\ui_loadingprogress.cpp"
+					$File	"gameui\nuggets\ui_matchevents.cpp"
+					$File	"gameui\nuggets\ui_playermanager.cpp"
+					$File	"gameui\nuggets\ui_semaphore.cpp"
+					$File	"gameui\nuggets\ui_sessions.cpp"
+				}
+
+				$File	"gameui\basemodpanel.cpp"
+				$File	"gameui\basemodpanel.h"
+				$File	"gameui\engineinterface.h"
+				$File	"gameui\gameconsole.cpp"
+				$File	"gameui\gameconsole.h"
+				$File	"gameui\gameconsoledialog.cpp"
+				$File	"gameui\gameconsoledialog.h"
+				$File	"gameui\gameui_interface.cpp"
+				$File	"gameui\gameui_interface.h"
+				$File	"gameui\rungameengine.h"
+				$File	"gameui\rungameengine.cpp"
+				$File	"gameui\sys_utils.h"
+				$File	"gameui\sys_utils.cpp"
+				{
+					$Configuration
+					{
+						$Compiler
+						{
+							$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+						}
+					}
+				}
+				$File	"gameui\uiavatarimage.cpp"
+				$File	"gameui\uiavatarimage.h"
+				$File	"gameui\uigamedata.cpp"
+				$File	"gameui\uigamedata.h"
+				$File	"gameui\uigamedata_invite.cpp"
+				$File	"gameui\uigamedata_storage.cpp"
+				$File	"gameui\vguisystemmoduleloader.cpp"
+				$File	"gameui\vguisystemmoduleloader.h"
+			}
+
+			$Folder "GameUI - Embedded"
+			{
+				$Folder "Base GameUI"
+				{
+					$Folder "Headers"
+					{
+						$File	"portal2\gameui\backgroundmenubutton.h" \
+								"portal2\gameui\basepanel.h" \
+								"portal2\gameui\basesavegamedialog.h" \
+								"portal2\gameui\bitmapimagepanel.h" \
+								"portal2\gameui\commandcheckbutton.h" \
+								"portal2\gameui\contentcontroldialog.h" \
+								"portal2\gameui\createmultiplayergamebotpage.h" \
+								"portal2\gameui\createmultiplayergamedialog.h" \
+								"portal2\gameui\createmultiplayergamegameplaypage.h" \
+								"portal2\gameui\createmultiplayergameserverpage.h" \
+								"portal2\gameui\customtabexplanationdialog.h" \
+								"portal2\gameui\cvarnegatecheckbutton.h" \
+								"portal2\gameui\cvarslider.h" \
+								"portal2\gameui\cvartextentry.h" \
+								"portal2\gameui\cvartogglecheckbutton.h" \
+								"portal2\gameui\engineinterface.h" \
+								"portal2\gameui\gameconsole.h" \
+								"portal2\gameui\gameconsoledialog.h" \
+								"portal2\gameui\gameui_interface.h" \
+								"portal2\gameui\gameui_util.h" \
+								"portal2\gameui\keytogglecheckbutton.h" \
+								"portal2\gameui\labeledcommandcombobox.h" \
+								"portal2\gameui\loadingdialog.h" \
+								"portal2\gameui\loadingtippanel.h" \
+								"portal2\gameui\modinfo.h" \
+								"portal2\gameui\mousemessageforwardingpanel.h" \
+								"portal2\gameui\multiplayeradvanceddialog.h" \
+								"portal2\gameui\optionsdialog.h" \
+								"portal2\gameui\optionssubaudio.h" \
+								"portal2\gameui\optionssubdifficulty.h" \
+								"portal2\gameui\optionssubgame.h" \
+								"portal2\gameui\optionssubkeyboard.h" \
+								"portal2\gameui\optionssubmouse.h" \
+								"portal2\gameui\optionssubmultiplayer.h" \
+								"portal2\gameui\optionssubportal.h" \
+								"portal2\gameui\optionssubvideo.h" \
+								"portal2\gameui\optionssubvoice.h" \
+								"portal2\gameui\panellistpanel.h" \
+								"portal2\gameui\playerlistdialog.h" \
+								"portal2\gameui\rungameengine.h" \
+								"portal2\gameui\scriptobject.h" \
+								"portal2\gameui\sys_utils.h" \
+								"portal2\gameui\textentrybox.h" \
+								"portal2\gameui\urlbutton.h" \
+								"portal2\gameui\vcontrolslistpanel.h" \
+								"portal2\gameui\vguisystemmoduleloader.h"
+					}
+					
+					$File	"portal2\gameui\backgroundmenubutton.cpp" \
+							"portal2\gameui\basesavegamedialog.cpp" \
+							"portal2\gameui\bitmapimagepanel.cpp" \
+							"portal2\gameui\commandcheckbutton.cpp" \
+							"portal2\gameui\contentcontroldialog.cpp" \
+							"portal2\gameui\createmultiplayergamebotpage.cpp" \
+							"portal2\gameui\createmultiplayergamedialog.cpp" \
+							"portal2\gameui\createmultiplayergamegameplaypage.cpp" \
+							"portal2\gameui\createmultiplayergameserverpage.cpp" \
+							"portal2\gameui\customtabexplanationdialog.cpp" \
+							"portal2\gameui\cvarnegatecheckbutton.cpp" \
+							"portal2\gameui\cvarslider.cpp" \
+							"portal2\gameui\cvartextentry.cpp" \
+							"portal2\gameui\cvartogglecheckbutton.cpp" \
+							"portal2\gameui\gameconsole.cpp" \
+							"portal2\gameui\gameconsoledialog.cpp" \
+							"portal2\gameui\gameui_interface.cpp" \
+							"portal2\gameui\gameui_util.cpp" \
+							"portal2\gameui\keytogglecheckbutton.cpp" \
+							"portal2\gameui\labeledcommandcombobox.cpp" \
+							"portal2\gameui\loadingdialog.cpp" \
+							"portal2\gameui\loadingtippanel.cpp" \
+							"portal2\gameui\logofile.cpp" [!$POSIX] \
+							"portal2\gameui\modinfo.cpp" \
+							"portal2\gameui\mousemessageforwardingpanel.cpp" \
+							"portal2\gameui\multiplayeradvanceddialog.cpp" \
+							"portal2\gameui\optionsdialog.cpp" \
+							"portal2\gameui\optionssubaudio.cpp" \
+							"portal2\gameui\optionssubdifficulty.cpp" \
+							"portal2\gameui\optionssubgame.cpp" \
+							"portal2\gameui\optionssubkeyboard.cpp" \
+							"portal2\gameui\optionssubmouse.cpp" \
+							"portal2\gameui\optionssubmultiplayer.cpp" \
+							"portal2\gameui\optionssubportal.cpp" \
+							"portal2\gameui\optionssubvideo.cpp" \
+							"portal2\gameui\optionssubvoice.cpp" \
+							"portal2\gameui\panellistpanel.cpp" \
+							"portal2\gameui\playerlistdialog.cpp" \
+							"portal2\gameui\rungameengine.cpp" \
+							"portal2\gameui\scriptobject.cpp" \
+							"portal2\gameui\sys_utils.cpp" \
+							"portal2\gameui\textentrybox.cpp" \
+							"portal2\gameui\urlbutton.cpp" \
+							"portal2\gameui\vcontrolslistpanel.cpp" \
+							"portal2\gameui\vguisystemmoduleloader.cpp"
+					{
+						$Configuration
+						{
+							$Compiler
+							{
+								$Create/UsePrecompiledHeader	"Not Using Precompiled Headers" [!$PS3]
+							}
+						}
+					}
+				}
+				
+				$Folder "External Stuff"
+				{
+					$File	"$SRCDIR\common\language.cpp"
+					{
+						$Configuration
+						{
+							$Compiler
+							{
+								$Create/UsePrecompiledHeader	"Not Using Precompiled Headers" [!$PS3]
+							}
+						}
+					}
+				}
+
+				$Folder "Portal2 GameUI"
+				{
+					$Folder "Headers"
+					{
+						$File	"portal2\gameui\portal2\basemodframe.h" \
+								"portal2\gameui\portal2\basemodpanel.h" \
+								"portal2\gameui\portal2\basemodui.h" \
+								"portal2\gameui\portal2\gamemodes.h" \
+								"portal2\gameui\portal2\steamcloudsync.h" \
+								"portal2\gameui\portal2\uiavatarimage.h" \
+								"portal2\gameui\portal2\uigamedata.h" \
+								"portal2\gameui\portal2\vachievements.h" \
+								"portal2\gameui\portal2\vaddonassociation.h" \
+								"portal2\gameui\portal2\vaddons.h" \
+								"portal2\gameui\portal2\vattractscreen.h" \
+								"portal2\gameui\portal2\vaudio.h" \
+								"portal2\gameui\portal2\vaudiovideo.h" \
+								"portal2\gameui\portal2\vcloud.h" \
+								"portal2\gameui\portal2\vcontrolleroptions.h" \
+								"portal2\gameui\portal2\vcontrolleroptionsbuttons.h" \
+								"portal2\gameui\portal2\vcontrolleroptionssticks.h" \
+								"portal2\gameui\portal2\vcustomcampaigns.h" \
+								"portal2\gameui\portal2\vdownloadcampaign.h" \
+								"portal2\gameui\portal2\vdownloads.h" \
+								"portal2\gameui\portal2\vdropdownmenu.h" \
+								"portal2\gameui\portal2\vendingsplitscreen.h" \
+								"portal2\gameui\portal2\vflyoutmenu.h" \
+								"portal2\gameui\portal2\vfooterpanel.h" \
+								"portal2\gameui\portal2\vfoundgames.h" \
+								"portal2\gameui\portal2\vfoundgroupgames.h" \
+								"portal2\gameui\portal2\vfoundpublicgames.h" \
+								"portal2\gameui\portal2\vgamelobby.h" \
+								"portal2\gameui\portal2\vgamelobbychat.h" \
+								"portal2\gameui\portal2\vgameoptions.h" \
+								"portal2\gameui\portal2\vgamesettings.h" \
+								"portal2\gameui\portal2\vgenericconfirmation.h" \
+								"portal2\gameui\portal2\vgenericpanellist.h" \
+								"portal2\gameui\portal2\vgenericwaitscreen.h" \
+								"portal2\gameui\portal2\vgetlegacydata.h" \
+								"portal2\gameui\portal2\vhybridbutton.h" \
+								"portal2\gameui\portal2\vdialoglistbutton.h" \
+								"portal2\gameui\portal2\vingamechapterselect.h" \
+								"portal2\gameui\portal2\vingamedifficultyselect.h" \
+								"portal2\gameui\portal2\vingamekickplayerlist.h" \
+								"portal2\gameui\portal2\vingamemainmenu.h" \
+								"portal2\gameui\portal2\vkeyboardmouse.h" \
+								"portal2\gameui\portal2\vleaderboard.h" \
+								"portal2\gameui\portal2\vloadingprogress.h" \
+								"portal2\gameui\portal2\vmainmenu.h" \
+								"portal2\gameui\portal2\vmultiplayer.h" \
+								"portal2\gameui\portal2\vnewgamedialog.h" \
+								"portal2\gameui\portal2\vcoopmode.h" \
+								"portal2\gameui\portal2\vchallengemodedialog.h" \
+								"portal2\gameui\portal2\voptions.h" \
+								"portal2\gameui\portal2\voptionscloud.h" \
+								"portal2\gameui\portal2\vpasswordentry.h" \
+								"portal2\gameui\portal2\vpvplobby.h" \
+								"portal2\gameui\portal2\vquickjoin.h" \
+								"portal2\gameui\portal2\vquickjoingroups.h" \
+								"portal2\gameui\portal2\vsignindialog.h" \
+								"portal2\gameui\portal2\vslidercontrol.h" \
+								"portal2\gameui\portal2\vspinnercontrol.h" \
+								"portal2\gameui\portal2\vstartcoopgame.h" \
+								"portal2\gameui\portal2\vsingleplayer.h" \
+								"portal2\gameui\portal2\vsteamcloudconfirmation.h" \
+								"portal2\gameui\portal2\vsteamlinkdialog.h" \
+								"portal2\gameui\portal2\vtransitionscreen.h" \
+								"portal2\gameui\portal2\vvideo.h" \
+								"portal2\gameui\portal2\vvoteoptions.h" \
+								"portal2\gameui\portal2\vsaveloadgamedialog.h" \
+								"portal2\gameui\portal2\vcommunitymapdialog.h" \
+								"portal2\gameui\portal2\vquickplay.h" \
+								"portal2\gameui\portal2\vplaytestdemosdialog.h" \								
+								"portal2\gameui\portal2\vratemapdialog.h" \								
+								"portal2\gameui\portal2\vmovieplayer.h" \
+								"portal2\gameui\portal2\transitionpanel.h" \
+								"portal2\gameui\portal2\vautosavenotice.h" \
+								"portal2\gameui\portal2\vfadeoutstartgame.h" \
+								"portal2\gameui\portal2\vadvancedvideo.h" \
+								"portal2\gameui\portal2\vkeybindings.h" \
+								"portal2\gameui\portal2\vsoundtest.h" \
+								"portal2\gameui\portal2\vpuzzlemakermenu.h" \
+								"portal2\gameui\portal2\vpuzzlemakermychambers.h" \
+								"portal2\gameui\portal2\vpuzzlemakerexitconfirmation.h" \
+								"portal2\gameui\portal2\vpuzzlemakersavedialog.h" \
+								"portal2\gameui\portal2\vpuzzlemakercompiledialog.h" \
+								"portal2\gameui\portal2\vpuzzlemakerpublishprogress.h" \
+								"portal2\gameui\portal2\vpuzzlemakeruilistitem.h" \
+								"portal2\gameui\portal2\vplaytestuploadwait.h" \
+								"portal2\gameui\portal2\vportalleaderboardhud.h" \
+								"portal2\gameui\portal2\vportalleaderboard.h" \
+								"portal2\gameui\portal2\vcoopexitchoice.h" \
+								"portal2\gameui\portal2\vportalchallengestatspanel.h" \
+								"portal2\gameui\portal2\vextrasdialog.h" \
+								"portal2\gameui\portal2\vfadeouttoeconui.h" \
+								"portal2\gameui\portal2\vxboxlive.h"
+					}
+					
+					$Folder "Win32" [$WIN32||$POSIX]
+					{
+						$File	"portal2\gameui\portal2\vaddonassociation.cpp" \
+								"portal2\gameui\portal2\vaddons.cpp" \
+								"portal2\gameui\portal2\vcloud.cpp" \
+								"portal2\gameui\portal2\vcustomcampaigns.cpp" \
+								"portal2\gameui\portal2\vdownloadcampaign.cpp" \
+								"portal2\gameui\portal2\vdownloads.cpp" \
+								"portal2\gameui\portal2\vgetlegacydata.cpp" \
+								"portal2\gameui\portal2\vkeyboardmouse.cpp" \
+								"portal2\gameui\portal2\vcommunitymapdialog.cpp" \
+								"portal2\gameui\portal2\vquickplay.cpp" \
+								"portal2\gameui\portal2\vplaytestdemosdialog.cpp" \
+								"portal2\gameui\portal2\vratemapdialog.cpp" \
+								"portal2\gameui\portal2\vsteamcloudconfirmation.cpp"
+						{
+							$Configuration
+							{
+								$Compiler
+								{
+									$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+								}
+							}
+						}
+					}
+					
+					$Folder "Steam Overlay" [$PS3]
+					{
+						$File	"portal2\gameui\portal2\steamoverlay\isteamoverlaymgr.h" \
+								"portal2\gameui\portal2\steamoverlay\soui_steamoverlaymgr.cpp" \
+								"portal2\gameui\portal2\steamoverlay\souirender_pch.h" \
+								"portal2\gameui\portal2\steamoverlay\souirender_pchend.h" 
+					}
+					
+					$File	"portal2\gameui\portal2\basemodframe.cpp" \
+							"portal2\gameui\portal2\basemodpanel.cpp" \
+							"portal2\gameui\portal2\gamemodes.cpp" \
+							"portal2\gameui\portal2\steamcloudsync.cpp" \
+							"portal2\gameui\portal2\uiavatarimage.cpp" \
+							"portal2\gameui\portal2\uigamedata.cpp" \
+							"portal2\gameui\portal2\uigamedata_invite.cpp" \
+							"portal2\gameui\portal2\uigamedata_storage.cpp" \
+							"portal2\gameui\portal2\vachievements.cpp" \
+							"portal2\gameui\portal2\vattractscreen.cpp" \
+							"portal2\gameui\portal2\vaudio.cpp" \
+							"portal2\gameui\portal2\vaudiovideo.cpp" \
+							"portal2\gameui\portal2\vcontrolleroptions.cpp" \
+							"portal2\gameui\portal2\vcontrolleroptionsbuttons.cpp" \
+							"portal2\gameui\portal2\vcontrolleroptionssticks.cpp" \
+							"portal2\gameui\portal2\vdropdownmenu.cpp" \
+							"portal2\gameui\portal2\vendingsplitscreen.cpp" \
+							"portal2\gameui\portal2\vflyoutmenu.cpp" \
+							"portal2\gameui\portal2\vfooterpanel.cpp" \
+							"portal2\gameui\portal2\vfoundgames.cpp" \
+							"portal2\gameui\portal2\vfoundgroupgames.cpp" \
+							"portal2\gameui\portal2\vfoundpublicgames.cpp" \
+							"portal2\gameui\portal2\vgamelobby.cpp" \
+							"portal2\gameui\portal2\vgamelobbychat.cpp" \
+							"portal2\gameui\portal2\vgameoptions.cpp" \
+							"portal2\gameui\portal2\vgamesettings.cpp" \
+							"portal2\gameui\portal2\vgenericconfirmation.cpp" \
+							"portal2\gameui\portal2\vgenericpanellist.cpp" \
+							"portal2\gameui\portal2\vgenericwaitscreen.cpp" \
+							"portal2\gameui\portal2\vhybridbutton.cpp" \
+							"portal2\gameui\portal2\vdialoglistbutton.cpp" \
+							"portal2\gameui\portal2\vingamechapterselect.cpp" \
+							"portal2\gameui\portal2\vingamedifficultyselect.cpp" \
+							"portal2\gameui\portal2\vingamekickplayerlist.cpp" \
+							"portal2\gameui\portal2\vingamemainmenu.cpp" \
+							"portal2\gameui\portal2\vleaderboard.cpp" \
+							"portal2\gameui\portal2\vloadingprogress.cpp" \
+							"portal2\gameui\portal2\vmainmenu.cpp" \
+							"portal2\gameui\portal2\vmenubackground.cpp" \
+							"portal2\gameui\portal2\vmultiplayer.cpp" \
+							"portal2\gameui\portal2\vnewgamedialog.cpp" \
+							"portal2\gameui\portal2\vcoopmode.cpp" \
+							"portal2\gameui\portal2\vchallengemodedialog.cpp" \
+							"portal2\gameui\portal2\voptions.cpp" \
+							"portal2\gameui\portal2\voptionscloud.cpp" \
+							"portal2\gameui\portal2\vpasswordentry.cpp" \
+							"portal2\gameui\portal2\vpvplobby.cpp" \
+							"portal2\gameui\portal2\vquickjoin.cpp" \
+							"portal2\gameui\portal2\vquickjoingroups.cpp" \
+							"portal2\gameui\portal2\vsignindialog.cpp" \
+							"portal2\gameui\portal2\vslidercontrol.cpp" \
+							"portal2\gameui\portal2\vspinnercontrol.cpp" \
+							"portal2\gameui\portal2\vstartcoopgame.cpp" \
+							"portal2\gameui\portal2\vsingleplayer.cpp" \
+							"portal2\gameui\portal2\vsteamlinkdialog.cpp" \
+							"portal2\gameui\portal2\vtransitionscreen.cpp" \
+							"portal2\gameui\portal2\vvideo.cpp" \
+							"portal2\gameui\portal2\vvoteoptions.cpp" \
+							"portal2\gameui\portal2\vsaveloadgamedialog.cpp" \
+							"portal2\gameui\portal2\vmovieplayer.cpp" \
+							"portal2\gameui\portal2\transitionpanel.cpp" \
+							"portal2\gameui\portal2\vautosavenotice.cpp" \
+							"portal2\gameui\portal2\vfadeoutstartgame.cpp" \
+							"portal2\gameui\portal2\vadvancedvideo.cpp" \
+							"portal2\gameui\portal2\vkeybindings.cpp" \
+							"portal2\gameui\portal2\vsoundtest.cpp" \
+							"portal2\gameui\portal2\vpuzzlemaker.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakermenu.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakermychambers.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakerexitconfirmation.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakersavedialog.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakercompiledialog.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakerpublishprogress.cpp" \
+							"portal2\gameui\portal2\vpuzzlemakeruilistitem.cpp" \
+							"portal2\gameui\portal2\vplaytestuploadwait.cpp" \
+							"portal2\gameui\portal2\vportalleaderboardhud.cpp" \
+							"portal2\gameui\portal2\vportalleaderboard.cpp" \
+							"portal2\gameui\portal2\vcoopexitchoice.cpp" \
+							"portal2\gameui\portal2\vportalchallengestatspanel.cpp" \
+							"portal2\gameui\portal2\vextrasdialog.cpp" \
+							"portal2\gameui\portal2\vfadeouttoeconui.cpp" \
+							"portal2\gameui\portal2\vxboxlive.cpp"
+					{
+						$Configuration
+						{
+							$Compiler
+							{
+								$Create/UsePrecompiledHeader	"Not Using Precompiled Headers" [!$PS3]
+							}
+						}
+					}
+				}
+			}
+			
+			$Folder "Portal 2"
+			{
+				
+				$File	"portal2\c_baseprojectedentity.h"
+				$File	"portal2\c_baseprojectedentity.cpp"
+				$File	"portal2\c_baseprojector.h"
+				$File	"portal2\c_baseprojector.cpp"
+				$File	"portal2\c_projected_entity_ambient_sound_proxy.cpp"
+				$File	"portal2\c_projected_entity_ambient_sound_proxy.h"
+				$File	"portal2\c_prop_weightedcube.cpp"
+				$File	"portal2\c_prop_weightedcube.h"
+				$File	"portal2\c_indicator_panel.cpp"
+				$File	"portal2\c_indicator_panel.h"
+				$File	"portal2\c_info_placement_helper.cpp"
+				$File	"portal2\c_info_placement_helper.h"
+				$File	"portal2\c_item_photo.cpp"
+				$File	"portal2\c_npc_hover_turret.cpp"
+				$File	"portal2\c_npc_personality_core.cpp"
+				$File	"portal2\c_pointsurvey.cpp"
+				$File	"portal2\c_portal_playerlocaldata.cpp"
+				$File	"portal2\c_portal_playerlocaldata.h"
+				$File	"portal2\c_portal2_lesson.cpp"
+				$File	"portal2\c_projectedwallentity.cpp"
+				$File	"portal2\c_projectedwallentity.h"
+				$File	"portal2\c_prop_floor_button.cpp"
+				$File	"portal2\c_prop_linked_portal_door.cpp"
+				$File	"portal2\c_trigger_catapult.cpp"
+				$File	"portal2\c_trigger_catapult.h"
+				$File	"portal2\c_trigger_tractorbeam.h"
+				$File	"portal2\c_trigger_tractorbeam.cpp"
+				$File	"portal2\hud_coop_ping_indicator.cpp"
+				$File	"portal2\hud_indicator.cpp"
+				$File	"portal2\hud_multiplayerbasicinfo.cpp"
+				$File	"portal2\hud_taunt_earned.cpp"
+				$File	"portal2\hud_taunt_earned.h"
+				$File	"portal2\hud_viewfinder.cpp"
+				$File	"portal2\hud_vs_score_panel.cpp"
+				$File	"portal2\hud_challenge_stats_panel.cpp"
+				$File	"portal2\hud_puzzlemaker_map_out_of_date.cpp"
+				$File	"portal2\hud_puzzlemaker_saving.cpp"
+				$File	"portal2\c_portal_race_checkpoint.cpp"
+				$File	"portal2\c_portal_pointpush.h"
+				$File	"portal2\c_portal_pointpush.cpp"
+				$File	"portal2\c_env_portal_laser.cpp"
+				$File	"portal2\c_perfmonitor.cpp"						[!$CERT]
+				$File	"portal2\radialbutton.cpp"
+				$File	"portal2\radialbutton.h"
+				$File	"portal2\c_fizzler_multiorigin_sound_player.h"
+				$File	"portal2\c_fizzler_multiorigin_sound_player.cpp"
+
+				$File	"$SRCDIR\game\shared\portal\baseprojectedentity_shared.h"
+				$File	"$SRCDIR\game\shared\portal\baseprojectedentity_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\projectedwallentity_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\trigger_tractorbeam_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal_grabcontroller_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\portal_grabcontroller_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\player_pickup.h"
+				$File	"$SRCDIR\game\shared\portal2\player_pickup.cpp"
+				$File	"$SRCDIR\game\shared\portal2\portal_pointpush_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\trigger_catapult_shared.cpp"
+				
+				$File	"$SRCDIR\game\shared\portal2\weapon_item_base_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\weapon_item_base_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\weapon_promo_items_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\weapon_promo_items_shared.cpp"
+				
+				$File	"portal2\c_prop_rockettripwire.cpp"
+				$File	"portal2\radialmenu.cpp"
+				$File	"portal2\radialmenu.h"
+				$File	"portal2\radialmenu_taunt.cpp"
+				$File	"portal2\radialmenu_taunt.h"
+				$File	"portal2\polygonbutton.cpp"
+				$File	"portal2\polygonbutton.h"
+				$File	"portal2\c_level_placard_display.cpp"
+				$File	"portal2\c_mp_lobby_screen.cpp"
+				$File	"portal2\c_mp_lobby_screen.h"
+
+				$File	"portal2\c_fizzler_effects.h"
+				$File	"portal2\c_fizzler_effects.cpp"
+				$File	"portal2\c_prop_tractorbeam.cpp"
+				$File	"portal2\c_hitbox_damaged_entity.h"
+				$File	"portal2\c_hitbox_damaged_entity.cpp"
+				
+				$File	"portal2\c_portal_beam_helper.h"
+				$File	"portal2\c_portal_beam_helper.cpp"
+				$File	"portal2\c_portal_mp_stats.h"
+				$File	"portal2\c_portal_mp_stats.cpp"
+
+				$File	"portal2\c_info_portal_score.cpp"
+				$File	"$SRCDIR\game\shared\portal2\vs_game_shared.h"
+
+				$File	"$SRCDIR\game\shared\portal2\damage_database.h"
+				$File	"$SRCDIR\game\shared\portal2\damage_database.cpp"
+				$File	"$SRCDIR\game\shared\portal2\hitbox_damaged_entity_shared.h"
+				$File	"$SRCDIR\game\shared\portal2\hitbox_damaged_entity_shared.cpp"
+
+				$File	"$SRCDIR\game\shared\portal2\material_index_data_ops_proxy.h"
+				$File	"$SRCDIR\game\shared\portal2\material_index_data_ops_proxy.cpp"
+
+				$Folder "leaderboard"
+				{
+					$File	"portal2\portal2_leaderboard.h"
+					$File	"portal2\portal2_leaderboard.cpp"
+					$File	"portal2\portal2_leaderboard_manager.h"
+					$File	"portal2\portal2_leaderboard_manager.cpp"
+
+					$File	"$SRCDIR\game\shared\portal2\portal2_leaderboard_bucketizer.h"
+					$File	"$SRCDIR\game\shared\portal2\portal2_leaderboard_bucketizer.cpp"
+				}
+
+				$Folder "community"
+				{
+					$File	"portal2\c_community_coop.h"
+					$File	"portal2\c_community_coop.cpp"
+				}
+
+				$Folder	"vgui"
+				{
+					$File	"portal2\vgui\portalclientscoreboard.cpp"
+					$File	"portal2\vgui\portalclientscoreboard.h"
+					$File	"portal2\vgui\surveypanel.cpp"
+					$File	"portal2\vgui\surveypanel.h"
+					$File	"portal2\vgui\splinegraphpanel.cpp"
+					$File	"portal2\vgui\splinegraphpanel.h"
+					$File	"portal2\vgui\vgui_indicator_panel.cpp"
+					$File 	"portal2\vgui\vgui_level_placard.cpp"
+					$File	"portal2\vgui\vgui_base_progress_screen.h"
+					$File	"portal2\vgui\vgui_base_progress_screen.cpp"
+					$File	"portal2\vgui\vgui_mp_lobby_screen.cpp"
+					$File	"portal2\vgui\vgui_mp_credits_screen.cpp"
+					$File	"portal2\vgui\vgui_sp_progress_screen.cpp"
+					$File	"portal2\vgui\vgui_mp_progress_screen.cpp"
+					$File	"portal2\vgui\portal_leaderboard_graph_panel.h"
+					$File	"portal2\vgui\portal_leaderboard_graph_panel.cpp"
+				}
+			}
+
+			$Folder "Paint"
+			{
+				// shared
+				$File	"$SRCDIR\game\shared\portal\paintable_entity.h"
+				$File	"$SRCDIR\game\shared\portal\prop_paint_power_user.h"
+				$File	"$SRCDIR\game\shared\portal\player_pickup_paint_power_user.h"
+				$File	"$SRCDIR\game\shared\portal\paint_color_manager.h"
+				$File	"$SRCDIR\game\shared\portal\paint_color_manager.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_power_user_interface.h"
+				$File	"$SRCDIR\game\shared\portal\paint_power_user_interface.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_power_user.h"
+				$File	"$SRCDIR\game\shared\portal\paint_power_info.h"
+				$File	"$SRCDIR\game\shared\portal\paint_power_info.cpp"
+				$File	"$SRCDIR\game\shared\portal\stick_partner.h"
+				$File	"$SRCDIR\game\shared\portal\stick_partner.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_blobs_shared.h"
+				$File	"$SRCDIR\game\shared\portal\paint_blobs_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_manager.h"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_manager.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_sprayer_shared.h"
+				$File	"$SRCDIR\game\shared\portal\paint_sprayer_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_cleanser_manager.h"
+				$File	"$SRCDIR\game\shared\portal\paint_cleanser_manager.cpp"
+				$File	"$SRCDIR\game\shared\portal\weapon_paintgun_shared.h"
+				$File	"$SRCDIR\game\shared\portal\weapon_paintgun_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_shared.h"
+				$File	"$SRCDIR\game\shared\portal\paint_stream_shared.cpp"
+				$File	"$SRCDIR\game\shared\portal2\paint_saverestore.h"
+				$File	"$SRCDIR\game\shared\portal2\paint_saverestore.cpp"
+				
+				// client
+				$File	"portal2\c_paint_sprayer.h"
+				$File	"portal2\c_paint_sprayer.cpp"
+				$File	"portal2\c_trigger_paint_cleanser.h"
+				$File	"portal2\c_trigger_paint_cleanser.cpp"
+				$File	"portal2\c_weapon_paintgun.h"
+				$File	"portal2\c_weapon_paintgun.cpp"
+				$File	"portal2\c_paint_messages.cpp"
+				$File	"portal2\c_paint_input.h"
+				$File	"portal2\c_paint_input.cpp"
+				//$File	"portal2\paint_hud_paint_icon.cpp"
+				//$File	"portal2\paint_hud_paint_gun_powers_indicator.cpp"
+				//$File	"portal2\paint_hud_paint_indicator.cpp"
+				//$File	"portal2\paint_hud_swap_guns_indicator.cpp"
+				$File	"portal2\c_prop_paint_bomb.h"
+				$File	"portal2\c_prop_paint_bomb.cpp"
+				$File	"portal2\c_paintblob_render.h"
+				$File	"portal2\c_paintblob_render.cpp"
+				$File	"portal2\c_paintblob.h"
+				$File	"portal2\c_paintblob.cpp"
+				$File	"portal2\c_paint_stream.h"
+				$File	"portal2\c_paint_stream.cpp"
+				$File	"portal2\paint_hud_paint_ammo.cpp"
+
+				$File	"$SRCDIR\common\ps3\vjobutils.cpp"		[$PS3]
+				
+				$Folder	"Additional Public Header Files"
+				{
+					$File	"$SRCDIR\public\meshutils\mesh.h"
+				}
+
+			}
+		}
+	}
+
+	$Folder "Protobuf Files"	[ ( $WIN32 || $OSXALL ) && !$NO_STEAM]
+	{
+		$DynamicFile "$GENERATED_PROTO_DIR\steammessages.pb.cc"
+		{
+			$Configuration
+			{
+				$Compiler 
+				{
+					$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+				}
+			}
+		}
+	}
+
+	$Folder	"Additional Link Libraries"
+	{
+		$Lib	"$LIBPUBLIC\meshutils"
+		$Lib	"$LIBPUBLIC\game_controls"			[ $IFDEF_GAMEUI_UISYSTEM2_ENABLED]
+		$Lib 	"$LIBCOMMON\jpeglib"				[ $WIN32 ||  $POSIX  ]
+		$Lib 	"$LIBPUBLIC\vpklib"					[ $WIN32 ||  $POSIX  ]
+		$Lib	"$LIBCOMMON\blobulator"
+		$Lib	"$LIBCOMMON\fileextd"				[ $WIN32 && !$NO_CEG ]
+
+		// The PuzzleMaker is loaded as a DLL during development (on WIN32), but for public builds it is linked as a static LIB:
+		// $Lib	"$LIBCOMMON\puzzlemaker_dll"		[  $WIN32 ]
+		$Lib	"$LIBCOMMON\puzzlemaker_lib"		[ $WIN32 || $OSXALL ]
+	}
+}

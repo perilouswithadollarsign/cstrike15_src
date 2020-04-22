@@ -1,0 +1,22 @@
+//-----------------------------------------------------------------------------
+//	SERVER_PORTAL.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro GAMENAME 	"portal"
+
+$Include "server_portal_base.vpc"
+
+$Project "Server (Portal)"
+{
+	$Folder	"Source Files"
+	{
+		$Folder	"Portal"
+		{
+			$File	"portal\portal_client.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\portal\portal_gamerules.h"
+		}
+	}
+}

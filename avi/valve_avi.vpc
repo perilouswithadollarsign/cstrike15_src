@@ -1,0 +1,74 @@
+//-----------------------------------------------------------------------------
+//	VALVE_AVI.VPC
+//
+//	Project Script
+//
+// MGP 4/010 Updated to support Quicktime on OSX.  Win32 builds can optionally
+//   be enabled for cross platform work if quickTime is installed on the Win32
+//   PC.
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$Include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+$include "$SRCDIR\vpc_scripts\source_video_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		// Win32 - need to point to Quicktime 7 for Win SDK directory so that dependant includes will work
+		$AdditionalIncludeDirectories	"$BASE,..\common\quicktime_win32\"		[$QUICKTIME_WINDOWS]
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\dx9sdk\include"			[$WINDOWS]
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\thirdparty\sdl\include;$SRCDIR\thirdparty\sdl_mixer"	[$LINUXALL]
+	}
+	$Linker
+	{
+		$IgnoreImportLibrary				"Yes" [$WINDOWS]
+		$AdditionalDependencies				"$BASE vfw32.lib" [$WINDOWS]
+		$SystemLibraries                    "iconv" [$OSXALL]
+		$SystemFrameworks					"Quicktime;Carbon"
+		$AdditionalLibraryDirectories		"$BASE;$SRCDIR\dx9sdk\lib"	[$WINDOWS]
+		$GCC_ExtraLinkerFlags				"-z muldefs -L$SRCDIR/thirdparty/sdl/build/.libs" [$LINUXALL]
+		$SystemLibraries					"SDL2" [$LINUXALL]
+	}
+}
+
+$Project "valve_avi"
+{
+	$Folder	"Source Files"
+	{
+		$File	"avi.cpp" [$WINDOWS]
+		$File	"avi_osx.cpp" [$OSXALL]
+		$File	"bink.cpp" [!$OSXALL]
+		$file   "quicktime.cpp" [$QUICKTIME_VIDEO||$QUICKTIME_WINDOWS]
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"avi.h"
+		$file   "quicktime.h"
+//		$File	"$SRCDIR\BinkSDK\bink.h"
+		$File	"$SRCDIR\public\pixelwriter.h"
+	}
+
+	$Folder	"Interface"
+	{
+		$File	"$SRCDIR\public\avi\iavi.h"
+		$File	"$SRCDIR\public\avi\ibik.h"
+		$File	"$SRCDIR\public\avi\iquicktime.h"
+	}
+
+	$Folder "Link Libraries" [$WINDOWS||$X360||$POSIX]
+	{
+		$Lib tier2
+		$lib tier3
+		$File   "$SRCDIR\lib\common\quicktime\QTMLClient.lib"		[$QUICKTIME_WINDOWS]
+		$File	"$SRCDIR\DX9SDK\lib\dsound.lib"						[$QUICKTIME_WINDOWS]
+		$File	"$SRCDIR\DX9SDK\lib\dxguid.lib"						[$QUICKTIME_WINDOWS]
+		$File	"$SRCDIR\lib\common\libSDL2_mixer.a"				[$LINUXALL]
+	}
+
+}
+

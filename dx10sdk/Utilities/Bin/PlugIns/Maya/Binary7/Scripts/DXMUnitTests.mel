@@ -1,0 +1,491 @@
+global int $DXMLogFileId= 0;
+
+global proc DXMLogStart( string $filename, int $append, string $runName )
+{
+	global int $DXMLogFileId;
+	
+	if($DXMLogFileId != 0)
+		return;
+		
+	if($append)
+	{
+		$DXMLogFileId=`fopen $filename "a"`;
+	}
+	else
+	{
+		$DXMLogFileId=`fopen $filename`;
+	}
+	
+	fprint $DXMLogFileId "<DXMLog";
+	if(size($runName) > 0)
+	{
+		fprint $DXMLogFileId " name=\"";
+		fprint $DXMLogFileId $runName;
+		fprint $DXMLogFileId "\"";
+	}
+	fprint $DXMLogFileId ">";
+}
+
+global proc DXMLogStop( )
+{
+	global int $DXMLogFileId;
+		
+	if($DXMLogFileId != 0)
+	{
+		fprint $DXMLogFileId "</DXMLog>";
+		fclose $DXMLogFileId;
+		$DXMLogFileId= 0;
+	}
+}
+
+global proc DXMLogTestBegin( string $testName)
+{
+	global int $DXMLogFileId;
+	
+	if($DXMLogFileId != 0)
+	{
+		fprint $DXMLogFileId "<DXMLogTest";
+		if(size($testName) > 0)
+		{
+			fprint $DXMLogFileId " name=\"";
+			fprint $DXMLogFileId $testName;	
+			fprint $DXMLogFileId "\"";
+		}	
+		fprint $DXMLogFileId ">";
+	}
+}
+
+global proc DXMLogTestEnd()
+{
+	global int $DXMLogFileId;
+	
+	if($DXMLogFileId != 0)
+	{
+		fprint $DXMLogFileId "\t</DXMLogTest>";
+	}
+}
+
+global proc DXMLogWarning( string $warnStr)
+{
+	global int $DXMLogFileId;
+	
+	warning $warnStr;
+	
+	if($DXMLogFileId != 0)
+	{
+		fprint $DXMLogFileId "<DXMLogWarning>";
+		fprint $DXMLogFileId $warnStr;
+		fprint $DXMLogFileId "</DXMLogWarning>";
+	}
+}
+
+global proc DXMLogInfo( string $warnStr)
+{
+	global int $DXMLogFileId;
+	
+	if($DXMLogFileId != 0)
+	{
+		fprint $DXMLogFileId "<DXMLogInfo>";
+		fprint $DXMLogFileId $warnStr;
+		fprint $DXMLogFileId "</DXMLogInfo>";
+	}
+}
+
+global proc DXMLogResult( string $result)
+{
+	global int $DXMLogFileId;
+
+	if($DXMLogFileId != 0)
+	{
+		fprint $DXMLogFileId "<DXMLogResult>";
+		fprint $DXMLogFileId $result;
+		fprint $DXMLogFileId "</DXMLogResult>";
+	}
+}
+
+
+global proc int DXMTestNodeOwnershipOfRoutes()
+{
+	DXMLogTestBegin("DXMTestNodeOwnershipOfRoutes");
+	
+	int $result= true;
+	
+	int $iNode;
+	string $nodes[]= `ls -dagObjects`; //`DXMGraphListNodes "DXMSyncGraph"`;
+	for($iNode= 0; $iNode < size($nodes); $iNode++)
+	{
+		string $paths[] = `ls -long -allPaths $nodes[$iNode]`;
+		string $routes[] = `DXMNodeDagListRoutes "DXMSyncGraph" $nodes[$iNode]`;
+		
+		
+		string $pathsMinusRoutes[] =stringArrayRemove($routes, $paths);
+		int $iPath;
+		for($iPath= 0; $iPath < size($pathsMinusRoutes); $iPath++ )
+		{
+			DXMLogWarning("Path in maya not found on DXMNode.  Node: " + $nodes[$iNode] + " Path: " + $pathsMinusRoutes[$iPath]);
+			$result= false;
+		}
+
+		string $routesMinusPaths[] =stringArrayRemove($paths, $routes);
+		int $iRoute;
+		for($iRoute= 0; $iRoute < size($routes); $iRoute++ )
+		{
+			DXMLogWarning("Route in DXMNode not found on in maya.  Node: " + $nodes[$iNode] + " Route: " + $routesMinusPaths[$iRoute]);
+			$result= false;
+		}	
+	}
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	return $result;
+}
+
+global proc int DXMTestRouteVisibility()
+{
+	DXMLogTestBegin("DXMTestRouteVisibility");	
+
+	int $result= true;
+
+	int $iNode;
+	string $invisibleNodes[] = `ls -dagObjects -invisible`;
+	for($iNode= 0; $iNode < size($invisibleNodes); $iNode++)
+	{
+		int $iPath;	
+		string $pathList[] = `ls -long -allPaths $invisibleNodes[$iNode]`;
+		for($iPath= 0; $iPath < size($pathList) && $result == true; $iPath++)
+		{
+			int $routeVis=  `DXMRouteIsVisible "DXMSyncGraph" $pathList[$iPath]`;
+			if($routeVis == true)
+			{
+				DXMLogWarning( "Failure in node's immediate path: (Node: " + $invisibleNodes[$iNode] + ") (Path: " + $pathList[$iPath] + " )" );
+				$result= false;
+			}			
+		
+			int $iDecendent;	
+			string $decendentList[] =  `listRelatives -fullPath -allDescendents $pathList[$iPath]`;
+			for($iDecendent= 0; $iDecendent < size($decendentList) && $result == true; $iDecendent++)
+			{
+				$routeVis= `DXMRouteIsVisible "DXMSyncGraph" $decendentList[$iDecendent]`;
+				if($routeVis == true)
+				{
+					DXMLogWarning( "Failure in node's decendents paths  (Node: " + $invisibleNodes[$iNode] + ") (Path: " + $decendentList[$iDecendent] + " )" );
+					$result= false;				
+				}
+			}
+		}				
+	}
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+
+	return $result;
+}
+
+global proc int DXMTestNodeExplicitInvisibility()
+{
+	DXMLogTestBegin("DXMTestNodeExplicitInvisibility");	
+
+	int $result= true;
+
+	int $iNode;
+	string $invisibleNodes[] = `ls -dagObjects -invisible`;
+	for($iNode= 0; $iNode < size($invisibleNodes); $iNode++)
+	{
+		if(0 == `DXMNodeDagIsExplicitlyInvisible "DXMSyncGraph" $invisibleNodes[$iNode]`)
+		{
+			DXMLogWarning( "DXMNode Visiblility does not match Maya: " + $invisibleNodes[$iNode] );
+			$result= false;
+		}					
+	}
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+
+	return $result;
+}
+
+global proc int DXMTestRouteParents()
+{
+	DXMLogTestBegin("DXMTestRouteParents");	
+	
+	int $result= true;
+
+
+	string $routeList[]= `DXMGraphListRoutes  "DXMSyncGraph"`;
+	
+	int $iRoute;
+	for($iRoute= 0; $iRoute < size($routeList); $iRoute++)
+	{
+		string $mayaParent[]= `listRelatives -fullPath -parent $routeList[$iRoute]`;
+		string $dxmParent[]= `DXMRouteGetParent "DXMSyncGraph" $routeList[$iRoute]`;
+
+		if( size($mayaParent) != 0 && size($dxmParent) != 0 )
+		{
+			if($dxmParent[0] != $mayaParent[0])
+			{
+				DXMLogWarning( "Parenting mismatch on route: " + $routeList[$iRoute] + " DXM: " + $dxmParent[0] + " Maya: " + $mayaParent[0] );
+				$result= false;
+			}				
+		}
+		else 
+		{
+			if(size($mayaParent) > 0)
+			{
+				DXMLogWarning( "Parenting mismatch on route: " + $routeList[$iRoute] + " Maya: " + $mayaParent[0] + " (DXM is empty)");
+				$result= false;
+			}
+			
+			if(size($dxmParent) > 0)
+			{
+				DXMLogWarning( "Parenting mismatch on route: " + $routeList[$iRoute] + " DXM: " + $dxmParent[0] + " (Maya is empty)");
+				$result= false;
+			}
+		}				
+	}
+
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+global proc int DXMTestFrameParents()
+{
+	DXMLogTestBegin("DXMTestFrameParents");	
+	
+	int $result= true;
+	
+	string $routeList[]= `DXMGraphListRoutes  "DXMSyncGraph"`;
+	
+	int $iRoute;
+	for($iRoute= 0; $iRoute < size($routeList); $iRoute++)
+	{
+		int $isFrameParentingEqual= `DXMRouteIsFrameParentingEqual "DXMSyncGraph" $routeList[$iRoute]`;
+		if($isFrameParentingEqual == false)
+		{
+			DXMLogWarning( "Route & Frame Parenting are not equal: " + $routeList[$iRoute] );
+			$result= false;
+		}	
+	}
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+global proc int DXMTestAdapterOwnership()
+{
+	DXMLogTestBegin("DXMTestAdapterOwnershipMatch");	
+	
+	int $result= true;
+	
+	string $nodes[]= `DXMGraphListNodes "DXMSyncGraph"`;	
+
+	int $iNode;
+	for($iNode= 0; $iNode < size($nodes); $iNode++)
+	{
+		string $nodeAdapters[]= `DXMNodeListAdapters "DXMSyncGraph" $nodes[$iNode]`;
+		int $iNA;
+		for($iNA= 0; $iNA < size($nodeAdapters); $iNA++)
+		{		
+			string $graphAdapter= `DXMNodeAdapterGetOwner "DXMSyncGraph" $nodes[$iNode] $nodeAdapters[$iNA]`;
+			int $isInterested= `DXMGraphAdapterIsInterested "DXMSyncGraph" $graphAdapter $nodes[$iNode]`;
+			
+			if($isInterested == false)
+			{
+				DXMLogWarning( "Node: " + $nodes[$iNode] + " NodeAdapter: " + $nodeAdapters[$iNA] + " GraphAdapter: " + $graphAdapter );
+				$result= false;
+			}		
+		}
+	}
+
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+global proc int DXMTestAllNodesHaveAnAdapter()
+{
+	DXMLogTestBegin("DXMTestAllNodesHaveAnAdapter");	
+
+	int $result= true;	
+	string $nodes[]= `DXMGraphListNodes "DXMSyncGraph"`;	
+
+	int $iNode;
+	for($iNode= 0; $iNode < size($nodes); $iNode++)
+	{
+		string $nodeAdapters[]= `DXMNodeListAdapters "DXMSyncGraph" $nodes[$iNode]`;
+		
+		if(size($nodeAdapters) == 0)
+		{
+			DXMLogWarning( "Failure at Node: " + $nodes[$iNode] );
+			$result= false;
+		}
+	}
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+
+
+
+global proc int DXMTestMeshVisibility()
+{
+	DXMLogTestBegin("DXMTestMeshVisibility");	
+
+	int $result= true;	
+	string $nodes[]= `DXMGraphListNodes "DXMSyncGraph"`;	
+
+	int $iNode;
+	for($iNode= 0; $iNode < size($nodes); $iNode++)
+	{
+		int $hasMesh= `DXMNodeHasAdapter "DXMSyncGraph" $nodes[$iNode] "DXMNodeMeshAdapter"`;
+	
+		if($hasMesh == true)
+		{
+			int $meshIsVisible= `DXMNodeMeshIsAnyRouteVisible "DXMSyncGraph" $nodes[$iNode]`;
+		
+			string $routeList[]= `DXMNodeDagListRoutes "DXMSyncGraph" $nodes[$iNode]`;
+			for($iRoute= 0; $iRoute < size($routeList); $iRoute++)
+			{
+				int $routeIsVisible= `DXMRouteIsVisible "DXMSyncGraph" $routeList[$iRoute]`;
+				
+				if($meshIsVisible == false && $routeIsVisible == true)
+				{
+					DXMLogWarning( "Mesh is not visible but Route is! Mesh: " + $nodes[$iNode] + " Route: " + $routeList[$iRoute] );
+					$result= false;			 
+				}
+			}	
+		}
+	}	
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+
+
+
+global proc int DXMTestMeshMembership()
+{
+	DXMLogTestBegin("DXMTestMeshMembership");	
+
+	int $result= true;	
+	string $nodes[]= `DXMGraphListNodes "DXMSyncGraph"`;	
+
+	int $iNode;
+	for($iNode= 0; $iNode < size($nodes); $iNode++)
+	{
+		int $hasMesh= `DXMNodeHasAdapter "DXMSyncGraph" $nodes[$iNode] "DXMNodeMeshAdapter"`;
+	
+		if($hasMesh == true)
+		{	
+			string $routeList[]= `DXMNodeDagListRoutes "DXMSyncGraph" $nodes[$iNode]`;
+			for($iRoute= 0; $iRoute < size($routeList); $iRoute++)
+			{
+				int $routeIsVisible= `DXMRouteIsVisible "DXMSyncGraph" $routeList[$iRoute]`;
+				int $meshIsMemberOfRoute= `DXMNodeMeshIsMemberOfRoute "DXMSyncGraph" $nodes[$iNode] $routeList[$iRoute]`;
+				
+				if($meshIsMemberOfRoute == true && $routeIsVisible == false)
+				{
+					DXMLogWarning( "Mesh is a member of an invisible route! Mesh: " + $nodes[$iNode] + " Route: " + $routeList[$iRoute] );
+					$result= false;			 
+				}				
+			}	
+		}
+	}	
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+global proc int DXMTestAllRoutesValid()
+{
+	DXMLogTestBegin("DXMTestAllRoutesValid");	
+
+	int $result= (false == `DXMGraphHasInvalidRoutes "DXMSyncGraph"`);	
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+global proc int DXMTestAllNodesValid()
+{
+	DXMLogTestBegin("DXMTestAllNodesValid");	
+
+	int $result= (false == `DXMGraphHasInvalidNodes "DXMSyncGraph"`);	
+	
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+
+/*EXAMPLE USAGE
+proc string polyCubeReturnRoot()
+{
+	string $result[]= `polyCube`;
+	return $result[0];	
+}
+DXMTestStressCreateDelete("polyCubeReturnRoot()", "delete", 10);
+*/
+
+global proc int DXMTestStressCreateDelete(string $createScripty, string $deleteScripty, int $count)
+{
+	DXMLogTestBegin("DXMTestStressCreateDelete");	
+
+	int $result= true;	
+
+	string $nodes[];
+	
+	$nodes= `DXMGraphListNodes "DXMSyncGraph"`;
+	
+	int $oldNodeCount= size($nodes);
+
+	int $index= 0;
+	for($index= 0; $index < $count; $index++)
+	{
+		string $deleteName= `eval $createScripty`;
+				
+		eval $deleteScripty $deleteName;
+	}
+	
+	DXCCRebuildDirty;
+	
+	$nodes= `DXMGraphListNodes "DXMSyncGraph"`;
+	
+	int $newNodeCount= size($nodes);
+
+	int $leakCount= $oldNodeCount - $newNodeCount;
+	if($leakCount != 0)
+	{
+		DXMLogWarning( "Leaked nodes: " + $leakCount );
+		$result= false;			 
+	}	
+				
+	DXMLogResult($result);
+	DXMLogTestEnd();	
+	
+	return $result;
+}
+
+/*EXAMPLE USAGE
+proc string polyCube2()
+{
+	string $result[]= `polyCube`;
+	return $result[0];	
+}
+DXMTestStressCreateDelete("polyCube2()", "delete", 10);
+*/

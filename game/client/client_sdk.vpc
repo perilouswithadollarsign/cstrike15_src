@@ -1,0 +1,63 @@
+//-----------------------------------------------------------------------------
+//	CLIENT_SDK.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+$Macro GAMENAME 	"sdk"
+
+$Include "$SRCDIR\game\client\client_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\game\shared;$SRCDIR\game\shared\sdk;$SRCDIR\game\client\sdk;$SRCDIR\game\client\sdk\vgui"
+		$PreprocessorDefinitions		"$BASE;SDK_CLIENT_DLL;SDK_DLL"
+		$ForceIncludes					"tier0\platform.h" [$WINDOWS]
+	}
+}
+
+$Project "Client (SDK)"
+{
+	$Folder "Source Files"
+	{
+		-$File	"$SRCDIR\game\shared\weapon_parse_default.cpp"
+	}
+
+	$Folder	"Source Files"
+	{
+		$Folder	"SDK"
+		{
+			$File	"sdk\c_sdk_player.cpp"
+			$File	"sdk\c_sdk_player.h"
+			$File	"sdk\clientmode_sdk.cpp"
+			$File	"sdk\clientmode_sdk.h"
+			$File	"sdk\sdk_in_main.cpp"
+			$File	"sdk\sdk_prediction.cpp"
+			$DynamicFile	"sdk\sdk_prediction.h"
+			$File	"sdk\vgui\sdkviewport.cpp"
+			$File	"sdk\vgui\sdkviewport.h"
+			$File	"sdk\vgui\vgui_rootpanel_sdk.cpp"
+			$File	"sdk\vgui\vgui_rootpanel_sdk.h"
+
+			//Shared
+			$File	"$SRCDIR\game\shared\sdk\sdk_gamemovement.cpp"
+			$DynamicFile	"$SRCDIR\game\shared\sdk\sdk_gamemovement.h"
+			$File	"$SRCDIR\game\shared\sdk\sdk_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\sdk\sdk_gamerules.h"
+			$File	"$SRCDIR\game\shared\sdk\sdk_player_shared.cpp"
+			$DynamicFile	"$SRCDIR\game\shared\sdk\sdk_player_shared.h"
+			$File	"$SRCDIR\game\shared\sdk\sdk_playeranimstate.cpp"
+			$File	"$SRCDIR\game\shared\sdk\sdk_playeranimstate.h"
+			$File	"$SRCDIR\game\shared\sdk\sdk_usermessages.cpp"
+			$DynamicFile	"$SRCDIR\game\shared\sdk\sdk_usermessages.h"
+			$File	"$SRCDIR\game\shared\sdk\sdk_weapon_parse.cpp"
+			$File	"$SRCDIR\game\shared\sdk\sdk_weapon_parse.h"
+			$File	"$SRCDIR\game\shared\sdk\weapon_sdkbase.cpp"
+			$File	"$SRCDIR\game\shared\sdk\weapon_sdkbase.h"
+		}
+	}
+
+}

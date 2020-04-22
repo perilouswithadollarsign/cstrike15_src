@@ -1,0 +1,674 @@
+//====== Copyright (c) 2013, Valve Corporation, All rights reserved. ========//
+//
+// Redistribution and use in source and binary forms, with or without 
+// modification, are permitted provided that the following conditions are met:
+//
+// Redistributions of source code must retain the above copyright notice, this
+// list of conditions and the following disclaimer.
+// Redistributions in binary form must reproduce the above copyright notice, 
+// this list of conditions and the following disclaimer in the documentation 
+// and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE 
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+// THE POSSIBILITY OF SUCH DAMAGE.
+//===========================================================================//
+//
+// Purpose: The file defines our Google Protocol Buffers which are used in over 
+// the wire messages for the Source engine.
+//
+//=============================================================================
+
+// Note about encoding:
+//	http://code.google.com/apis/protocolbuffers/docs/encoding.html
+//
+// TL;DR: Use sint32/sint64 for values that may be negative.
+//
+// There is an important difference between the signed int types (sint32 and sint64)
+// and the "standard" int types (int32 and int64) when it comes to encoding negative
+// numbers.  If you use int32 or int64 as the type for a negative number, the
+// resulting varint is always ten bytes long – it is, effectively, treated like a
+// very large unsigned integer.  If you use one of the signed types, the resulting
+// varint uses ZigZag encoding, which is much more efficient.
+
+
+// Commenting this out allows it to be compiled for SPEED or LITE_RUNTIME.
+// option optimize_for = SPEED;
+
+// We don't use the service generation functionality
+option cc_generic_services = false;
+
+
+// 
+// STYLE NOTES:
+//
+// Use CamelCase CMsgMyMessageName style names for messages.
+// 
+// Use lowercase _ delimited names like my_steam_id for field names, this is non-standard for Steam,
+// but plays nice with the Google formatted code generation.  
+// 
+// Try not to use required fields ever. Only do so if you are really really sure you'll never want them removed. 
+// Optional should be preffered as it will make versioning easier and cleaner in the future if someone refactors
+// your message and wants to remove or rename fields.
+//
+// Use fixed64 for JobId_t, GID_t, or SteamID.  This is appropriate for any field that is normally
+// going to be larger than 2^56.  Otherwise use int64 for 64 bit values that are frequently smaller
+// than 2^56 as it will safe space on the wire in those cases.
+//
+// Similar to fixed64, use fixed32 for RTime32 or other 32 bit values that are frequently larger than
+// 2^28.  It will safe space in those cases, otherwise use int32 which will safe space for smaller values.
+// An exception to this rule for RTime32 is if the value will frequently be zero rather than set to an actual 
+// time.
+//
+
+import "google/protobuf/descriptor.proto";
+//import "network_connection.proto";   // common types are in here
+
+//=============================================================================
+// Common Types
+//=============================================================================
+
+message CMsgVector
+{
+	optional float x = 1;
+	optional float y = 2;
+	optional float z = 3;
+}
+
+message CMsgVector2D
+{
+	optional float x = 1;
+	optional float y = 2;
+}
+
+message CMsgQAngle
+{
+	optional float x = 1;
+	optional float y = 2;
+	optional float z = 3;
+}
+
+message CMsgRGBA
+{
+	optional int32 r = 1;
+	optional int32 g = 2;
+	optional int32 b = 3;
+	optional int32 a = 4;
+}
+
+//=============================================================================
+// Bidirectional NET Messages
+//=============================================================================
+
+enum NET_Messages
+{
+	net_NOP = 0;
+	net_Disconnect = 1;				// disconnect, last message in connection
+	net_File = 2;					// file transmission message request/deny
+	net_SplitScreenUser = 3;		// Changes split screen user, client and server must both provide handler
+	net_Tick = 4; 					// s->c world tick, c->s ack world tick
+	net_StringCmd = 5; 				// a string command
+	net_SetConVar = 6;				// sends one/multiple convar/userinfo settings
+	net_SignonState = 7;			// signals or acks current signon state
+	// client clc messages and server svc messages use the range 8+
+	net_PlayerAvatarData = 100;		// player avatar RGB data (client clc & server svc message blocks use 8..., so start a new range here @ 100+)
+}
+
+message CNETMsg_Tick
+{
+	optional uint32 tick = 1;							// current tick count
+// 	optional uint32 host_frametime = 2;					// Host frame time in 1/100000th of a second
+// 	optional uint32 host_frametime_std_deviation = 3;	// Host frame time stddev in 1/100000th of a second
+	optional uint32 host_computationtime = 4;			// Host frame computation time in usec (1/1,000,000th sec) - will be say 4 ms when server is running at 25% CPU load for 64-tick server
+	optional uint32 host_computationtime_std_deviation = 5;	// Host frame computation time stddev in usec (1/1,000,000th sec)
+	optional uint32 host_framestarttime_std_deviation = 6; // Host frame start time stddev in usec (1/1,000,000th sec) - measures how precisely we can wake up from sleep when meeting server framerate
+	optional uint32 hltv_replay_flags = 7 ; // 0 or absent by default, 1 when hltv replay is in progress - used to fix client state in case of server crashes of full frame updates
+}
+
+message CNETMsg_StringCmd
+{
+	optional string command = 1;
+}
+
+message CNETMsg_SignonState
+{
+	optional uint32 signon_state = 1;				// See SIGNONSTATE_ defines
+	optional uint32 spawn_count = 2;				// server spawn count (session number)
+	optional uint32 num_server_players	 = 3; 		// Number of players the server discloses as connected to the server
+	repeated string players_networkids = 4;			// player network ids
+	optional string map_name = 5;					// Name of the current map
+}
+
+message CMsg_CVars
+{
+	message CVar
+	{
+		optional string name = 1;
+		optional string value = 2;
+		optional uint32 dictionary_name = 3;		// In order to save on connect packet size convars that are known will have their dictionary name index sent here
+	}
+
+	repeated CVar cvars = 1;
+}
+
+message CNETMsg_SetConVar
+{
+	optional CMsg_CVars convars = 1;
+}
+
+message CNETMsg_NOP
+{
+}
+
+message CNETMsg_Disconnect
+{
+	optional string text = 1;
+}
+
+message CNETMsg_File
+{
+	optional int32 transfer_id = 1;
+	optional string file_name = 2;
+	optional bool is_replay_demo_file = 3;
+	optional bool deny = 4;
+}
+
+message CNETMsg_SplitScreenUser
+{
+	optional int32 slot = 1;
+}
+
+message CNETMsg_PlayerAvatarData
+{	// 12 KB player avatar 64x64 rgb only no alpha
+	// WARNING-WARNING-WARNING
+	// This message is extremely large for our net channels
+	// and must be pumped through special fragmented waiting list
+	// via chunk-based ack mechanism!
+	// See: INetChannel::EnqueueVeryLargeAsyncTransfer
+	// WARNING-WARNING-WARNING
+	optional uint32 accountid = 1;
+	optional bytes rgb = 2;
+}
+
+
+//=============================================================================
+// Client messages
+//=============================================================================
+
+enum CLC_Messages
+{
+	clc_ClientInfo 				= 8;				// client info (table CRC etc)    
+	clc_Move 					= 9;				// [CUserCmd]     
+	clc_VoiceData 				= 10;				// Voicestream data from a client    
+	clc_BaselineAck 			= 11;				// client acknowledges a new baseline seqnr   
+	clc_ListenEvents 			= 12;				// client acknowledges a new baseline seqnr   
+	clc_RespondCvarValue 		= 13;				// client is responding to a svc_GetCvarValue message.  
+	clc_FileCRCCheck 			= 14;				// client is sending a file's CRC to the server to be verified. 
+	clc_LoadingProgress 		= 15;				// client loading progress  
+	clc_SplitPlayerConnect 		= 16;
+	clc_ClientMessage 			= 17; 
+	clc_CmdKeyValues			= 18;
+	clc_HltvReplay				= 20;
+}
+
+message CCLCMsg_ClientInfo
+{
+	optional fixed32 send_table_crc = 1;
+	optional uint32 server_count = 2;
+	optional bool is_hltv = 3;
+	optional bool is_replay = 4;
+	optional uint32 friends_id = 5;
+	optional string friends_name = 6;
+	repeated fixed32 custom_files = 7;
+}
+
+message CCLCMsg_Move
+{
+	optional uint32 num_backup_commands = 1;		// new commands = user_cmds_size() - num_backup_commands
+	optional uint32 num_new_commands = 2;
+	optional bytes data = 3;
+}
+
+enum VoiceDataFormat_t
+{
+	VOICEDATA_FORMAT_STEAM = 0; // steam uses SILK
+	VOICEDATA_FORMAT_ENGINE = 1; // was speex, switching to celt
+};
+
+message CCLCMsg_VoiceData
+{
+	optional bytes data = 1;
+	optional fixed64 xuid = 2;
+	optional VoiceDataFormat_t format = 3 [default = VOICEDATA_FORMAT_ENGINE];
+	optional int32 sequence_bytes = 4; // This is a TCP-style sequence number, so it includes the current packet length.  So it's actually the offset within the compressed data stream of the next packet to follow (if any).
+	optional uint32 section_number = 5;
+	optional uint32 uncompressed_sample_offset = 6;
+}
+
+message CCLCMsg_BaselineAck
+{
+	optional int32 baseline_tick = 1;
+	optional int32 baseline_nr = 2;
+}
+
+message CCLCMsg_ListenEvents
+{
+	repeated fixed32 event_mask = 1;
+}
+
+message CCLCMsg_RespondCvarValue
+{
+	optional int32 cookie = 1;			// QueryCvarCookie_t
+	optional int32 status_code = 2;		// EQueryCvarValueStatus
+	optional string name = 3;
+	optional string value = 4;
+}
+
+message CCLCMsg_FileCRCCheck
+{
+	// See CCLCMsg_FileCRCCheck_t in netmessages.h while reading this.
+	
+	// Optimisation: 
+
+	// Do not set or get path or filename directly, use instead
+	// CCLCMsg_FileCRCCheck_t::GetPath()
+	// CCLCMsg_FileCRCCheck_t::GetPath()...etc..
+	
+	// If the path and/or filename below is one of certain commonly occuring ones
+	// then an index is stored instead of a string. So if code_path != -1 then 
+	// path == "". 
+
+	optional int32 code_path = 1;			// read comment above
+	optional string path = 2;				// read comment above
+	optional int32 code_filename = 3;		// read comment above
+	optional string filename = 4;			// read comment above
+
+	optional int32 file_fraction = 5;
+	optional bytes md5 = 6;
+	optional uint32 crc = 7;
+	optional int32 file_hash_type = 8;
+	optional int32 file_len = 9;
+	optional int32 pack_file_id = 10;
+	optional int32 pack_file_number = 11;
+}
+
+message CCLCMsg_LoadingProgress
+{
+	optional int32 progress = 1;
+}
+
+message CCLCMsg_SplitPlayerConnect
+{
+	optional CMsg_CVars convars = 1;
+}
+
+message CCLCMsg_CmdKeyValues
+{
+	optional bytes keyvalues = 1;
+}
+
+
+//=============================================================================
+// Server messages
+//=============================================================================
+
+enum ESplitScreenMessageType 
+{
+	option allow_alias = true;	
+	
+	MSG_SPLITSCREEN_ADDUSER = 0;
+	MSG_SPLITSCREEN_REMOVEUSER = 1;
+	MSG_SPLITSCREEN_TYPE_BITS = 1;
+};
+
+enum SVC_Messages
+{
+	svc_ServerInfo 			= 8;		// first message from server about game; map etc
+	svc_SendTable 			= 9;		// sends a sendtable description for a game class
+	svc_ClassInfo 			= 10;		// Info about classes (first byte is a CLASSINFO_ define).							
+	svc_SetPause 			= 11;		// tells client if server paused or unpaused
+	svc_CreateStringTable 	= 12;		// inits shared string tables
+	svc_UpdateStringTable 	= 13;		// updates a string table
+	svc_VoiceInit 			= 14;		// inits used voice codecs & quality
+	svc_VoiceData 			= 15;		// Voicestream data from the server
+	svc_Print 				= 16;		// print text to console
+	svc_Sounds 				= 17;		// starts playing sound
+	svc_SetView 			= 18;		// sets entity as point of view
+	svc_FixAngle 			= 19;		// sets/corrects players viewangle
+	svc_CrosshairAngle 		= 20;		// adjusts crosshair in auto aim mode to lock on traget
+	svc_BSPDecal 			= 21;		// add a static decal to the world BSP
+	svc_SplitScreen 		= 22;		// split screen style message
+	svc_UserMessage 		= 23;		// a game specific message 
+	svc_EntityMessage 		= 24;		// a message for an entity
+	svc_GameEvent 			= 25;		// global game event fired
+	svc_PacketEntities 		= 26;		// non-delta compressed entities
+	svc_TempEntities 		= 27;		// non-reliable event object
+	svc_Prefetch 			= 28;		// only sound indices for now
+	svc_Menu 				= 29;		// display a menu from a plugin
+	svc_GameEventList 		= 30;		// list of known games events and fields
+	svc_GetCvarValue 		= 31;		// Server wants to know the value of a cvar on the client	
+	svc_PaintmapData		= 33;		// Server paintmap data
+	svc_CmdKeyValues		= 34;		// Server submits KeyValues command for the client
+	svc_EncryptedData		= 35;		// Server submites encrypted data
+	svc_HltvReplay			= 36;		// start or stop HLTV-fed replay
+	svc_Broadcast_Command	= 38;		// broadcasting a user command
+}
+
+message CSVCMsg_ServerInfo
+{
+	optional int32 protocol = 1;			// protocol version
+	optional int32 server_count = 2;		// number of changelevels since server start
+	optional bool is_dedicated = 3;  		// dedicated server ?	
+	optional bool is_official_valve_server = 4;
+	optional bool is_hltv = 5;				// HLTV server ?
+	optional bool is_replay = 6;			// Replay server ?
+	optional bool is_redirecting_to_proxy_relay = 21;	// // Will be redirecting to proxy relay
+	optional int32 c_os = 7;				// L = linux, W = Win32
+	optional fixed32 map_crc = 8;			// server map CRC
+	optional fixed32 client_crc = 9;		// client.dll CRC server is using
+	optional fixed32 string_table_crc = 10;	// string table CRC server is using
+	optional int32 max_clients = 11;		// max number of clients on server
+	optional int32 max_classes = 12;		// max number of server classes
+	optional int32 player_slot = 13;		// our client slot number
+	optional float tick_interval = 14;		// server tick interval
+	optional string game_dir = 15;			// game directory eg "tf2"
+	optional string map_name = 16;			// name of current map 
+	optional string map_group_name = 17;	// name of current map 
+	optional string sky_name = 18;			// name of current skybox 
+	optional string host_name = 19;			// server name
+	optional uint32 public_ip = 20;	
+	optional uint64 ugc_map_id = 22;	
+}
+
+message CSVCMsg_ClassInfo
+{
+	message class_t
+	{
+		optional int32 class_id = 1;
+		optional string data_table_name = 2;
+		optional string class_name = 3;
+	}
+
+	optional bool create_on_client = 1;	
+	repeated class_t classes = 2;
+}
+
+message CSVCMsg_SendTable
+{
+	message sendprop_t
+	{
+		optional int32 type = 1;				// SendPropType
+		optional string var_name = 2;
+		optional int32 flags = 3;
+		optional int32 priority = 4;
+		optional string dt_name = 5;			// if pProp->m_Type == DPT_DataTable || IsExcludeProp
+		optional int32 num_elements = 6;		// else if pProp->m_Type == DPT_Array
+		optional float low_value = 7;			// else ...
+		optional float high_value = 8;			// 		...
+		optional int32 num_bits = 9;			//		...
+	};
+
+	optional bool is_end = 1;
+	optional string net_table_name = 2;
+	optional bool needs_decoder = 3;
+	repeated sendprop_t props = 4;
+}
+
+message CSVCMsg_Print
+{
+	optional string text = 1;
+}
+
+message CSVCMsg_SetPause
+{
+	optional bool paused = 1;
+}
+
+message CSVCMsg_SetView
+{
+	optional int32 entity_index = 1;
+}
+
+message CSVCMsg_CreateStringTable
+{
+	optional string name = 1;
+	optional int32 max_entries = 2;
+	optional int32 num_entries = 3;
+	optional bool user_data_fixed_size = 4;
+	optional int32 user_data_size = 5;
+	optional int32 user_data_size_bits = 6;
+	optional int32 flags = 7;
+	optional bytes string_data = 8;
+}
+
+message CSVCMsg_UpdateStringTable
+{
+	optional int32 table_id = 1;
+	optional int32 num_changed_entries = 2;
+	optional bytes string_data = 3;
+}
+
+message CSVCMsg_VoiceInit
+{
+	optional int32 quality = 1;
+	optional string codec = 2;
+	optional int32 version = 3 [default = 0];
+}
+
+message CSVCMsg_VoiceData
+{
+	optional int32 client = 1;
+	optional bool proximity = 2;
+	optional fixed64 xuid = 3;
+	optional int32 audible_mask = 4; 
+	optional bytes voice_data = 5;
+	optional bool caster = 6;
+	optional VoiceDataFormat_t format = 7 [default = VOICEDATA_FORMAT_ENGINE];
+	optional int32 sequence_bytes = 8; // This is a TCP-style sequence number, so it includes the current packet length.  So it's actually the offset within the compressed data stream of the next packet to follow (if any).
+	optional uint32 section_number = 9;
+	optional uint32 uncompressed_sample_offset = 10;
+}
+
+message CSVCMsg_FixAngle
+{
+	optional bool relative = 1;
+	optional CMsgQAngle angle = 2;
+}
+
+message CSVCMsg_CrosshairAngle
+{
+	optional CMsgQAngle angle = 1;
+}
+
+message CSVCMsg_Prefetch
+{
+	optional int32 sound_index = 1;
+}
+
+message CSVCMsg_BSPDecal
+{
+	optional CMsgVector pos = 1;
+	optional int32 decal_texture_index = 2;
+	optional int32 entity_index = 3;
+	optional int32 model_index = 4;
+	optional bool low_priority = 5;
+}
+
+message CSVCMsg_SplitScreen
+{
+	optional ESplitScreenMessageType type = 1;
+	optional int32 slot = 2;
+	optional int32 player_index = 3;
+}
+
+message CSVCMsg_GetCvarValue
+{
+	optional int32 cookie = 1;		// QueryCvarCookie_t
+	optional string cvar_name = 2;
+}
+
+message CSVCMsg_Menu
+{
+	optional int32 dialog_type = 1;		// DIALOG_TYPE
+	optional bytes menu_key_values = 2; // KeyValues.WriteAsBinary()
+}
+
+message CSVCMsg_UserMessage
+{
+	optional int32 msg_type = 1;
+	optional bytes msg_data = 2;	
+	optional int32 passthrough = 3;// 0 or absent = normal event; 1 = pass-through real-time event needed during replay
+}
+
+message CSVCMsg_PaintmapData
+{
+	optional bytes paintmap = 1;
+}
+
+message CSVCMsg_GameEvent
+{
+	message key_t
+	{
+		optional int32 type = 1;			// type
+		optional string val_string = 2;		// TYPE_STRING
+		optional float val_float = 3;		// TYPE_FLOAT 
+		optional int32 val_long = 4;		// TYPE_LONG  
+		optional int32 val_short = 5;		// TYPE_SHORT 
+		optional int32 val_byte = 6;		// TYPE_BYTE  
+		optional bool val_bool = 7;			// TYPE_BOOL  
+		optional uint64 val_uint64 = 8;		// TYPE_UINT64
+		optional bytes val_wstring = 9;		// TYPE_WSTRING
+	}
+
+	optional string event_name = 1;
+	optional int32 eventid = 2;
+	repeated key_t keys = 3;
+	optional int32 passthrough = 4; // 0 or absent = normal event; 1 = pass-through real-time event needed during replay
+}
+
+message CSVCMsg_GameEventList
+{
+	message key_t
+	{
+		optional int32 type = 1;
+		optional string name = 2;
+	};
+
+	message descriptor_t
+	{
+		optional int32 eventid = 1;
+		optional string name = 2;
+		repeated key_t keys = 3;
+	};
+
+	repeated descriptor_t descriptors = 1;
+}
+
+message CSVCMsg_TempEntities
+{
+	optional bool reliable = 1;
+	optional int32 num_entries = 2;
+	optional bytes entity_data = 3;
+}
+
+message CSVCMsg_PacketEntities
+{
+	optional int32 max_entries = 1;
+	optional int32 updated_entries = 2;
+	optional bool is_delta = 3;	
+	optional bool update_baseline = 4;
+	optional int32 baseline = 5;
+	optional int32 delta_from = 6;
+	optional bytes entity_data = 7;
+}
+
+message CSVCMsg_Sounds
+{
+	message sounddata_t
+	{
+		optional sint32			origin_x = 1;
+		optional sint32			origin_y = 2;
+		optional sint32			origin_z = 3;
+		optional uint32			volume = 4;
+		optional float			delay_value = 5;
+		optional int32			sequence_number = 6;
+		optional int32			entity_index = 7;
+		optional int32			channel = 8;
+		optional int32			pitch = 9;
+		optional int32			flags = 10;
+		optional uint32 		sound_num = 11;
+		optional fixed32		sound_num_handle = 12;
+		optional int32			speaker_entity = 13;
+		optional int32			random_seed = 14;
+		optional int32			sound_level = 15; // soundlevel_t
+		optional bool			is_sentence = 16;
+		optional bool			is_ambient = 17;
+	};
+
+	optional bool reliable_sound = 1;
+	repeated sounddata_t sounds = 2;
+}
+
+message CSVCMsg_EntityMsg
+{
+	optional int32 ent_index = 1;
+	optional int32 class_id = 2;
+	optional bytes ent_data = 3;
+}
+
+message CSVCMsg_CmdKeyValues
+{
+	optional bytes keyvalues = 1;
+}
+
+message CSVCMsg_EncryptedData
+{
+	optional bytes encrypted = 1;
+	optional int32 key_type = 2;
+}
+
+message CSVCMsg_HltvReplay
+{
+	optional int32 delay = 1; // delay in ticks, 0 or abscent if replay stops
+	optional int32 primary_target = 2; // the primary target to look at during the replay
+	optional int32 replay_stop_at = 3; // the tick when replay stops, on delayed timeline
+	optional int32 replay_start_at = 4; // the tick when replay starts, on real timeline
+	optional int32 replay_slowdown_begin = 5;
+	optional int32 replay_slowdown_end = 6;
+	optional float replay_slowdown_rate = 7;
+}
+
+enum ReplayEventType_t
+{
+	REPLAY_EVENT_CANCEL  = 0;   // Cancel any replays in progress
+	REPLAY_EVENT_DEATH   = 1;   // replay the last player death
+	REPLAY_EVENT_GENERIC = 2;   // replay the event specified in the message
+	REPLAY_EVENT_STUCK_NEED_FULL_UPDATE = 3; // the client is stuck , the full frame update was somehow discarded at netchan level (reason unknown as of end of 2015), and a new full update is requested
+}
+
+message CCLCMsg_HltvReplay
+{
+	optional int32 request = 1; // 0 = cancel, 1 = request death replay, 2 = request arbitrary replay, 3 = request full frame update because client didn't receive it when expected
+	optional float slowdown_length = 2;
+	optional float slowdown_rate = 3;
+
+	optional int32 primary_target_ent_index = 4;
+	optional float event_time = 5;
+}
+
+message CSVCMsg_Broadcast_Command
+{
+	optional string cmd = 1;
+}
+
+ 
+
+// Do not remove this comment due to a bug on the Mac OS X protobuf compiler - <sergiy> integrated from Dota

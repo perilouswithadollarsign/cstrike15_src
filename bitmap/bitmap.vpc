@@ -1,0 +1,63 @@
+//-----------------------------------------------------------------------------
+//	BITMAP.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\dx9sdk\include"			[$WINDOWS]
+		$AdditionalIncludeDirectories	"$BASE;$(XEDK)\include\win32"			[$WINDOWS && $XDKINSTALLED]
+		$AdditionalIncludeDirectories	"$BASE;$(XEDK)\include\xbox"			[$X360]
+	}
+}
+
+$Project "bitmap"
+{
+	$Folder	"Source Files"
+	{
+		$File	"bitmap.cpp"
+		$File	"ImageByteSwap.cpp"					[$X360 || $PS3]
+		$File	"colorconversion.cpp"
+		$File	"floatbitmap.cpp"
+		$File	"floatbitmap2.cpp"
+		$File	"floatbitmap3.cpp"
+		$File	"floatbitmap4.cpp"					[$WINDOWS]
+		$File	"floatbitmap_bilateralfilter.cpp"
+		$File	"floatcubemap.cpp"
+		$File	"imageformat.cpp"
+		$File	"psd.cpp"
+		$File	"psheet.cpp"
+		$File	"resample.cpp"
+		$File	"tgaloader.cpp"
+		$File	"texturepacker.cpp"
+		$File	"tgawriter.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\bitmap\bitmap.h"
+		$File	"$SRCDIR\public\bitmap\floatbitmap.h"
+		$File	"$SRCDIR\public\bitmap\imageformat.h"
+		$File	"$SRCDIR\public\bitmap\imageformat_declarations.h"
+		$File	"$SRCDIR\public\bitmap\psd.h"
+		$File	"$SRCDIR\public\bitmap\psheet.h"
+		$File	"$SRCDIR\public\bitmap\texturepacker.h"
+		$File	"$SRCDIR\public\bitmap\tgaloader.h"
+		$File	"$SRCDIR\public\bitmap\tgawriter.h"
+		$File	"$SRCDIR\public\bitmap\stb_dxt.h"
+	}
+
+	$Folder "Link Libraries" [$WINDOWS]
+	{
+		$Lib	"$SRCDIR\lib\public\nvtc"			[!$WIN64]
+		$Lib	"$SRCDIR\lib\public\nvtc64"			[$WIN64]
+		$Lib	"bitmap_byteswap"
+	}
+}

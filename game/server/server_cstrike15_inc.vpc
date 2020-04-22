@@ -1,0 +1,360 @@
+//-----------------------------------------------------------------------------
+//	SERVER_CSTRIKE15_INC.VPC
+//
+//	Project Script
+//  Main body for building server DLLs for CS:GO
+//-----------------------------------------------------------------------------
+
+$MacroRequired "OUTBINNAME"
+$MacroRequired "SPROJ"
+$MacroRequired "SRVSRCDIR"
+
+$Macro SRCDIR		"..\.."
+$Macro GAMENAME 	"csgo"
+
+
+$Include "$SRCDIR\game\server\server_base.vpc"
+$Include "$SRCDIR\game\server\server_econ_base.vpc" [!$PS3 && !$X360]
+$include "$SRCDIR\game\shared\cstrike15\cstrike15_usermessages_include.vpc"
+$Include "$SRCDIR\game\shared\cstrike15\cstrike15_gcmessages_include.vpc" [!$PS3 && !$X360]
+
+$include "$SRCDIR\external\external.vpc"
+$include "$SRCDIR\external\$EXTERNALCRYPTOPP\external_cryptopp.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE;$SRCDIR\game\shared\cstrike15\control,$SRCDIR\game\shared\cstrike15,$SRVSRCDIR,$SRVSRCDIR\cstrike15"
+		$AdditionalIncludeDirectories	"$BASE;$SRVSRCDIR\cstrike15\bot,$SRVSRCDIR\cstrike15\bot\states,$SRCDIR\game\shared\cstrike15\bot,$SRVSRCDIR\cstrike15\hostage,$SRVSRCDIR\cstrike15\control"
+		$PreprocessorDefinitions		"$BASE;BOTS;CSTRIKE_DLL;USE_ECONOMY_FEATURES"
+		$PreprocessorDefinitions        "$BASE;VALVE_DEDICATED_SERVER"			[$VALVE_DATACENTER]
+	}
+
+	$Linker
+	{
+		$AdditionalDependencies			"$BASE ws2_32.lib" [$WINDOWS]
+	}
+}
+
+
+$Project $SPROJ
+{
+	$Folder	"Source Files"
+	{
+//		-$File	"$SRVSRCDIR\AI_ConCommands.cpp"
+		$File	"$SRVSRCDIR\hl2\Func_Monitor.cpp"
+		$File	"$SRVSRCDIR\h_cycler.cpp"
+		$File	"$SRVSRCDIR\h_cycler.h"
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.cpp"
+		$File	"$SRCDIR\game\shared\predicted_viewmodel.h"
+		$File	"$SRVSRCDIR\team_objectiveresource.cpp"
+		$File	"$SRVSRCDIR\team_objectiveresource.h"
+		$File	"$SRVSRCDIR\team_spawnpoint.cpp"
+		$File	"$SRVSRCDIR\team_spawnpoint.h"
+		$File	"$SRVSRCDIR\server_log_http_dispatcher.cpp"
+		$File	"$SRVSRCDIR\server_log_http_dispatcher.h"
+		$File	"$SRCDIR\game\shared\teamplayroundbased_gamerules.cpp"
+		$File	"$SRCDIR\game\shared\teamplayroundbased_gamerules.h"
+		$File	"$SRCDIR\game\shared\cstrike15\dlchelper.h"
+
+		$Folder	"Economy" [!$X360 && !$PS3]
+		{
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_inventory.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_inventory.h"
+			//$File	"$SRCDIR\game\shared\econ\econ_claimcode.cpp"
+			//$File	"$SRCDIR\game\shared\econ\econ_claimcode.h"
+			
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_system.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_system.h"
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_schema.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_schema.h"
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_item_constants.h"
+			$File	"$SRCDIR\game\shared\cstrike15\cstrike15_gcconstants.h"
+
+			$File	"$SRCDIR/game/shared/cstrike15/cs_econ_item_string_table.cpp"
+			$File	"$SRCDIR/game/shared/cstrike15/cs_econ_item_string_table.h"
+		}
+
+		$Folder	"CounterStrike DLL"
+		{
+			$File	"$SRCDIR\game\shared\cstrike15\cs_achievement_constants.h"
+			$File	"$SRCDIR\game\shared\cstrike15\achievements_cs.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\achievements_cs.h"
+			$File	"$SRCDIR\game\shared\cstrike15\basecsgrenade_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\basecsgrenade_projectile.h"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_ammodef.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_ammodef.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_autobuy.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_autobuy.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_client.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_client.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_entity_spotting.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_entity_spotting.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_eventlog.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_gameinterface.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_gamemovement.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_gamerules.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_gamerules.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_gamestats.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_gamestats.h"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_gamestats_shared.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_gamestats_shared.h"
+			$File	"$SRVSRCDIR\steamworks_gamestats_server.cpp"
+			$File	"$SRVSRCDIR\steamworks_gamestats_server.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_hltvdirector.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_player.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_player.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_player_resource.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_player_resource.h"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_player_shared.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_playeranimstate.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_playeranimstate.h"
+			$File	"$SRCDIR\game\shared\cstrike15\csgo_playeranimstate.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\csgo_playeranimstate.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_playermove.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_pushentity.cpp"
+			$File	"$SRVSRCDIR\dedicated_server_ugc_manager.cpp"					[!$X360 && !$PS3]
+			$File	"$SRVSRCDIR\dedicated_server_ugc_manager.h"						[!$X360 && !$PS3]
+			$File	"$SRCDIR\game\shared\cstrike15\cs_shareddefs.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_shareddefs.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_team.cpp"
+			$File	"$SRVSRCDIR\cstrike15\cs_team.h"
+			$File	"$SRVSRCDIR\cstrike15\cs_vehicle_jeep.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_weapon_parse.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_weapon_parse.h"
+			$File	"$SRCDIR\game\shared\cstrike15\flashbang_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\flashbang_projectile.h"
+			$File	"$SRVSRCDIR\cstrike15\func_bomb_target.cpp"
+			$File	"$SRVSRCDIR\cstrike15\func_bomb_target.h"
+			$File	"$SRVSRCDIR\cstrike15\func_buy_zone.cpp"
+			$File	"$SRVSRCDIR\cstrike15\func_hostage_rescue.cpp"
+			$File	"$SRVSRCDIR\cstrike15\func_hostage_rescue.h"
+			$File	"$SRVSRCDIR\cstrike15\func_no_defuse.cpp"
+			$File	"$SRVSRCDIR\cstrike15\func_no_defuse.h"
+			$File	"$SRVSRCDIR\cstrike15\funfact_cs.cpp"
+			$File	"$SRVSRCDIR\cstrike15\funfact_cs.h"
+			$File	"$SRVSRCDIR\cstrike15\funfactmgr_cs.cpp"
+			$File	"$SRVSRCDIR\cstrike15\funfactmgr_cs.h"
+			$File	"$SRCDIR\game\shared\cstrike15\fx_cs_shared.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\fx_cs_shared.h"
+			$File	"$SRCDIR\game\shared\cstrike15\hegrenade_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\hegrenade_projectile.h"
+			$File	"$SRVSRCDIR\cstrike15\info_view_parameters.cpp"
+			$File	"$SRVSRCDIR\cstrike15\item_ammo.cpp"
+			$File	"$SRVSRCDIR\cstrike15\item_assaultsuit.cpp"
+			$File	"$SRVSRCDIR\cstrike15\item_defuser.cpp"
+			$File	"$SRVSRCDIR\cstrike15\item_kevlar.cpp"
+			$File	"$SRVSRCDIR\cstrike15\item_nvgs.cpp"
+			$File	"$SRVSRCDIR\cstrike15\mapinfo.cpp"
+			$File	"$SRVSRCDIR\cstrike15\mapinfo.h"
+			$File	"$SRVSRCDIR\cstrike15\point_hiding_spot.cpp"
+			$File	"$SRVSRCDIR\cstrike15\point_hiding_spot.h"
+			$File	"$SRVSRCDIR\cstrike15\point_surroundtest.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\smokegrenade_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\smokegrenade_projectile.h"
+			$File	"$SRVSRCDIR\cstrike15\te_radioicon.cpp"
+			$File	"$SRVSRCDIR\cstrike15\te_shotgun_shot.cpp"
+			$File	"$SRVSRCDIR\cstrike15\te_shotgun_shot.h"
+			$File	"$SRCDIR\game\shared\cstrike15\player_pickup.h"
+			$File	"$SRCDIR\game\shared\cstrike15\player_pickup.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\cs_player_rank_shared.h"
+			//$File	"$SRCDIR\game\shared\ugc_workshop_manager.cpp"
+			//$File	"$SRCDIR\game\shared\ugc_workshop_manager.h"
+			$File	"$SRCDIR\game\shared\cstrike15\molotov_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\molotov_projectile.h"
+			$File	"$SRCDIR\game\shared\cstrike15\decoy_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\decoy_projectile.h"
+			$File	"$SRCDIR\game\shared\cstrike15\viewmodel_arm_config.inc"
+
+			$File	"$SRCDIR\game\shared\cstrike15\sensorgrenade_projectile.cpp"
+			$File	"$SRCDIR\game\shared\cstrike15\sensorgrenade_projectile.h"
+			$File   "$SRVSRCDIR\cstrike15\cs_voteissues.h"
+			$File   "$SRVSRCDIR\cstrike15\cs_voteissues.cpp"			
+
+			$File	"$SRCDIR\public\gametypes\igametypes.h"
+			$File	"$SRCDIR\game\shared\cstrike15\gametypes.h"
+			$File	"$SRCDIR\game\shared\cstrike15\gametypes.cpp"
+			
+
+			{
+				$Configuration
+				{
+					$Compiler
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+					}
+				}
+			}
+
+			$File	"$SRCDIR\public\zip\XUnzip.h"
+			$File	"$SRCDIR\public\zip\XZip.h" 
+
+			$File	"$SRCDIR\public\XZip.cpp" \
+					"$SRCDIR\public\XUnzip.cpp"
+			{
+				$Configuration
+				{
+					$Compiler
+					{
+						$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+					}
+				}
+			}
+
+			$Folder	"Weapon"
+			{
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_basecsgrenade.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_basecsgrenade.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_c4.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_c4.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_csbase.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_csbase.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_csbasegun.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_csbasegun.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_deagle.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_elite.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_flashbang.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_flashbang.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_hegrenade.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_ironsightcontroller.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_ironsightcontroller.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_knife.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_knife.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_m3.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_sg552.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_smokegrenade.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_smokegrenade.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_xm1014.cpp"
+
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_sawedoff.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_taser.cpp"
+
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_molotov.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_molotov.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_decoy.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_decoy.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_sensorgrenade.h"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_sensorgrenade.cpp"
+
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_nova.cpp"
+
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_baseitem.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\weapon_baseitem.h"
+				$File	"$SRCDIR\game\shared\cstrike15\item_healthshot.cpp"
+				$File	"$SRCDIR\game\shared\cstrike15\item_healthshot.h"
+			}
+
+			$Folder "Effects"
+			{
+				$File	"$SRVSRCDIR\cstrike15\Effects\inferno.cpp"
+				$File	"$SRVSRCDIR\cstrike15\Effects\inferno.h"
+
+				$File	"$SRVSRCDIR\cstrike15\Effects\chicken.cpp"
+				$File	"$SRVSRCDIR\cstrike15\Effects\chicken.h"
+
+				$Folder "Shared"
+				{
+					$File	"$SRCDIR\game\shared\cstrike15\infernoshared.cpp"
+					$File	"$SRCDIR\game\shared\entityutil.h"
+				}
+			}
+			
+			$Folder	"Bot"
+			{
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot.h"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_chatter.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_chatter_coop.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_chatter.h"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_event.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_event_bomb.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_event_player.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_event_weapon.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_init.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_listen.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_manager.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_manager.h"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_nav.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_pathfind.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_radio.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_statemachine.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_update.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_vision.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_weapon.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_bot_weapon_id.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_gamestate.cpp"
+				$File	"$SRVSRCDIR\cstrike15\bot\cs_gamestate.h"
+
+				$Folder	"States"
+				{
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_attack.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_buy.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_defuse_bomb.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_pickup_hostage.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_escape_from_bomb.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_fetch_bomb.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_follow.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_hide.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_hunt.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_idle.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_idle_coop.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_investigate_noise.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_move_to.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_open_door.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_plant_bomb.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_use_entity.cpp"
+					$File	"$SRVSRCDIR\cstrike15\bot\states\cs_bot_escape_from_flames.cpp"
+
+				}
+
+				$Folder	"Shared"
+				{
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot.cpp"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot.h"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_constants.h"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_hide.cpp"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_manager.cpp"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_manager.h"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_profile.cpp"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_profile.h"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_util.cpp"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\bot_util.h"
+					$File	"$SRCDIR\common\platforminputdevice.h"
+					$File	"$SRCDIR\common\platforminputdevice.cpp"
+					{
+						$Configuration
+						{
+							$Compiler
+							{
+								$Create/UsePrecompiledHeader	"Not Using Precompiled Headers"
+							}
+						}
+					}
+					$File	"$SRCDIR\game\shared\cstrike15\bot\shared_util.cpp"
+					$File	"$SRCDIR\game\shared\cstrike15\bot\shared_util.h"
+				}
+			}
+
+			$Folder	"Hostage"
+			{
+				$File	"$SRVSRCDIR\cstrike15\hostage\cs_simple_hostage.cpp"
+				$File	"$SRVSRCDIR\cstrike15\hostage\cs_simple_hostage.h"
+			}
+
+			$Folder	"Navigation Mesh"
+			{
+				$File	"$SRVSRCDIR\cstrike15\cs_nav.h"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_area.cpp"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_area.h"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_generate.cpp"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_mesh.cpp"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_mesh.h"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_pathfind.h"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_path.cpp"
+				$File	"$SRVSRCDIR\cstrike15\cs_nav_path.h"
+			}
+		}
+	}
+}
+

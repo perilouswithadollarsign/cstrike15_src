@@ -1,0 +1,61 @@
+//-----------------------------------------------------------------------------
+//	APPFRAMEWORK.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+
+$include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$General
+	{
+		$AdditionalProjectDependencies	"$BASE;togl"	[!$IS_LIB_PROJECT && $GL]
+	}
+	$Compiler
+	{
+		$PreprocessorDefinitions	"$BASE;VERSION_SAFE_STEAM_API_INTERFACES"	[($WINDOWS && $GL) || $LINUXALL]
+		$PreprocessorDefinitions	"$BASE;ALLOW_TEXT_MODE=1"	[$CSTRIKE_TRUNK_BUILD||$CSTRIKE_STAGING_BUILD]
+	}
+	
+	$Linker [$OSXALL && !$IS_LIB_PROJECT]
+	{
+		$SystemFrameworks "Carbon;OpenGL;Quartz;Cocoa;IOKit"
+	}
+}
+
+$Project "appframework"
+{
+	$Folder	"Source Files"
+	{
+		$File	"AppSystemGroup.cpp"
+		$File	"$SRCDIR\public\filesystem_init.cpp"
+		$File	"VguiMatSysApp.cpp"	[$WINDOWS]
+		$File	"matsysapp.cpp"		[$WINDOWS]
+		$File	"WinApp.cpp"		[$WINDOWS]
+		$File	"posixapp.cpp"		[$POSIX]
+		$File	"sdlmgr.cpp"		[$SDL]
+		$File	"cocoamgr.mm"		[!$SDL && $OSXALL]
+		$File	"glmrendererinfo_osx.mm"	[$SDL && $OSXALL]
+	}
+
+	$Folder	"Interface"
+	{
+		$File	"$SRCDIR\public\appframework\AppFramework.h"
+		$File	"$SRCDIR\public\appframework\iappsystem.h"
+		$File	"$SRCDIR\public\appframework\IAppSystemGroup.h"
+		$File	"$SRCDIR\public\appframework\tier2app.h"
+		$File	"$SRCDIR\public\appframework\tier3app.h"
+		$File	"$SRCDIR\public\appframework\matsysapp.h"
+		$File	"$SRCDIR\public\appframework\VguiMatSysApp.h"
+		$File	"$SRCDIR\public\appframework\ilaunchermgr.h"
+	}
+
+	$Folder	"Link Libraries"
+	{
+		$ImpLib togl [!$IS_LIB_PROJECT && $GL]
+		$ImpLib SDL2 [!$IS_LIB_PROJECT && $SDL]
+	}
+}

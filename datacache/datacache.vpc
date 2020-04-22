@@ -1,0 +1,73 @@
+//-----------------------------------------------------------------------------
+//	DATACACHE.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$macro SRCDIR		".."
+$Macro OUTBINDIR	"$SRCDIR\..\game\bin"
+
+$include "$SRCDIR\vpc_scripts\source_dll_base.vpc"
+
+$Configuration
+{
+	$Linker [!$PS3]
+	{
+		$SystemLibraries		"iconv" [$OSXALL]
+	}
+	$Linker [$WINDOWS]
+	{
+		$AdditionalDependencies			"$BASE libedgegeomtool.Release.Win32.vs8.lib"		[$PS3SDKINSTALLED]
+		$AdditionalLibraryDirectories	"$BASE;$SRCDIR\ps3sdk\cell\host-win32\lib"			[$PS3SDKINSTALLED]
+	}
+	$Compiler
+	{
+		$AdditionalIncludeDirectories	"$BASE,$SRCDIR\ps3sdk\cell\host-common\include,$SRCDIR\ps3sdk\cell\target\common\include"	[$PS3SDKINSTALLED]
+		$PreprocessorDefinitions		"$BASE;MDLCACHE_DLL_EXPORT"
+	}
+}
+
+
+$Project "datacache"
+{
+	$Folder	"Source Files"
+	{
+		$File	"datacache.cpp"
+		$File	"mdlcache.cpp"
+		$File	"mdlcombine.cpp"
+		$File	"vtfcombine.cpp"
+		$File	"resourceaccesscontrol.cpp"
+		$File	"precachesystem.cpp"
+		$File	"$SRCDIR\public\studio.cpp"
+		$File	"$SRCDIR\public\studio_virtualmodel.cpp"
+		$File	"$SRCDIR\common\studiobyteswap.cpp"
+		$File	"$SRCDIR\utils\common\datalinker.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"datacache.h"
+		$File	"datacache_common.h"
+		$File	"mdlcombine.h"
+		$File	"vtfcombine.h"
+		$File	"$SRCDIR\public\studio.h"
+		$File	"$SRCDIR\common\studiobyteswap.h"
+		$File	"$SRCDIR\utils\common\datalinker.h"
+	}
+
+	$Folder	"Interface"
+	{
+		$File	"$SRCDIR\public\datacache\idatacache.h"
+		$File	"$SRCDIR\public\datacache\imdlcache.h"
+		$File	"$SRCDIR\public\datacache\iresourceaccesscontrol.h"
+		$File	"$SRCDIR\public\datacache\iprecachesystem.h"
+		$File	"$SRCDIR\public\vcollide.h"
+	}
+	
+	$folder	"Link Libraries"
+	{
+		$lib	tier2
+		$lib	tier3
+		$Lib	mathlib
+	}
+}

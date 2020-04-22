@@ -1,0 +1,43 @@
+//-----------------------------------------------------------------------------
+//	FOW.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Macro OUTLIBDIR	"$SRCDIR\lib\public"
+
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$AdditionalIncludeDirectories		"$BASE,$SRCDIR\utils\common,$SRCDIR\public\fow"
+	}
+}
+
+$Project "FoWLib"
+{
+	$Folder	"Source Files"
+	{
+		$File	"fow.cpp"
+		$File	"fow_2dplane.cpp"
+		$File	"fow_horizontalslice.cpp"
+		$File	"fow_lineoccluder.cpp"
+		$File	"fow_radiusoccluder.cpp"
+		$File	"fow_trisoup.cpp"
+		$File	"fow_viewer.cpp"
+	}
+
+	$Folder	"Header Files"
+	{
+		$File	"..\public\fow\fow.h"
+		$File	"fow_2dplane.h"
+		$File	"fow_horizontalslice.h"
+		$File	"fow_lineoccluder.h"
+		$File	"fow_radiusoccluder.h"
+		$File	"fow_trisoup.h"
+		$File	"fow_viewer.h"
+	}
+}

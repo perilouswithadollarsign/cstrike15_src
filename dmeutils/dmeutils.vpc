@@ -1,0 +1,33 @@
+//-----------------------------------------------------------------------------
+//	DMEUTILS.VPC
+//
+//	Project Script
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		".."
+$Include "$SRCDIR\vpc_scripts\source_lib_base.vpc"
+
+$Configuration
+{
+	$Compiler
+	{
+		$PreprocessorDefinitions			"$BASE;DMEUTILS_LIB"
+	}
+}
+
+$Project "dmeutils"
+{
+	$Folder	"Header Files"
+	{
+		$File	"$SRCDIR\public\dmeutils\dmmeshutils.h"
+		$File	"$SRCDIR\public\dmeutils\dmanimutils.h"
+	}
+
+	$Folder	"Source Files"
+	{
+		$File	"dmmeshutils.cpp"
+		$File	"dmanimutils.cpp"
+		$File	"loadfromdmx.cpp"
+		$File	"savetodmx.cpp"
+	}
+}
