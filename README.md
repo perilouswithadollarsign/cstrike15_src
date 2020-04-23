@@ -6,7 +6,7 @@
 
 ~~sorry, i had to restart the import because a bunch of the shit got all messed up, it will be back up in a few minutes~~
 
-back up, but i cant push some commits because of github bandwith limits :/
+back up, but i cant push some commits because of github lfs bandwith limits :/
 
 use the magnet link to download it instead if u want, it includes hl2 and fan made fstop, as well as some information about the leak
 
