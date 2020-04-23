@@ -1,5 +1,7 @@
 # cstrike15_src
 
+**VALVE HAS REMOVED ECONOMY SOURCE, YOU CANT ECONFUCK WITH THIS**
+
 ~~sorry, i had to restart the import because a bunch of the shit got all messed up, it will be back up in a few minutes~~
 
 back up, but some of the large files are missing in the "lib" folder becuse of github bandwith limits :/
