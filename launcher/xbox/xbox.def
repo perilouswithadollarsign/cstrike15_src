@@ -1,3 +1,0 @@
-LIBRARY	launcher_360.dll
-EXPORTS
-	LauncherMain	@1
