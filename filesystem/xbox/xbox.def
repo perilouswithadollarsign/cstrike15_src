@@ -1,3 +1,0 @@
-LIBRARY	filesystem_stdio_360.dll
-EXPORTS
-	CreateInterface		@1
