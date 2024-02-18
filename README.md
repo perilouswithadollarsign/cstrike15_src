@@ -1,13 +1,6 @@
-# cstrike15_src
+# CS:GO Source Code
 
-**VALVE HAD ALREADY REMOVED ECONOMY SOURCE WHEN THIS WAS LEAKED, YOU CANT ECONFUCK WITH THIS, STOP MESSAGING ME ABOUT IT**
+**THIS IS POSTED FOR EDUCATIONAL PURPOSES. I am not responsible for the actions of people using this.**
 
-**DO NOT EXPECT TO PASTE AND SUDDENLY HAVE WORKING CS:GO. THIS IS POSTED FOR EDUCATIONAL PURPOSES. I AM NOT RESPONSIBLE FOR THE ACTIONS OF PEOPLE USING THIS**
-
-~~sorry, i had to restart the import because a bunch of the shit got all messed up, it will be back up in a few minutes~~
-
-back up, but i cant push some commits because of github lfs bandwith limits :/
-
-use the magnet link to download it instead if u want, it includes hl2 and fan made fstop, as well as some information about the leak
-
-magnet:?xt=urn:btih:21DDA6847DDE983F2F8063739249D2D1D09A5DDA&dn=April%2022nd%202020%2c%20random%20leaked%20shit.rar&tr=udp%3a%2f%2ftracker.openbittorrent.com%3a1337%2fannounce&tr=udp%3a%2f%2ftracker.opentrackr.org%3a1337%2fannounce
+Magnet link for everything:
+magnet:?xt=urn:btih:C90AE5816CC3237151B13BF0BF7AFF8824DD6B1C&dn=2022%20April%2022%20Leak.7z&tr=udp%3a%2f%2ftracker.openbittorrent.com%3a80%2fannounce&tr=udp%3a%2f%2ftracker.opentrackr.org%3a1337%2fannounce&tr=wss%3a%2f%2fwstracker.online
